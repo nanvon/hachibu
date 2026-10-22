@@ -1,0 +1,904 @@
+{
+  "appleSmartBattery" : {
+    "AdapterDetails" : {
+      "AdapterID" : 28697,
+      "AdapterPowerTier" : 2,
+      "AdapterVoltage" : 28000,
+      "Current" : 4990,
+      "Description" : "pd charger",
+      "FamilyCode" : -536854518,
+      "FwVersion" : "01040090",
+      "HwVersion" : "1.0",
+      "IsWireless" : false,
+      "Manufacturer" : "Apple Inc.",
+      "Model" : "0x7019",
+      "Name" : "140W USB-C Power Adapter",
+      "PMUConfiguration" : 4990,
+      "UsbHvcHvcIndex" : 7,
+      "UsbHvcMenu" : [
+        {
+          "Index" : 0,
+          "MaxCurrent" : 2960,
+          "MaxVoltage" : 5000
+        },
+        {
+          "Index" : 1,
+          "MaxCurrent" : 2970,
+          "MaxVoltage" : 9000
+        },
+        {
+          "Index" : 2,
+          "MaxCurrent" : 2980,
+          "MaxVoltage" : 15000
+        },
+        {
+          "Index" : 3,
+          "MaxCurrent" : 4990,
+          "MaxVoltage" : 20000
+        }
+      ],
+      "Watts" : 140
+    },
+    "AdapterInfo" : 0,
+    "Amperage" : 0,
+    "AppleRawAdapterDetails" : [
+      {
+        "AdapterID" : 28697,
+        "AdapterPowerTier" : 2,
+        "AdapterVoltage" : 28000,
+        "Current" : 4990,
+        "Description" : "pd charger",
+        "FamilyCode" : -536854518,
+        "FwVersion" : "01040090",
+        "HwVersion" : "1.0",
+        "IsWireless" : false,
+        "Manufacturer" : "Apple Inc.",
+        "Model" : "0x7019",
+        "Name" : "140W USB-C Power Adapter",
+        "PMUConfiguration" : 4990,
+        "UsbHvcHvcIndex" : 7,
+        "UsbHvcMenu" : [
+          {
+            "Index" : 0,
+            "MaxCurrent" : 2960,
+            "MaxVoltage" : 5000
+          },
+          {
+            "Index" : 1,
+            "MaxCurrent" : 2970,
+            "MaxVoltage" : 9000
+          },
+          {
+            "Index" : 2,
+            "MaxCurrent" : 2980,
+            "MaxVoltage" : 15000
+          },
+          {
+            "Index" : 3,
+            "MaxCurrent" : 4990,
+            "MaxVoltage" : 20000
+          }
+        ],
+        "Watts" : 140
+      }
+    ],
+    "AppleRawBatteryVoltage" : 12241,
+    "AppleRawExternalConnected" : true,
+    "AtCriticalLevel" : false,
+    "AvgTimeToEmpty" : 65535,
+    "AvgTimeToFull" : 65535,
+    "BatteryData" : {
+      "AbsoluteCapacity" : 0,
+      "AvgTimeToEmpty" : 65535,
+      "BatteryPower" : 0,
+      "CurrentCapacity" : 80,
+      "DesignCapacity" : 8694,
+      "FullChargeCapacity" : 7942,
+      "FullyCharged" : 0,
+      "MaxCapacity" : 100,
+      "NominalChargeCapacity" : 8186,
+      "RemainingCapacity" : 6276,
+      "TrueRemainingCapacity" : 0
+    },
+    "BatteryInstalled" : true,
+    "BatteryInvalidWakeSeconds" : 30,
+    "BatteryPackCount" : 1,
+    "BatteryShutdownReason" : {
+      "ShutDownTimestamp" : 0,
+      "ShutDownUpoReboot" : 0
+    },
+    "BestAdapterIndex" : 0,
+    "BootPathUpdated" : 1792629230,
+    "BootVoltage" : 0,
+    "ChargerConfiguration" : 4984,
+    "ChargerCount" : 1,
+    "ChargerData" : {
+      "IsCharging" : 0,
+      "NotChargingReason" : 16777216,
+      "PMUConfiguration" : 4990,
+      "PMUConfigured" : 4984,
+      "SlowChargingReason" : 0,
+      "TimeChargingThermallyLimited" : 0
+    },
+    "CurrentCapacity" : 80,
+    "CycleCount" : 68,
+    "DeadBatteryBootData" : {
+      "ActivePayloads" : 0
+    },
+    "DesignCycleCount9C" : 1000,
+    "DeviceName" : "bq40z651",
+    "ExternalChargeCapable" : true,
+    "ExternalConnected" : true,
+    "FedDetails" : [
+      {
+        "FedDesignCapacity" : 0,
+        "FedDualRolePower" : 0,
+        "FedExternalConnected" : 0,
+        "FedPdSpecRevision" : 0,
+        "FedPortPowerRole" : 0,
+        "FedProductID" : 0,
+        "FedPwrPolicySt" : 0,
+        "FedRemainingCapacity" : 0,
+        "FedSnkConfReason" : 0,
+        "FedSrcConfReason" : 0,
+        "FedStateOfCharge" : 0,
+        "FedVendorID" : 0
+      },
+      {
+        "FedDesignCapacity" : 0,
+        "FedDualRolePower" : 0,
+        "FedExternalConnected" : 0,
+        "FedPdSpecRevision" : 0,
+        "FedPortPowerRole" : 0,
+        "FedProductID" : 0,
+        "FedPwrPolicySt" : 0,
+        "FedRemainingCapacity" : 0,
+        "FedSnkConfReason" : 0,
+        "FedSrcConfReason" : 0,
+        "FedStateOfCharge" : 0,
+        "FedVendorID" : 0
+      },
+      {
+        "FedDesignCapacity" : 0,
+        "FedDualRolePower" : 0,
+        "FedExternalConnected" : 0,
+        "FedPdSpecRevision" : 0,
+        "FedPortPowerRole" : 1,
+        "FedProductID" : 0,
+        "FedPwrPolicySt" : 0,
+        "FedRemainingCapacity" : 0,
+        "FedSnkConfReason" : 0,
+        "FedSrcConfReason" : 0,
+        "FedStateOfCharge" : 0,
+        "FedVendorID" : 0
+      },
+      {
+        "FedDesignCapacity" : 0,
+        "FedDualRolePower" : 0,
+        "FedExternalConnected" : 1,
+        "FedPdSpecRevision" : 2,
+        "FedPortPowerRole" : 0,
+        "FedProductID" : 0,
+        "FedPwrPolicySt" : 0,
+        "FedRemainingCapacity" : 0,
+        "FedSnkConfReason" : 0,
+        "FedSrcConfReason" : 0,
+        "FedStateOfCharge" : 0,
+        "FedVendorID" : 0
+      }
+    ],
+    "FullPathUpdated" : 1792662522,
+    "FullyCharged" : false,
+    "IOGeneralInterest" : "IOCommand is not serializable",
+    "IOReportLegend" : [
+      {
+        "IOReportChannelInfo" : {
+          "IOReportChannelUnit" : 0
+        },
+        "IOReportChannels" : [
+          [
+            7167869599145487988,
+            6460407809,
+            "BatteryCycleCount"
+          ]
+        ],
+        "IOReportGroupName" : "Battery"
+      }
+    ],
+    "IOReportLegendPublic" : true,
+    "InstantAmperage" : 0,
+    "IsCharging" : false,
+    "Location" : 0,
+    "MaxCapacity" : 100,
+    "PortControllerInfo" : [
+      {
+        "PortControllerActiveContractRdo" : 0,
+        "PortControllerAttachCount" : 0,
+        "PortControllerBootFlags" : 0,
+        "PortControllerCapMismatch" : 0,
+        "PortControllerDataRoleSwapCount" : 0,
+        "PortControllerDataRoleSwapFailCount" : 0,
+        "PortControllerDetachCount" : 0,
+        "PortControllerDnSt" : 0,
+        "PortControllerElectionFailReason" : 0,
+        "PortControllerEvtBuffer" : {
+          "$data" : "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+        },
+        "PortControllerFetStatus" : 0,
+        "PortControllerFwVersion" : 2191360,
+        "PortControllerHardResetCount" : 0,
+        "PortControllerHvEnRecoveryCount" : 0,
+        "PortControllerI2cErrCount" : 0,
+        "PortControllerInpFetEnFailCount" : 0,
+        "PortControllerIrqCntAlert" : 0,
+        "PortControllerIrqCntAppLd" : 0,
+        "PortControllerIrqCntConSrc" : 0,
+        "PortControllerIrqCntHrdRst" : 0,
+        "PortControllerIrqCntPdStsUpd" : 0,
+        "PortControllerIrqCntPlg" : 0,
+        "PortControllerIrqCntPwrStsUpd" : 0,
+        "PortControllerIrqCntRxIdSop" : 0,
+        "PortControllerIrqCntRxRdo" : 0,
+        "PortControllerIrqCntRxSnkCap" : 0,
+        "PortControllerIrqCntRxSrcCap" : 0,
+        "PortControllerIrqCntStsUpd" : 0,
+        "PortControllerIrqCntUsb2Plg" : 0,
+        "PortControllerIrqCntUsb2Wak" : 0,
+        "PortControllerIrqCntUvdmEnum" : 0,
+        "PortControllerIrqCntUvdmStsUpd" : 0,
+        "PortControllerIrqCntldcm" : 0,
+        "PortControllerLoserReason" : 1,
+        "PortControllerMaxPower" : 0,
+        "PortControllerNEprPDOs" : 0,
+        "PortControllerNPDOs" : 0,
+        "PortControllerPDst" : 0,
+        "PortControllerPortMode" : 2,
+        "PortControllerPortPDO" : [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "PortControllerPowerState" : 255,
+        "PortControllerPwrRoleSwapCount" : 0,
+        "PortControllerPwrRoleSwapFailCount" : 0,
+        "PortControllerShortDetectCount" : 0,
+        "PortControllerSrcTypes" : 0,
+        "PortControllerSrdoCount" : 0,
+        "PortControllerSrdoRejectCount" : 0,
+        "PortControllerSrdoRetryCount" : 0,
+        "PortControllerSrdyCount" : 0,
+        "PortControllerSrdyRejectCount" : 0,
+        "PortControllerStuckCmdCount" : 0,
+        "PortControllerSurpriseAckCount" : 0,
+        "PortControllerSurpriseNackCount" : 0,
+        "PortControllerUvdmStatus" : 0,
+        "PortControllerVdoFailCount" : 0,
+        "PortControllerWakeFailCount" : 0
+      },
+      {
+        "PortControllerActiveContractRdo" : 0,
+        "PortControllerAttachCount" : 0,
+        "PortControllerBootFlags" : 0,
+        "PortControllerCapMismatch" : 0,
+        "PortControllerDataRoleSwapCount" : 0,
+        "PortControllerDataRoleSwapFailCount" : 0,
+        "PortControllerDetachCount" : 0,
+        "PortControllerDnSt" : 0,
+        "PortControllerElectionFailReason" : 0,
+        "PortControllerEvtBuffer" : {
+          "$data" : "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+        },
+        "PortControllerFetStatus" : 0,
+        "PortControllerFwVersion" : 2191360,
+        "PortControllerHardResetCount" : 0,
+        "PortControllerHvEnRecoveryCount" : 0,
+        "PortControllerI2cErrCount" : 0,
+        "PortControllerInpFetEnFailCount" : 0,
+        "PortControllerIrqCntAlert" : 0,
+        "PortControllerIrqCntAppLd" : 0,
+        "PortControllerIrqCntConSrc" : 0,
+        "PortControllerIrqCntHrdRst" : 0,
+        "PortControllerIrqCntPdStsUpd" : 0,
+        "PortControllerIrqCntPlg" : 0,
+        "PortControllerIrqCntPwrStsUpd" : 0,
+        "PortControllerIrqCntRxIdSop" : 0,
+        "PortControllerIrqCntRxRdo" : 0,
+        "PortControllerIrqCntRxSnkCap" : 0,
+        "PortControllerIrqCntRxSrcCap" : 0,
+        "PortControllerIrqCntStsUpd" : 0,
+        "PortControllerIrqCntUsb2Plg" : 0,
+        "PortControllerIrqCntUsb2Wak" : 0,
+        "PortControllerIrqCntUvdmEnum" : 0,
+        "PortControllerIrqCntUvdmStsUpd" : 0,
+        "PortControllerIrqCntldcm" : 0,
+        "PortControllerLoserReason" : 1,
+        "PortControllerMaxPower" : 0,
+        "PortControllerNEprPDOs" : 0,
+        "PortControllerNPDOs" : 0,
+        "PortControllerPDst" : 0,
+        "PortControllerPortMode" : 2,
+        "PortControllerPortPDO" : [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "PortControllerPowerState" : 255,
+        "PortControllerPwrRoleSwapCount" : 0,
+        "PortControllerPwrRoleSwapFailCount" : 0,
+        "PortControllerShortDetectCount" : 0,
+        "PortControllerSrcTypes" : 0,
+        "PortControllerSrdoCount" : 0,
+        "PortControllerSrdoRejectCount" : 0,
+        "PortControllerSrdoRetryCount" : 0,
+        "PortControllerSrdyCount" : 0,
+        "PortControllerSrdyRejectCount" : 0,
+        "PortControllerStuckCmdCount" : 0,
+        "PortControllerSurpriseAckCount" : 0,
+        "PortControllerSurpriseNackCount" : 0,
+        "PortControllerUvdmStatus" : 0,
+        "PortControllerVdoFailCount" : 0,
+        "PortControllerWakeFailCount" : 0
+      },
+      {
+        "PortControllerActiveContractRdo" : 0,
+        "PortControllerAttachCount" : 2,
+        "PortControllerBootFlags" : 0,
+        "PortControllerCapMismatch" : 0,
+        "PortControllerDataRoleSwapCount" : 0,
+        "PortControllerDataRoleSwapFailCount" : 0,
+        "PortControllerDetachCount" : 1,
+        "PortControllerDnSt" : 115,
+        "PortControllerElectionFailReason" : 0,
+        "PortControllerEvtBuffer" : {
+          "$data" : "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMBGgNf+AADAhoDPwJf+AADARoDX/gA"
+        },
+        "PortControllerFetStatus" : 2,
+        "PortControllerFwVersion" : 2191360,
+        "PortControllerHardResetCount" : 0,
+        "PortControllerHvEnRecoveryCount" : 0,
+        "PortControllerI2cErrCount" : 0,
+        "PortControllerInpFetEnFailCount" : 0,
+        "PortControllerIrqCntAlert" : 0,
+        "PortControllerIrqCntAppLd" : 0,
+        "PortControllerIrqCntConSrc" : 0,
+        "PortControllerIrqCntHrdRst" : 0,
+        "PortControllerIrqCntPdStsUpd" : 0,
+        "PortControllerIrqCntPlg" : 3,
+        "PortControllerIrqCntPwrStsUpd" : 3,
+        "PortControllerIrqCntRxIdSop" : 0,
+        "PortControllerIrqCntRxRdo" : 0,
+        "PortControllerIrqCntRxSnkCap" : 0,
+        "PortControllerIrqCntRxSrcCap" : 0,
+        "PortControllerIrqCntStsUpd" : 7,
+        "PortControllerIrqCntUsb2Plg" : 0,
+        "PortControllerIrqCntUsb2Wak" : 0,
+        "PortControllerIrqCntUvdmEnum" : 0,
+        "PortControllerIrqCntUvdmStsUpd" : 3,
+        "PortControllerIrqCntldcm" : 0,
+        "PortControllerLoserReason" : 1,
+        "PortControllerMaxPower" : 0,
+        "PortControllerNEprPDOs" : 0,
+        "PortControllerNPDOs" : 0,
+        "PortControllerPDst" : 0,
+        "PortControllerPortMode" : 2,
+        "PortControllerPortPDO" : [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "PortControllerPowerState" : 255,
+        "PortControllerPwrRoleSwapCount" : 0,
+        "PortControllerPwrRoleSwapFailCount" : 0,
+        "PortControllerShortDetectCount" : 0,
+        "PortControllerSrcTypes" : 0,
+        "PortControllerSrdoCount" : 0,
+        "PortControllerSrdoRejectCount" : 0,
+        "PortControllerSrdoRetryCount" : 0,
+        "PortControllerSrdyCount" : 0,
+        "PortControllerSrdyRejectCount" : 0,
+        "PortControllerStuckCmdCount" : 0,
+        "PortControllerSurpriseAckCount" : 0,
+        "PortControllerSurpriseNackCount" : 0,
+        "PortControllerUvdmStatus" : 0,
+        "PortControllerVdoFailCount" : 0,
+        "PortControllerWakeFailCount" : 0
+      },
+      {
+        "PortControllerActiveContractRdo" : 1103582677,
+        "PortControllerAttachCount" : 1,
+        "PortControllerBootFlags" : 0,
+        "PortControllerCapMismatch" : 0,
+        "PortControllerDataRoleSwapCount" : 0,
+        "PortControllerDataRoleSwapFailCount" : 0,
+        "PortControllerDetachCount" : 1,
+        "PortControllerDnSt" : 81,
+        "PortControllerElectionFailReason" : 0,
+        "PortControllerEvtBuffer" : {
+          "$data" : "8BPwE/AT8BPwE/AT8BPwE/AT8BPwE/AT8BPwE/AT8BPwE/AT8BPwE/AT8BPwE/AT8BPwE/AT8BPwE/AT8BPwE/AT8BPwE/AT8BPwE/AT8BPwE/AT8BPwE/AT8BPwE/AT8BPwE/AT8BPwE/AT8BPwE/AT8BPwE/AT"
+        },
+        "PortControllerFetStatus" : 140,
+        "PortControllerFwVersion" : 2191360,
+        "PortControllerHardResetCount" : 1,
+        "PortControllerHvEnRecoveryCount" : 0,
+        "PortControllerI2cErrCount" : 0,
+        "PortControllerInpFetEnFailCount" : 0,
+        "PortControllerIrqCntAlert" : 0,
+        "PortControllerIrqCntAppLd" : 0,
+        "PortControllerIrqCntConSrc" : 0,
+        "PortControllerIrqCntHrdRst" : 1,
+        "PortControllerIrqCntPdStsUpd" : 5,
+        "PortControllerIrqCntPlg" : 2,
+        "PortControllerIrqCntPwrStsUpd" : 5,
+        "PortControllerIrqCntRxIdSop" : 4,
+        "PortControllerIrqCntRxRdo" : 0,
+        "PortControllerIrqCntRxSnkCap" : 0,
+        "PortControllerIrqCntRxSrcCap" : 4,
+        "PortControllerIrqCntStsUpd" : 14,
+        "PortControllerIrqCntUsb2Plg" : 0,
+        "PortControllerIrqCntUsb2Wak" : 0,
+        "PortControllerIrqCntUvdmEnum" : 2,
+        "PortControllerIrqCntUvdmStsUpd" : 11,
+        "PortControllerIrqCntldcm" : 0,
+        "PortControllerLoserReason" : 0,
+        "PortControllerMaxPower" : 139720,
+        "PortControllerNEprPDOs" : 1,
+        "PortControllerNPDOs" : 4,
+        "PortControllerPDst" : 5,
+        "PortControllerPortMode" : 2,
+        "PortControllerPortPDO" : [
+          142709032,
+          184617,
+          307498,
+          410099,
+          0,
+          0,
+          0,
+          573939,
+          -768567669,
+          0,
+          0,
+          0,
+          0
+        ],
+        "PortControllerPowerState" : 255,
+        "PortControllerPwrRoleSwapCount" : 0,
+        "PortControllerPwrRoleSwapFailCount" : 0,
+        "PortControllerShortDetectCount" : 0,
+        "PortControllerSrcTypes" : 3,
+        "PortControllerSrdoCount" : 5,
+        "PortControllerSrdoRejectCount" : 0,
+        "PortControllerSrdoRetryCount" : 0,
+        "PortControllerSrdyCount" : 7,
+        "PortControllerSrdyRejectCount" : 2,
+        "PortControllerStuckCmdCount" : 0,
+        "PortControllerSurpriseAckCount" : 0,
+        "PortControllerSurpriseNackCount" : 0,
+        "PortControllerUvdmStatus" : 3,
+        "PortControllerVdoFailCount" : 0,
+        "PortControllerWakeFailCount" : 0
+      }
+    ],
+    "PostChargeWaitSeconds" : 120,
+    "PostDischargeWaitSeconds" : 120,
+    "PowerDistribution" : {
+      "IPDChargingAllowed" : 0,
+      "IPDInputCurrent" : 4990,
+      "IPDInputPower" : 139720,
+      "IPDInputVoltage" : 28000,
+      "IPDRatio" : 100,
+      "IPDRatioOverride" : 255,
+      "IPDWattageOverride" : 30000
+    },
+    "PowerOutDetails" : [
+      {
+        "AccumulatedPower" : 4909240,
+        "AccumulatorCount" : 6214,
+        "AccumulatorErrorCount" : 0,
+        "AdapterVoltage" : 5237,
+        "ConfiguredCurrent" : 3000,
+        "ConfiguredVoltage" : 5000,
+        "Current" : 152,
+        "FilteredPower" : 790,
+        "NumLDCMCollisions" : 0,
+        "PDPowermW" : 0,
+        "PortIndex" : 3,
+        "PortType" : 0,
+        "PowerState" : 0,
+        "USBSleepPoolPowermW" : 0,
+        "USBWakePoolPowermW" : 0,
+        "VConnAccumulatedPower" : 0,
+        "VConnAccumulatorCount" : 6214,
+        "VConnAccumulatorErrorCount" : 0,
+        "VConnCurrent" : 0,
+        "VConnMaxCurrent" : 330,
+        "VConnPower" : 0,
+        "Watts" : 798
+      }
+    ],
+    "PowerTelemetryData" : {
+      "AccumSystemEffectiveTotalLoad" : 0,
+      "AccumSystemEffectiveTotalLoadCount" : 0,
+      "AccumulatedAdapterEfficiencyLoss" : 46896752111769,
+      "AccumulatedBatteryDischarge" : -84910015,
+      "AccumulatedBatteryPower" : 98218199,
+      "AccumulatedSystemEnergyConsumed" : 64554717651,
+      "AccumulatedSystemLoad" : 455472389,
+      "AccumulatedSystemPowerIn" : 232397014557,
+      "AccumulatedWallEnergyEstimate" : 134421100,
+      "AdapterEfficiencyLoss" : 127,
+      "AdapterEfficiencyLossAccumulatorCount" : 23848,
+      "BatteryDischargeAccumulatorCount" : 6881,
+      "BatteryPower" : 0,
+      "BatteryPowerAccumulatorCount" : 1408,
+      "PowerTelemetryErrorCount" : 0,
+      "SystemCurrentIn" : 646,
+      "SystemEffectiveTotalLoad" : 0,
+      "SystemEnergyConsumed" : 5027,
+      "SystemLoad" : 18099,
+      "SystemLoadAccumulatorCount" : 30891,
+      "SystemPowerIn" : 18099,
+      "SystemPowerInAccumulatorCount" : 23947,
+      "SystemVoltageIn" : 27985,
+      "WallEnergyEstimate" : 5154
+    },
+    "SkipperNEIgnoreAtCritical" : false,
+    "TimeRemaining" : 65535,
+    "UpdateTime" : 1792662522,
+    "UserVisiblePathUpdated" : 1792662462,
+    "Voltage" : 12241,
+    "built-in" : true
+  },
+  "appleSmartBatteryPack" : {
+    "BankCount" : 3,
+    "BatteryData" : {
+      "AbsoluteCapacity" : 0,
+      "Amperage" : 0,
+      "AppleRawBatteryVoltage" : 12241,
+      "AppleRawCurrentCapacity" : 6276,
+      "AppleRawMaxCapacity" : 7942,
+      "BatteryCellDisconnectCount" : 0,
+      "BatteryHealthMetric" : 0,
+      "BatteryPfCommsFailure" : 0,
+      "BatteryPower" : 0,
+      "BatteryState" : {
+        "$data" : "AAAAAAAAAAAAw+QAAo4BAQI="
+      },
+      "ChargeAccum" : 0,
+      "ChemID" : 20784,
+      "CurrentCapacity" : 80,
+      "CycleCount" : 68,
+      "DailyMaxSoc" : 79,
+      "DailyMinSoc" : 52,
+      "DataFlashWriteCount" : 9231,
+      "DateOfFirstUse" : 0,
+      "DesignCapacity" : 8694,
+      "Dod0AtQualifiedQmax" : 0,
+      "FaultType" : 1,
+      "FccComp1" : 7942,
+      "FccComp2" : 7942,
+      "FilteredCurrent" : 0,
+      "Flags" : 16777217,
+      "FullyCharged" : 0,
+      "GasGaugeFirmwareVersion" : 2,
+      "GaugeFlagRaw" : 192,
+      "IPDBatteryDemand" : 15802,
+      "ISS" : 0,
+      "ITMiscStatus" : 0,
+      "IdealCRate" : {
+        "$real" : 0.699999988079071
+      },
+      "InstantAmperage" : 0,
+      "LifetimeData" : {
+        "AverageTemperature" : 230,
+        "CycleCountLastQmax" : 57,
+        "MaximumChargeCurrent" : 9472,
+        "MaximumDischargeCurrent" : -8211,
+        "MaximumPackVoltage" : 13003,
+        "MaximumTemperature" : 41,
+        "MinimumPackVoltage" : 7150,
+        "MinimumTemperature" : 0,
+        "RDISCnt" : 0,
+        "Raw" : {
+          "$data" : "B016+QABZX4AAAAAAAAAAAdO4HeAAMfkQLIAAAAAAAAAKQAAEO8H/jLLG+4lAN/tLZDcJ9/t3CcA5gAIUKQABA=="
+        },
+        "TemperatureSamples" : 544932,
+        "TotalOperatingTime" : 34058,
+        "UpdateTime" : 1792662522
+      },
+      "ManufactureDate" : 62883441490226,
+      "MaxCapacity" : 100,
+      "MiscStatus" : 140,
+      "NominalChargeCapacity" : 8186,
+      "PackCurrentAccumulator" : 625932,
+      "PackCurrentAccumulatorCount" : 33297,
+      "PackReserve" : 244,
+      "PassedCharge" : -23,
+      "PermanentFailureStatus" : 0,
+      "QmaxDisqualificationReason" : 0,
+      "Qstart" : 0,
+      "RSS" : 0,
+      "ResScale" : 0,
+      "SimRate" : 0,
+      "Soc1Voltage" : 0,
+      "StateOfCharge" : 79,
+      "Temperature" : 2700,
+      "TrueRemainingCapacity" : 0,
+      "VacVoltageLimit" : 4335,
+      "VirtualTemperature" : 2700,
+      "VmaxNcc" : 4335,
+      "Voltage" : 12241,
+      "iMaxAndSocSmoothTable" : {
+        "$data" : "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+      }
+    },
+    "CarrierMode" : {
+      "CarrierModeHighVoltage" : 0,
+      "CarrierModeLowVoltage" : 0,
+      "CarrierModeStatus" : 0
+    },
+    "ID" : 0,
+    "KioskMode" : {
+
+    }
+  },
+  "chargeLimitArchive" : {
+    "$archiver" : "NSKeyedArchiver",
+    "$objects" : [
+      "$null",
+      {
+        "$class" : {
+          "$uid" : 7
+        },
+        "NS.objects" : [
+          {
+            "$uid" : 2
+          }
+        ]
+      },
+      {
+        "$class" : {
+          "$uid" : 6
+        },
+        "drain" : true,
+        "isEndOfCharge" : true,
+        "noChargeToFull" : false,
+        "owner" : 455,
+        "reason" : {
+          "$uid" : 3
+        },
+        "soclimit" : 80,
+        "terminated" : false
+      },
+      "manualChargeLimit",
+      {
+        "$class" : {
+          "$uid" : 5
+        }
+      },
+      {
+        "$classes" : [
+          "NSUUID",
+          "NSObject"
+        ],
+        "$classname" : "NSUUID"
+      },
+      {
+        "$classes" : [
+          "ChargeCtrlPolicy",
+          "NSObject"
+        ],
+        "$classname" : "ChargeCtrlPolicy"
+      },
+      {
+        "$classes" : [
+          "NSMutableArray",
+          "NSArray",
+          "NSObject"
+        ],
+        "$classname" : "NSMutableArray"
+      }
+    ],
+    "$top" : {
+      "root" : {
+        "$uid" : 1
+      }
+    },
+    "$version" : 100000
+  },
+  "exportedAt" : "2026-10-22T09:49:25Z",
+  "externalPowerAdapterDetails" : {
+    "AdapterID" : 28697,
+    "AdapterPowerTier" : 2,
+    "AdapterVoltage" : 28000,
+    "Current" : 4990,
+    "Description" : "pd charger",
+    "FamilyCode" : -536854518,
+    "FwVersion" : "01040090",
+    "HwVersion" : "1.0",
+    "IsWireless" : false,
+    "Manufacturer" : "Apple Inc.",
+    "Model" : "0x7019",
+    "Name" : "140W USB-C Power Adapter",
+    "PMUConfiguration" : 4990,
+    "UsbHvcHvcIndex" : 7,
+    "UsbHvcMenu" : [
+      {
+        "Index" : 0,
+        "MaxCurrent" : 2960,
+        "MaxVoltage" : 5000
+      },
+      {
+        "Index" : 1,
+        "MaxCurrent" : 2970,
+        "MaxVoltage" : 9000
+      },
+      {
+        "Index" : 2,
+        "MaxCurrent" : 2980,
+        "MaxVoltage" : 15000
+      },
+      {
+        "Index" : 3,
+        "MaxCurrent" : 4990,
+        "MaxVoltage" : 20000
+      }
+    ],
+    "Watts" : 140
+  },
+  "formatVersion" : 1,
+  "lowPowerModeEnabled" : false,
+  "powerSources" : [
+    {
+      "Battery Provides Time Remaining" : true,
+      "Current" : 0,
+      "Current Capacity" : 80,
+      "DesignCycleCount" : 300,
+      "Is Charged" : false,
+      "Is Charging" : false,
+      "Is Present" : true,
+      "LPM Active" : false,
+      "Max Capacity" : 100,
+      "Name" : "InternalBattery-0",
+      "Power Source ID" : 23724131,
+      "Power Source State" : "AC Power",
+      "Time to Empty" : 0,
+      "Time to Full Charge" : 0,
+      "Transport Type" : "Internal",
+      "Type" : "InternalBattery"
+    }
+  ],
+  "system" : {
+    "model" : "MacBookPro18,1",
+    "osBuild" : "26A434",
+    "osVersion" : "27.0.1"
+  },
+  "systemProfilerPower" : {
+    "SPPowerDataType" : [
+      {
+        "_name" : "spbattery_information",
+        "sppower_battery_charge_info" : {
+          "sppower_battery_at_warn_level" : "FALSE",
+          "sppower_battery_fully_charged" : "FALSE",
+          "sppower_battery_is_charging" : "FALSE",
+          "sppower_battery_state_of_charge" : 80
+        },
+        "sppower_battery_health_info" : {
+          "sppower_battery_cycle_count" : 68,
+          "sppower_battery_health" : "Good",
+          "sppower_battery_health_maximum_capacity" : "95%"
+        },
+        "sppower_battery_model_info" : {
+          "sppower_battery_cell_revision" : "0a14",
+          "sppower_battery_device_name" : "bq40z651",
+          "sppower_battery_firmware_version" : "0b00",
+          "sppower_battery_hardware_revision" : "0100",
+          "sppower_battery_pack_lot_code" : "0000",
+          "sppower_battery_pcb_lot_code" : "0000"
+        }
+      },
+      {
+        "AC Power" : {
+          "Current Power Source" : "TRUE",
+          "Disk Sleep Timer" : 10,
+          "Display Sleep Timer" : 5,
+          "Hibernate Mode" : 3,
+          "LowPowerMode" : "No",
+          "PrioritizeNetworkReachabilityOverSleep" : "No",
+          "Sleep On Power Button" : "Yes",
+          "System Sleep Timer" : 0,
+          "Wake On LAN" : "No"
+        },
+        "Battery Power" : {
+          "Disk Sleep Timer" : 10,
+          "Display Sleep Timer" : 5,
+          "Hibernate Mode" : 3,
+          "LowPowerMode" : "No",
+          "PrioritizeNetworkReachabilityOverSleep" : "No",
+          "ReduceBrightness" : "Yes",
+          "Sleep On Power Button" : "Yes",
+          "SleepServices" : 0,
+          "System Sleep Timer" : 1,
+          "Wake On LAN" : "No"
+        },
+        "_name" : "sppower_information"
+      },
+      {
+        "_name" : "sppower_hwconfig_information",
+        "sppower_ups_installed" : "FALSE"
+      },
+      {
+        "_name" : "sppower_ac_charger_information",
+        "sppower_ac_charger_ID" : "0x7019",
+        "sppower_ac_charger_family" : "0xe000400a",
+        "sppower_ac_charger_firmware_version" : "01040090",
+        "sppower_ac_charger_hardware_version" : "1.0",
+        "sppower_ac_charger_manufacturer" : "Apple Inc.",
+        "sppower_ac_charger_name" : "140W USB-C Power Adapter",
+        "sppower_ac_charger_watts" : "140",
+        "sppower_battery_charger_connected" : "TRUE",
+        "sppower_battery_is_charging" : "FALSE"
+      },
+      {
+        "_items" : [
+          {
+            "_items" : [
+              {
+                "UserVisible" : false,
+                "appPID" : 349,
+                "eventtype" : "wake",
+                "scheduledby" : "com.apple.alarm.user-invisible-com.apple.acmd.alarm",
+                "time" : "2026-10-22T08:13:35Z"
+              },
+              {
+                "UserVisible" : false,
+                "appPID" : 627,
+                "eventtype" : "wake",
+                "scheduledby" : "com.apple.alarm.user-invisible-com.apple.calaccessd.travelEngine.periodicRefreshTimer",
+                "time" : "2026-10-22T08:47:30Z"
+              },
+              {
+                "UserVisible" : false,
+                "appPID" : 363,
+                "eventtype" : "wake",
+                "scheduledby" : "com.apple.alarm.user-invisible-com.apple.acmd.alarm",
+                "time" : "2026-10-22T10:02:44Z"
+              }
+            ],
+            "_name" : "sppower_scheduled_events_info"
+          }
+        ],
+        "_name" : "sppower_events_info"
+      }
+    ]
+  }
+}

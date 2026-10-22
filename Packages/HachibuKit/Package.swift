@@ -27,5 +27,14 @@ let package = Package(
             dependencies: ["BatteryCore", "HistoryStore"],
             resources: [.process("Resources")]
         ),
+        // 输出本机诊断数据，用于录制 Tests/Fixtures。不进入 App。
+        .executableTarget(
+            name: "hachibu-diagnostics",
+            dependencies: ["BatteryCore"]
+        ),
+        .testTarget(
+            name: "BatteryCoreTests",
+            dependencies: ["BatteryCore"]
+        ),
     ]
 )
