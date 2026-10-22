@@ -117,6 +117,23 @@ public final class HistoryStore: Sendable {
         }
     }
 
+    /// 最早一条记录的时间：`minute_samples` 的最早采样时间和 `hourly_samples` 的最早小时起点中较早的一个。
+    /// 用于近期曲线标“未记录”。没有数据时为 nil。
+    public func firstSampleTime() async throws -> Date? {
+        try await dbQueue.read { db in
+            try Int64.fetchOne(
+                db,
+                sql: """
+                    SELECT MIN(t) FROM (
+                        SELECT MIN(ts) AS t FROM minute_samples
+                        UNION ALL
+                        SELECT MIN(hour_ts) AS t FROM hourly_samples
+                    )
+                    """
+            ).map(UnixTime.date)
+        }
+    }
+
     /// 侧栏底部的记录概况：`daily_samples` 最早的一天和行数。没有数据时为 nil。
     public func recordingSummary() async throws -> RecordingSummary? {
         try await dbQueue.read { db in

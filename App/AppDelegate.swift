@@ -7,9 +7,16 @@ private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Hachibu"
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    private let batteryMonitor = BatteryMonitor(sampler: BatterySampler(store: AppDelegate.openHistoryStore()))
+    private let historyStore: HistoryStore?
+    private let batteryMonitor: BatteryMonitor
     private var statusItemController: StatusItemController?
-    private lazy var mainWindowController = MainWindowController()
+    private lazy var mainWindowController = MainWindowController(history: HistoryModel(store: historyStore))
+
+    override init() {
+        historyStore = Self.openHistoryStore()
+        batteryMonitor = BatteryMonitor(sampler: BatterySampler(store: historyStore))
+        super.init()
+    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.mainMenu = MainMenu.make()

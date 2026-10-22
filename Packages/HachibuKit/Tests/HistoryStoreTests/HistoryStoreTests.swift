@@ -60,6 +60,7 @@ private func minute(_ offset: Int) -> Date {
         let samples = try await store.minuteSamples(from: minute(1), to: minute(3))
         #expect(samples.map(\.percent) == [1, 2])
         #expect(try await store.latestMinuteSampleTime() == minute(3))
+        #expect(try await store.firstSampleTime() == minute(0))
     }
 
     @Test func fromSnapshot() {
@@ -92,6 +93,7 @@ private func minute(_ offset: Int) -> Date {
     @Test func emptyStore() async throws {
         let store = try HistoryStore.inMemory()
         #expect(try await store.latestMinuteSampleTime() == nil)
+        #expect(try await store.firstSampleTime() == nil)
         #expect(try await store.recordingSummary() == nil)
     }
 }
@@ -138,6 +140,8 @@ private func minute(_ offset: Int) -> Date {
         #expect(try store.hourlySamples() == [firstHour])
         let remaining = try await store.minuteSamples(from: base, to: minute(120))
         #expect(remaining.map(\.timestamp) == [minute(60)])
+        // 最早的分钟数据已聚合删除，取小时数据的起点。
+        #expect(try await store.firstSampleTime() == base)
     }
 
     @Test func aggregationIsIdempotent() async throws {

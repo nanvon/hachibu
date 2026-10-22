@@ -40,5 +40,9 @@ let package = Package(
             name: "HistoryStoreTests",
             dependencies: ["HistoryStore", "BatteryCore"]
         ),
+        .testTarget(
+            name: "FeatureUITests",
+            dependencies: ["FeatureUI", "HistoryStore"]
+        ),
     ]
 )
