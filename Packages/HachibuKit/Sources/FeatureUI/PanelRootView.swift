@@ -5,15 +5,18 @@ import SwiftUI
 /// 显示规则见 docs/v1技术设计.md 第 7、8 节。
 public struct PanelRootView: View {
     private let monitor: BatteryMonitor
+    private let settings: AppSettings
     private let onOpenMainWindow: @MainActor () -> Void
     private let onQuit: @MainActor () -> Void
 
     public init(
         monitor: BatteryMonitor,
+        settings: AppSettings,
         onOpenMainWindow: @escaping @MainActor () -> Void,
         onQuit: @escaping @MainActor () -> Void
     ) {
         self.monitor = monitor
+        self.settings = settings
         self.onOpenMainWindow = onOpenMainWindow
         self.onQuit = onQuit
     }
@@ -29,7 +32,11 @@ public struct PanelRootView: View {
                 Text("No Battery Detected", bundle: .module)
                     .font(.headline)
             case .battery(let snapshot):
-                BatteryPanelContent(snapshot: snapshot, health: monitor.health)
+                BatteryPanelContent(
+                    snapshot: snapshot,
+                    health: monitor.health,
+                    highTemperatureCelsius: settings.temperatureAlertThreshold
+                )
             }
 
             Divider()
@@ -56,6 +63,7 @@ public struct PanelRootView: View {
 private struct BatteryPanelContent: View {
     let snapshot: BatterySnapshot
     let health: BatteryHealthInfo?
+    let highTemperatureCelsius: Int
 
     var body: some View {
         StatusHeader(snapshot: snapshot)
@@ -63,7 +71,7 @@ private struct BatteryPanelContent: View {
             PowerCard(flow: flow, isExternalPower: snapshot.isExternalPower == true, updatedAt: snapshot.telemetryUpdatedAt)
         }
         HealthCard(snapshot: snapshot, health: health)
-        LiveCard(snapshot: snapshot)
+        LiveCard(snapshot: snapshot, highTemperatureCelsius: highTemperatureCelsius)
         if snapshot.isExternalPower == true {
             ChargerCard(snapshot: snapshot)
         }
@@ -224,10 +232,9 @@ private struct HealthCard: View {
 // MARK: - 实时
 
 private struct LiveCard: View {
-    /// 温度达到该值时显示“偏高”。取 docs/v1技术设计.md 第 12 节的默认提醒阈值；设置页完成后改为读取用户设置。
-    static let highTemperatureCelsius = 40.0
-
     let snapshot: BatterySnapshot
+    /// 温度达到该值时显示“偏高”，即设置里的温度提醒阈值。
+    let highTemperatureCelsius: Int
 
     var body: some View {
         PanelCard(Text("Live", bundle: .module)) {
@@ -251,7 +258,7 @@ private struct LiveCard: View {
 
     private var isTemperatureHigh: Bool {
         guard let temperature = snapshot.temperatureCelsius else { return false }
-        return temperature >= Self.highTemperatureCelsius
+        return temperature >= Double(highTemperatureCelsius)
     }
 }
 

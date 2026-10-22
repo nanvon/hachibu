@@ -4,10 +4,19 @@ import SwiftUI
 /// 主窗口的内容：侧栏切换历史曲线、通知、设置三页。窗口行为由 App 层的 MainWindowController 负责。
 public struct MainWindowRootView: View {
     private let history: HistoryModel
+    private let settings: AppSettings
+    private let onExportDiagnostics: @MainActor () async -> Void
     @State private var selection: MainWindowPage? = .history
 
-    public init(history: HistoryModel) {
+    /// `onExportDiagnostics` 由 App 层选择保存位置并写文件，完成后返回。
+    public init(
+        history: HistoryModel,
+        settings: AppSettings,
+        onExportDiagnostics: @escaping @MainActor () async -> Void
+    ) {
         self.history = history
+        self.settings = settings
+        self.onExportDiagnostics = onExportDiagnostics
     }
 
     public var body: some View {
@@ -31,8 +40,10 @@ public struct MainWindowRootView: View {
             switch page {
             case .history:
                 HistoryPage(model: history)
-            case .notifications, .settings:
+            case .notifications:
                 PlaceholderPage(page: page)
+            case .settings:
+                SettingsPage(settings: settings, onExportDiagnostics: onExportDiagnostics)
             }
         }
         .frame(minWidth: 760, minHeight: 520)
@@ -80,7 +91,7 @@ private struct RecordingSummaryView: View {
     }
 }
 
-/// 通知、设置页尚未实现。
+/// 通知页尚未实现。
 private struct PlaceholderPage: View {
     let page: MainWindowPage
 

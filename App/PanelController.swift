@@ -19,6 +19,7 @@ final class PanelController: NSObject, NSWindowDelegate {
     /// `onVisibilityChange` 在面板显示、关闭时调用，用于切换采样频率。
     init(
         monitor: BatteryMonitor,
+        settings: AppSettings,
         onOpenMainWindow: @escaping @MainActor () -> Void,
         onVisibilityChange: @escaping @MainActor (Bool) -> Void
     ) {
@@ -33,6 +34,7 @@ final class PanelController: NSObject, NSWindowDelegate {
 
         let content = PanelHostingView(rootView: PanelRootView(
             monitor: monitor,
+            settings: settings,
             onOpenMainWindow: { [weak self] in
                 self?.close()
                 onOpenMainWindow()

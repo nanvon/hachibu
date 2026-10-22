@@ -9,8 +9,12 @@ private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Hachibu"
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private let historyStore: HistoryStore?
     private let batteryMonitor: BatteryMonitor
+    private let settings = AppSettings()
     private var statusItemController: StatusItemController?
-    private lazy var mainWindowController = MainWindowController(history: HistoryModel(store: historyStore))
+    private lazy var mainWindowController = MainWindowController(
+        history: HistoryModel(store: historyStore),
+        settings: settings
+    )
 
     override init() {
         historyStore = Self.openHistoryStore()
@@ -24,6 +28,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let panelController = PanelController(
             monitor: batteryMonitor,
+            settings: settings,
             onOpenMainWindow: { [weak self] in
                 self?.mainWindowController.showAndActivate()
             },
@@ -31,7 +36,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 batteryMonitor.setPanelVisible(visible)
             }
         )
-        statusItemController = StatusItemController(panelController: panelController)
+        statusItemController = StatusItemController(
+            panelController: panelController,
+            monitor: batteryMonitor,
+            settings: settings
+        )
     }
 
     /// 打开历史数据库。失败时只记录日志：照常显示实时读数，不写库。

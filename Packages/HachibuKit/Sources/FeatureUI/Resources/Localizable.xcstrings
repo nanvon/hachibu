@@ -249,12 +249,32 @@
         }
       }
     },
+    "Diagnostics" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "诊断"
+          }
+        }
+      }
+    },
     "End" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "结束"
+          }
+        }
+      }
+    },
+    "Export Diagnostic Data…" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "导出诊断数据…"
           }
         }
       }
@@ -289,6 +309,16 @@
         }
       }
     },
+    "General" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通用"
+          }
+        }
+      }
+    },
     "Good" : {
       "localizations" : {
         "zh-Hans" : {
@@ -305,6 +335,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "偏高"
+          }
+        }
+      }
+    },
+    "High Battery Temperature" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "电池温度过高"
           }
         }
       }
@@ -349,6 +389,16 @@
         }
       }
     },
+    "Launch at Login" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "登录时启动"
+          }
+        }
+      }
+    },
     "Live" : {
       "localizations" : {
         "zh-Hans" : {
@@ -369,6 +419,16 @@
         }
       }
     },
+    "Low Battery Health" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "健康度低"
+          }
+        }
+      }
+    },
     "Low Power Mode" : {
       "localizations" : {
         "zh-Hans" : {
@@ -385,6 +445,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "最大容量"
+          }
+        }
+      }
+    },
+    "Maximum capacity below %lld%%" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最大容量低于 %lld%%"
+          }
+        }
+      }
+    },
+    "Menu Bar" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "菜单栏"
           }
         }
       }
@@ -465,6 +545,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "使用电池"
+          }
+        }
+      }
+    },
+    "Open Login Items Settings…" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开登录项设置…"
           }
         }
       }
@@ -559,6 +649,26 @@
         }
       }
     },
+    "Requires approval in System Settings." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "需要在系统设置中批准。"
+          }
+        }
+      }
+    },
+    "Saves the current battery readings as a JSON file you can attach to an issue. Serial numbers and UUIDs are removed." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "将当前电池读数保存为 JSON 文件，可在提交 issue 时附上。序列号和 UUID 已删除。"
+          }
+        }
+      }
+    },
     "Segment" : {
       "localizations" : {
         "zh-Hans" : {
@@ -575,6 +685,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "设置"
+          }
+        }
+      }
+    },
+    "Show in Menu Bar" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "菜单栏显示"
           }
         }
       }
@@ -609,12 +729,42 @@
         }
       }
     },
+    "Temperature above %lld °C" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "温度高于 %lld °C"
+          }
+        }
+      }
+    },
     "The history database could not be opened." : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "无法打开历史数据库。"
+          }
+        }
+      }
+    },
+    "The panel marks the temperature as High at or above the temperature threshold." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "温度达到温度提醒阈值时，面板会标记为“偏高”。"
+          }
+        }
+      }
+    },
+    "The system could not find this login item." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "系统找不到此登录项。"
           }
         }
       }
