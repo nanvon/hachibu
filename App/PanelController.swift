@@ -11,10 +11,16 @@ final class PanelController: NSObject, NSWindowDelegate {
     private static let screenMargin: CGFloat = 8
 
     private let panel: StatusPanel
+    private let onVisibilityChange: @MainActor (Bool) -> Void
     private weak var anchorButton: NSStatusBarButton?
     private var eventMonitors: [Any] = []
 
-    init(onOpenMainWindow: @escaping @MainActor () -> Void) {
+    /// `onVisibilityChange` 在面板显示、关闭时调用，用于切换采样频率。
+    init(
+        onOpenMainWindow: @escaping @MainActor () -> Void,
+        onVisibilityChange: @escaping @MainActor (Bool) -> Void
+    ) {
+        self.onVisibilityChange = onVisibilityChange
         panel = StatusPanel(
             contentRect: .zero,
             styleMask: [.borderless, .nonactivatingPanel],
@@ -57,6 +63,7 @@ final class PanelController: NSObject, NSWindowDelegate {
         guard panel.isVisible else { return }
         panel.orderOut(nil)
         removeEventMonitors()
+        onVisibilityChange(false)
     }
 
     // MARK: - NSWindowDelegate
@@ -84,6 +91,7 @@ final class PanelController: NSObject, NSWindowDelegate {
 
         panel.makeKeyAndOrderFront(nil)
         installEventMonitors()
+        onVisibilityChange(true)
     }
 
     private func installEventMonitors() {
