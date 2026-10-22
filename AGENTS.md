@@ -65,6 +65,20 @@ swift build --package-path Packages/HachibuKit      # 单独编译本地包
 
 `Hachibu.xcodeproj` 由 XcodeGen 生成，不提交，不要手改。
 
+## 改完代码后的校验
+
+本节是对“未经要求不运行 build / test”的明确授权：每次改完代码，按改动范围运行下面的命令，不必再询问。
+
+- 改了 `Packages/HachibuKit` 下的代码：
+  `swift build --package-path Packages/HachibuKit --build-tests`
+  `swift test --package-path Packages/HachibuKit`
+- 改了 `App/`、`project.yml`、`Config/`，增删了文件，或改了 HachibuKit 的公共接口：
+  `xcodegen generate`
+  `xcodebuild -project Hachibu.xcodeproj -scheme Hachibu -configuration Debug build`
+- 只改文档时不运行。
+
+项目代码出现编译警告也要处理，或者说明为什么不处理。GRDB 等依赖自身的警告不用管。校验失败要原样报告，不能跳过；修复如果超出原指令范围，先说明再改。只运行编译和测试，不启动 App，不做界面测试。
+
 ## Git
 
 主分支为 `main`。提交信息用 Conventional Commits 格式：类型前缀用英文（`feat`、`fix`、`docs`、`chore`、`refactor`、`test` 等，可加范围如 `feat(BatteryCore):`），描述和正文用中文。
