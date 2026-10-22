@@ -16,6 +16,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         batteryMonitor.start()
 
         let panelController = PanelController(
+            monitor: batteryMonitor,
             onOpenMainWindow: { [weak self] in
                 self?.mainWindowController.showAndActivate()
             },

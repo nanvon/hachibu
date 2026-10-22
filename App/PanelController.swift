@@ -12,11 +12,13 @@ final class PanelController: NSObject, NSWindowDelegate {
 
     private let panel: StatusPanel
     private let onVisibilityChange: @MainActor (Bool) -> Void
+    private var content: NSView?
     private weak var anchorButton: NSStatusBarButton?
     private var eventMonitors: [Any] = []
 
     /// `onVisibilityChange` 在面板显示、关闭时调用，用于切换采样频率。
     init(
+        monitor: BatteryMonitor,
         onOpenMainWindow: @escaping @MainActor () -> Void,
         onVisibilityChange: @escaping @MainActor (Bool) -> Void
     ) {
@@ -29,13 +31,22 @@ final class PanelController: NSObject, NSWindowDelegate {
         )
         super.init()
 
-        let content = NSHostingView(rootView: PanelRootView(
+        let content = PanelHostingView(rootView: PanelRootView(
+            monitor: monitor,
             onOpenMainWindow: { [weak self] in
                 self?.close()
                 onOpenMainWindow()
             },
             onQuit: { NSApp.terminate(nil) }
         ))
+        // 只用内容的理想尺寸，不加最小、最大尺寸约束；面板大小由 fitToContent() 设置。
+        content.sizingOptions = [.intrinsicContentSize]
+        content.onIntrinsicContentSizeChange = { [weak self] in
+            guard let self else { return }
+            // 在当前布局过程结束后再改窗口大小。
+            Task { self.fitToContent() }
+        }
+        self.content = content
 
         panel.isFloatingPanel = true
         panel.level = .statusBar
@@ -81,6 +92,7 @@ final class PanelController: NSObject, NSWindowDelegate {
         // 每次打开都按按钮当前所在的屏幕重新计算位置。
         let buttonFrame = buttonWindow.convertToScreen(button.convert(button.bounds, to: nil))
         let visibleFrame = (buttonWindow.screen ?? NSScreen.main)?.visibleFrame ?? buttonFrame
+        fitToContent()
         let size = panel.frame.size
         let x = min(
             max(buttonFrame.midX - size.width / 2, visibleFrame.minX + Self.screenMargin),
@@ -92,6 +104,15 @@ final class PanelController: NSObject, NSWindowDelegate {
         panel.makeKeyAndOrderFront(nil)
         installEventMonitors()
         onVisibilityChange(true)
+    }
+
+    /// 按内容的理想尺寸调整面板大小，保持顶边位置不变（面板挂在菜单栏下方）。
+    private func fitToContent() {
+        guard let size = content?.fittingSize, size != panel.frame.size else { return }
+        var frame = panel.frame
+        frame.origin.y = frame.maxY - size.height
+        frame.size = size
+        panel.setFrame(frame, display: panel.isVisible)
     }
 
     private func installEventMonitors() {
@@ -146,6 +167,16 @@ final class PanelController: NSObject, NSWindowDelegate {
             content.bottomAnchor.constraint(equalTo: effect.bottomAnchor),
         ])
         return effect
+    }
+}
+
+/// 内容的理想尺寸变化时（例如插拔电时显示或隐藏充电器卡片）通知面板调整大小。
+final class PanelHostingView<Content: View>: NSHostingView<Content> {
+    var onIntrinsicContentSizeChange: (@MainActor () -> Void)?
+
+    override func invalidateIntrinsicContentSize() {
+        super.invalidateIntrinsicContentSize()
+        onIntrinsicContentSizeChange?()
     }
 }
 
