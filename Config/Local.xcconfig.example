@@ -1,0 +1,7 @@
+// 复制为 Config/Local.xcconfig 后按需填写，覆盖 Base.xcconfig 中的签名设置。
+// Local.xcconfig 已加入 .gitignore，不要提交。
+
+// DEVELOPMENT_TEAM = XXXXXXXXXX
+// CODE_SIGN_STYLE = Manual
+// CODE_SIGN_IDENTITY = Apple Development
+// CODE_SIGN_IDENTITY[config=Release] = Developer ID Application

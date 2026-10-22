@@ -1,0 +1,28 @@
+// Hachibu App target 的构建设置，Debug 和 Release 共用。
+// 签名相关的本地设置放在 Local.xcconfig（不提交），见 Local.xcconfig.example。
+
+PRODUCT_NAME = Hachibu
+// 占位值，发布前确定，见 docs/v1技术设计.md 第 1 节。
+PRODUCT_BUNDLE_IDENTIFIER = io.github.nanvon.hachibu
+MARKETING_VERSION = 0.1.0
+CURRENT_PROJECT_VERSION = 1
+
+MACOSX_DEPLOYMENT_TARGET = 14.0
+ARCHS = arm64
+SWIFT_VERSION = 6.0
+
+INFOPLIST_FILE = App/Info.plist
+CODE_SIGN_ENTITLEMENTS = App/Hachibu.entitlements
+ENABLE_HARDENED_RUNTIME = YES
+
+// 默认本地签名（Sign to Run Locally），clone 后不需要开发者账号即可运行。
+CODE_SIGN_STYLE = Manual
+CODE_SIGN_IDENTITY = -
+DEVELOPMENT_TEAM =
+
+LOCALIZATION_PREFERS_STRING_CATALOGS = YES
+SWIFT_EMIT_LOC_STRINGS = YES
+ENABLE_USER_SCRIPT_SANDBOXING = YES
+DEAD_CODE_STRIPPING = YES
+
+#include? "Local.xcconfig"

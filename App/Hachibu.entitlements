@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- 不启用 App Sandbox，不声明其他权限。见 docs/v1技术设计.md 第 4 节。 -->
+<plist version="1.0">
+<dict/>
+</plist>

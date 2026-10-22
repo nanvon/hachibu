@@ -1,0 +1,14 @@
+.DS_Store
+
+# XcodeGen 生成的工程
+*.xcodeproj/
+
+# Xcode / SwiftPM
+xcuserdata/
+DerivedData/
+build/
+.build/
+.swiftpm/
+
+# 本地签名配置
+Config/Local.xcconfig

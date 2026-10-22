@@ -1,0 +1,28 @@
+# XcodeGen 配置。修改后运行 `xcodegen generate` 重新生成 Hachibu.xcodeproj（不提交）。
+# 构建设置写在 Config/Base.xcconfig，这里只描述工程结构。
+name: Hachibu
+options:
+  developmentLanguage: en
+  createIntermediateGroups: true
+
+packages:
+  HachibuKit:
+    path: Packages/HachibuKit
+
+targets:
+  Hachibu:
+    type: application
+    platform: macOS
+    configFiles:
+      Debug: Config/Base.xcconfig
+      Release: Config/Base.xcconfig
+    sources:
+      - path: App
+    dependencies:
+      - package: HachibuKit
+        product: BatteryCore
+      - package: HachibuKit
+        product: HistoryStore
+      - package: HachibuKit
+        product: FeatureUI
+    scheme: {}

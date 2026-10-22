@@ -1,0 +1,26 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "Battery data will appear here." : {
+      "localizations" : {
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "电池数据将显示在这里。" } }
+      }
+    },
+    "History, notifications and settings will appear here." : {
+      "localizations" : {
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "历史曲线、通知和设置将显示在这里。" } }
+      }
+    },
+    "Open Main Window" : {
+      "localizations" : {
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "打开主窗口" } }
+      }
+    },
+    "Quit" : {
+      "localizations" : {
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "退出" } }
+      }
+    }
+  },
+  "version" : "1.0"
+}
