@@ -1,0 +1,18 @@
+{
+  "application" : {
+    "name" : "Hachibu.app",
+    "x" : 180,
+    "y" : 236
+  },
+  "applications" : {
+    "x" : 480,
+    "y" : 236
+  },
+  "background" : "background.png",
+  "iconSize" : 96,
+  "volumeIcon" : "VolumeIcon.icns",
+  "window" : {
+    "height" : 440,
+    "width" : 660
+  }
+}

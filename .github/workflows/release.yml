@@ -1,0 +1,119 @@
+name: Release
+
+# 推送 v 开头的 tag 后构建、签名更新源，并发布 DMG / ZIP / appcast / 更新日志。
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write # 创建 Release / 上传产物需要写权限
+
+jobs:
+  release:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 校验更新签名配置
+        shell: bash
+        env:
+          SPARKLE_PUBLIC_ED_KEY: ${{ vars.SPARKLE_PUBLIC_ED_KEY }}
+          SPARKLE_PRIVATE_ED_KEY: ${{ secrets.SPARKLE_PRIVATE_ED_KEY }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$SPARKLE_PUBLIC_ED_KEY" || -z "$SPARKLE_PRIVATE_ED_KEY" ]]; then
+            echo "请先设置 repository variable SPARKLE_PUBLIC_ED_KEY 和 secret SPARKLE_PRIVATE_ED_KEY。"
+            echo "配置方式见 docs/打包发布.md；本次停止发布，避免分发无法验证更新的 App。"
+            exit 1
+          fi
+
+      - name: 校验发布说明
+        shell: bash
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          notes_path="release-notes/${TAG}.md"
+          if [[ ! -s "$notes_path" ]] || ! grep -q '[^[:space:]]' "$notes_path"; then
+            echo "缺少 ${notes_path}；请在创建发布 tag 前补充面向用户的更新说明。" >&2
+            exit 1
+          fi
+
+      - name: 选择最新 Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: 安装 XcodeGen
+        run: brew install xcodegen
+
+      - name: 安装 DMG 打包工具
+        shell: bash
+        run: |
+          python3 -m venv "$RUNNER_TEMP/hachibu-dmg-tools"
+          "$RUNNER_TEMP/hachibu-dmg-tools/bin/python" -m pip install dmgbuild==1.6.7
+          echo "$RUNNER_TEMP/hachibu-dmg-tools/bin" >> "$GITHUB_PATH"
+
+      - name: 构建并打包(ad-hoc 签名,无需证书)
+        env:
+          SPARKLE_PUBLIC_ED_KEY: ${{ vars.SPARKLE_PUBLIC_ED_KEY }}
+        run: ./scripts/build.sh
+
+      - name: 签名更新包、更新日志和 appcast
+        shell: bash
+        env:
+          TAG: ${{ github.ref_name }}
+          SPARKLE_PUBLIC_ED_KEY: ${{ vars.SPARKLE_PUBLIC_ED_KEY }}
+          SPARKLE_PRIVATE_ED_KEY: ${{ secrets.SPARKLE_PRIVATE_ED_KEY }}
+        run: |
+          set -euo pipefail
+          # SPM 的预编译 artifact 内含官方签名工具，与 App 锁定的 Sparkle 版本相同。
+          sparkle_sign_update="build/SourcePackages/artifacts/sparkle/Sparkle/bin/sign_update"
+          if [[ ! -x "$sparkle_sign_update" ]]; then
+            echo "构建目录中找不到 Sparkle sign_update；请检查 SPM artifact。"
+            exit 1
+          fi
+          python3 scripts/generate-update-feed.py \
+            --tag "$TAG" \
+            --repository "$GITHUB_REPOSITORY" \
+            --app build/Build/Products/Release/Hachibu.app \
+            --dist dist \
+            --sign-update "$sparkle_sign_update"
+
+      - name: 生成 Release 正文
+        shell: bash
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          # 本版说明在前，近期新功能在后；GitHub 会合并连续空行，用 <br> 多留一行空白。
+          highlights="release-notes/highlights.md"
+          {
+            cat "release-notes/${TAG}.md"
+            if [[ -f "$highlights" ]] && grep -q '[^[:space:]]' "$highlights"; then
+              printf '\n\n<br>\n\n'
+              cat "$highlights"
+            fi
+          } > dist/release-body.md
+
+      - name: 上传到 GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          # 不设 name:Release 标题沿用默认的 tag 名(如 v0.1.0)。
+          body_path: dist/release-body.md
+          # 先将产物上传到 draft，全部成功后才使 latest/appcast 对用户可见。
+          draft: true
+          fail_on_unmatched_files: true
+          files: |
+            dist/Hachibu.dmg
+            dist/Hachibu.app.zip
+            dist/appcast.xml
+            dist/release-notes.md
+          generate_release_notes: false
+
+      - name: 发布已完整上传的 Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --draft=false --latest

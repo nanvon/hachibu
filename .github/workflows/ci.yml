@@ -1,0 +1,39 @@
+name: CI
+
+# 推送到 main 和提交 PR 时编译、测试 HachibuKit，并编译 App（不签名）。
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 选择最新 Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: 安装 XcodeGen
+        run: brew install xcodegen
+
+      - name: 编译并测试 HachibuKit
+        run: |
+          swift build --package-path Packages/HachibuKit --build-tests
+          swift test --package-path Packages/HachibuKit
+
+      - name: 编译 App
+        run: |
+          xcodegen generate
+          xcodebuild \
+            -project Hachibu.xcodeproj \
+            -scheme Hachibu \
+            -configuration Debug \
+            CODE_SIGNING_ALLOWED=NO \
+            build

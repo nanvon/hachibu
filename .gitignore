@@ -8,6 +8,7 @@ xcuserdata/
 DerivedData/
 build/
 .build/
+dist/
 .swiftpm/
 
 # 本地签名配置
