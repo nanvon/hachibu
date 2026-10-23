@@ -67,7 +67,7 @@ import Testing
     }
 
     @Test func charging() throws {
-        let flow = try #require(flow(external: true, battery: 2000))
+        let flow = try #require(self.flow(external: true, battery: 2000))
         #expect(flow.links == [
             .init(from: .charger, to: .computer, powerMW: 10000),
             .init(from: .charger, to: .battery, powerMW: 2000),
@@ -79,7 +79,7 @@ import Testing
     }
 
     @Test func smallBatteryPowerIsZero() throws {
-        let flow = try #require(flow(external: true, battery: -499))
+        let flow = try #require(self.flow(external: true, battery: -499))
         #expect(flow.links == [.init(from: .charger, to: .computer, powerMW: 10000)])
         // 节点数值仍取原始读数。
         #expect(flow.batteryMW == 499)
@@ -87,7 +87,7 @@ import Testing
     }
 
     @Test func pluggedInDraining() throws {
-        let flow = try #require(flow(external: true, input: 7000, battery: -3000))
+        let flow = try #require(self.flow(external: true, input: 7000, battery: -3000))
         #expect(flow.links == [
             .init(from: .charger, to: .computer, powerMW: 7000),
             .init(from: .battery, to: .computer, powerMW: 3000),
@@ -99,7 +99,7 @@ import Testing
     }
 
     @Test func onBattery() throws {
-        let flow = try #require(flow(external: false, input: 0, load: 8000, battery: -8100))
+        let flow = try #require(self.flow(external: false, input: 0, load: 8000, battery: -8100))
         #expect(flow.links == [.init(from: .battery, to: .computer, powerMW: 8000)])
         #expect(flow.batteryMW == 8100)
         #expect(flow.caption == .onBattery(loadMW: 8000))
