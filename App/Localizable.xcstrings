@@ -345,6 +345,56 @@
       "localizations" : {
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "窗口" } }
       }
+    },
+    "Imported AlDente History" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已导入的 AlDente 历史"
+          }
+        }
+      }
+    },
+    "Exports the complete original JSON, including battery identifiers." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "导出完整的原始 JSON，包括电池标识。"
+          }
+        }
+      }
+    },
+    "Could Not Export Archive" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法导出档案"
+          }
+        }
+      }
+    },
+    "The imported archive could not be found." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "找不到此导入档案。"
+          }
+        }
+      }
+    },
+    "The stored archive failed its integrity check. No file was exported." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已保存档案未通过完整性检查，未导出文件。"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

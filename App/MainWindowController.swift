@@ -11,6 +11,7 @@ import UniformTypeIdentifiers
 final class MainWindowController: NSWindowController, NSWindowDelegate {
     private var history: HistoryModel?
     private var store: HistoryStore?
+    private var alDenteHistoryWindow: AlDenteHistoryWindowController?
 
     convenience init(history: HistoryModel, store: HistoryStore?, monitor: BatteryMonitor, settings: AppSettings, alerts: AlertMonitor, updates: UpdateController) {
         let window = NSWindow(
@@ -37,6 +38,12 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         } else {
             importAction = nil
         }
+        let browseAction: (@MainActor @Sendable () -> Void)?
+        if store != nil {
+            browseAction = { [weak self] in self?.showImportedHistory() }
+        } else {
+            browseAction = nil
+        }
         let hostingView = NSHostingView(rootView: MainWindowRootView(
             history: history,
             settings: settings,
@@ -45,7 +52,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
                 await self?.exportDiagnostics()
             },
             onCheckForUpdates: updates.isAvailable ? { @MainActor in updates.checkForUpdates() } : nil,
-            onImportHistory: importAction
+            onImportHistory: importAction,
+            onBrowseImportedHistory: browseAction
         ).environment(monitor))
         hostingView.sceneBridgingOptions = [.toolbars, .title]
         window.contentView = hostingView
@@ -61,6 +69,14 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
 
     func windowWillClose(_ notification: Notification) {
         history?.stop()
+    }
+
+    private func showImportedHistory() {
+        guard let store else { return }
+        if alDenteHistoryWindow == nil {
+            alDenteHistoryWindow = AlDenteHistoryWindowController(store: store)
+        }
+        alDenteHistoryWindow?.showAndActivate()
     }
 
     /// 选择保存位置后读取当前数据（已脱敏），写成 JSON。见 docs/v1技术设计.md 第 14 节。
@@ -104,6 +120,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
             guard await confirmation.beginSheetModal(for: window) == .alertFirstButtonReturn else { return }
 
             let result = try await store.importAlDenteArchive(archive)
+            alDenteHistoryWindow?.refreshIfVisible()
             guard window.isVisible else { return }
             let finished = NSAlert()
             finished.messageText = String(localized: "History Import Complete")

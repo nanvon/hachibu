@@ -1160,6 +1160,476 @@
           }
         }
       }
+    },
+    "Imported AlDente History" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已导入的 AlDente 历史"
+          }
+        }
+      }
+    },
+    "Refresh" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "刷新"
+          }
+        }
+      }
+    },
+    "Import Batch" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "导入批次"
+          }
+        }
+      }
+    },
+    "Export Original File…" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "导出原始文件…"
+          }
+        }
+      }
+    },
+    "Source Table" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "来源表"
+          }
+        }
+      }
+    },
+    "Source ID" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "原始 ID"
+          }
+        }
+      }
+    },
+    "Original Timestamp" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "原始时间"
+          }
+        }
+      }
+    },
+    "Original Value" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "原始值"
+          }
+        }
+      }
+    },
+    "No Imported Archives" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "尚未导入档案"
+          }
+        }
+      }
+    },
+    "Import an AlDente history file in Settings → Historical Data." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请在「设置 → 历史数据」中导入 AlDente 历史文件。"
+          }
+        }
+      }
+    },
+    "This source table has no records." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此来源表没有记录。"
+          }
+        }
+      }
+    },
+    "%lld–%lld of %lld records" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "第 %lld–%lld 条，共 %lld 条记录"
+          }
+        }
+      }
+    },
+    "Previous Page" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上一页"
+          }
+        }
+      }
+    },
+    "Next Page" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下一页"
+          }
+        }
+      }
+    },
+    "View Imported History…" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "查看已导入历史…"
+          }
+        }
+      }
+    },
+    "%lld source records" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 条来源记录"
+          }
+        }
+      }
+    },
+    "Source timestamps and values are shown without timezone or unit conversion. Text values are quoted; an empty string appears as \"\". Records are ordered by the original timestamp, newest first." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "时间和值均按来源显示，不转换时区或单位。文本带引号，空字符串显示为 \"\"。记录按原始时间倒序排列。"
+          }
+        }
+      }
+    },
+    "The imported archive could not be found." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "找不到此导入档案。"
+          }
+        }
+      }
+    },
+    "A stored source record is invalid. The original archive has not been changed." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已保存的来源记录无效。原始档案未被修改。"
+          }
+        }
+      }
+    },
+    "Design Capacity" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "设计容量"
+          }
+        }
+      }
+    },
+    "Battery Identifier" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "电池标识"
+          }
+        }
+      }
+    },
+    "Charge Limit History" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "充电上限历史"
+          }
+        }
+      }
+    },
+    "Battery Power" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "电池功率"
+          }
+        }
+      }
+    },
+    "Calibration Records" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "校准记录"
+          }
+        }
+      }
+    },
+    "Battery Condition" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "电池状况"
+          }
+        }
+      }
+    },
+    "System Maximum Capacity" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "系统最大容量"
+          }
+        }
+      }
+    },
+    "Input Power" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "输入功率"
+          }
+        }
+      }
+    },
+    "How to Export from AlDente" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "如何从 AlDente 导出"
+          }
+        }
+      }
+    },
+    "Copy AI Export Prompt" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "复制 AI 导出提示词"
+          }
+        }
+      }
+    },
+    "1. Copy the export prompt and give it to an AI tool that can read files and run commands on this Mac." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1. 复制导出提示词，交给能够在本机读取文件、执行命令的 AI 工具。"
+          }
+        }
+      }
+    },
+    "2. Ask it to inspect AlDente locally, export all source records, and verify the resulting JSON. If it reports an unsupported database or incomplete export, keep that report and do not import a partial file." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "2. 让 AI 检查本机 AlDente、导出全部来源记录并核对 JSON。若报告数据库不支持或导出不完整，保留报告，不要导入部分数据。"
+          }
+        }
+      }
+    },
+    "3. Choose Import AlDente History… below and select the verified JSON. Review the record counts before confirming." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "3. 点击下方「导入 AlDente 历史…」，选择核对通过的 JSON，检查记录数量后确认。"
+          }
+        }
+      }
+    },
+    "Local database reading has been verified with AlDente 1.39.3 (111). Other versions need to be inspected first; compatibility is not guaranteed." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本机数据库读取已在 AlDente 1.39.3（111）验证。其他版本需要先检查，不能保证兼容。"
+          }
+        }
+      }
+    },
+    "The export includes battery identifiers and history. Use a local AI tool with file access; you do not need to upload your database or exported file to a chat." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "导出包含电池标识和历史记录。请使用能访问本机文件的 AI 工具，无需把数据库或导出文件上传到聊天中。"
+          }
+        }
+      }
+    },
+    "Export prompt copied. Paste it into your local AI tool." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已复制导出提示词，请粘贴到本地 AI 工具中。"
+          }
+        }
+      }
+    },
+    "Could not copy the export prompt. Please try again." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法复制导出提示词，请重试。"
+          }
+        }
+      }
+    },
+    "Chart" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "曲线"
+          }
+        }
+      }
+    },
+    "Original Records" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "原始记录"
+          }
+        }
+      }
+    },
+    "Display" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示"
+          }
+        }
+      }
+    },
+    "Calibration, battery condition, and battery identifiers are shown as original records." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "校准、电池状况和电池标识以原始记录展示。"
+          }
+        }
+      }
+    },
+    "No source records can be plotted. You can still inspect every original record." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有可绘制的来源记录，仍可查看全部原始记录。"
+          }
+        }
+      }
+    },
+    "%lld plotted points from %lld records in this range" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此范围内共 %lld 个绘图点，来自 %lld 条记录"
+          }
+        }
+      }
+    },
+    "Dense curves retain the first, last, minimum, and maximum points in each time bucket and segment. All original records remain available." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "密集曲线按时段和分段保留首末点及最小、最大值点，全部原始记录仍可查看。"
+          }
+        }
+      }
+    },
+    "Not plotted in this table: %lld invalid timestamps and %lld values that cannot be represented exactly. Original records are unchanged." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此表未绘制：%lld 条时间无效的记录、%lld 个无法精确表示的值。原始记录保持不变。"
+          }
+        }
+      }
+    },
+    "%lld records share timestamps and are shown as separate points. Inspect Original Records for all values." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 条记录与其他记录同一时刻，均以独立点展示。请在「原始记录」中查看全部值。"
+          }
+        }
+      }
+    },
+    "Chart times are UTC. Ranges end at the latest plottable record in the selected table. Gaps stay disconnected; values are not converted or cleaned." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "曲线时间为 UTC，范围截止于所选表最新的可绘制记录。缺口断线，数值不换算、不清洗。"
+          }
+        }
+      }
+    },
+    "Power values use the original AlDente scale. The unit and measurement source have not been verified; these are not Hachibu power measurements." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "功率值沿用 AlDente 原始数值，单位与采集来源尚未核实，不代表 Hachibu 的功率读数。"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

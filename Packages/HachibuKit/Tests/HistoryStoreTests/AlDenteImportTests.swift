@@ -221,7 +221,137 @@ private func editTable(_ root: inout [String: Any], _ name: String, edit: (inout
         let reopened = try HistoryStore(fileURL: url)
         #expect(try await reopened.alDenteArchiveData(identifier: archive.identifier) == data)
         try await verifyEveryRecord(archive, in: reopened)
+        let batches = try await reopened.alDenteImports()
+        #expect(batches.map(\.id) == [archive.identifier])
+        let summaries = try await reopened.alDenteTableSummaries(importIdentifier: archive.identifier)
+        #expect(summaries.map(\.recordCount) == archive.tables.map(\.recordCount))
+        for table in archive.tables {
+            var offset = 0
+            var actual: [AlDenteHistoryRecord] = []
+            repeat {
+                let page = try await reopened.alDenteRecordPage(importIdentifier: archive.identifier,
+                    table: table.table, offset: offset, limit: 500)
+                actual += page.records
+                offset += page.limit
+            } while offset < table.recordCount
+            let expected = Dictionary(uniqueKeysWithValues: archive.records.filter { $0.table == table.table }
+                .map { ($0.identifier, $0) })
+            #expect(Set(actual.map(\.id)) == Set(expected.keys))
+            for record in actual {
+                let source = try #require(expected[record.id])
+                #expect(record.sourceID == source.sourceID)
+                #expect(record.timestamp == source.timestamp)
+                switch record.value {
+                case .integer(let value): #expect(AlDenteArchive.bytes(UInt64(bitPattern: value)) == source.value)
+                case .real(let value): #expect(AlDenteArchive.bytes(value.bitPattern) == source.value)
+                case .text(let value): #expect(Data(value.utf8) == source.value)
+                }
+            }
+        }
         #expect(try await reopened.importAlDenteArchive(archive).existingRecords == archive.recordCount)
+    }
+}
+
+@Suite struct AlDenteHistoryTests {
+    @Test func listsBatchMetadataAndEmptyTables() async throws {
+        let store = try HistoryStore.inMemory()
+        #expect(try await store.alDenteImports().isEmpty)
+        let archive = try AlDenteArchive(data: archiveFixture { root in
+            editTable(&root, "batteryCycles") { table in
+                table["rows"] = [] as [[String: Any]]
+                table["rowCount"] = 0
+            }
+        })
+        _ = try await store.importAlDenteArchive(archive)
+        let batch = try #require(try await store.alDenteImports().first)
+        #expect(batch.id == archive.identifier)
+        #expect(batch.sourceVersion == "1.39.3")
+        #expect(batch.sourceBuild == "111")
+        #expect(batch.recordCount == 12)
+        let tables = try await store.alDenteTableSummaries(importIdentifier: batch.id)
+        #expect(tables.count == 13)
+        #expect(tables.first?.recordCount == 0)
+        #expect(tables.first?.firstTimestamp == nil)
+        let page = try await store.alDenteRecordPage(importIdentifier: batch.id, table: .batteryCycles)
+        #expect(page.totalCount == 0)
+        #expect(page.records.isEmpty)
+    }
+
+    @Test func pagesStablyAndIsolatesBatches() async throws {
+        let store = try HistoryStore.inMemory()
+        let original = try AlDenteArchive(data: archiveFixture())
+        _ = try await store.importAlDenteArchive(original)
+        let large = try AlDenteArchive(data: archiveFixture { root in
+            editTable(&root, "batteryCycles") { table in
+                table["rows"] = (1...503).map { id in
+                    ["id": id, "timestamp": id == 1 ? "2027-01-01T00:00:00.000" : "2026-10-22T08:13:43.766",
+                     "value": id] as [String: Any]
+                }
+                table["rowCount"] = 503
+            }
+        })
+        _ = try await store.importAlDenteArchive(large)
+        let first = try await store.alDenteRecordPage(importIdentifier: large.identifier,
+            table: .batteryCycles, offset: -10, limit: 1000)
+        let last = try await store.alDenteRecordPage(importIdentifier: large.identifier,
+            table: .batteryCycles, offset: 500, limit: 500)
+        #expect(first.limit == 500)
+        #expect(first.offset == 0)
+        #expect(first.totalCount == 503)
+        #expect(first.records.first?.sourceID == 1) // 最新时间优先，ID 不表示先后。
+        #expect(first.records.dropFirst().first?.sourceID == 503)
+        let all = try await store.alDenteRecords(importIdentifier: large.identifier, table: .batteryCycles)
+        #expect(all.count == 503)
+        #expect(all.last?.sourceID == 1)
+        #expect(last.records.map(\.sourceID) == [4, 3, 2])
+        #expect(Set((first.records + last.records).map(\.id)).count == 503)
+        let old = try await store.alDenteRecordPage(importIdentifier: original.identifier, table: .batteryCycles)
+        #expect(old.totalCount == 1)
+        #expect(old.records.first?.value == .integer(0))
+        #expect(try await store.alDenteRecords(importIdentifier: original.identifier, table: .batteryCycles).count == 1)
+        let bounded = try await store.alDenteRecordPage(importIdentifier: large.identifier, table: .batteryCycles, limit: 0)
+        #expect(bounded.limit == 1)
+    }
+
+    @Test func decodesExactValuesAndRejectsCorruption() async throws {
+        let store = try HistoryStore.inMemory()
+        let archive = try AlDenteArchive(data: archiveFixture { root in
+            editTable(&root, "batteryCycles") { table in
+                table["rows"] = [
+                    ["id": 1, "timestamp": "a", "value": Int64.min],
+                    ["id": 2, "timestamp": "b", "value": Int64.max],
+                ] as [[String: Any]]
+                table["rowCount"] = 2
+            }
+        })
+        _ = try await store.importAlDenteArchive(archive)
+        let integers = try await store.alDenteRecordPage(importIdentifier: archive.identifier, table: .batteryCycles)
+        #expect(integers.records.map(\.value) == [.integer(Int64.max), .integer(Int64.min)])
+        let real = try await store.alDenteRecordPage(importIdentifier: archive.identifier, table: .chargingPower)
+        #expect(real.records.first?.value == .real(-1.5))
+        let text = try await store.alDenteRecordPage(importIdentifier: archive.identifier, table: .macOSbatteryCondition)
+        #expect(text.records.first?.value == .text(""))
+        try await store.dbQueue.write { db in
+            try db.execute(sql: "UPDATE aldente_records SET value = ? WHERE source_table = ?",
+                           arguments: [Data([0]), "chargingPower"])
+        }
+        await #expect(throws: AlDenteHistoryError.self) {
+            try await store.alDenteRecordPage(importIdentifier: archive.identifier, table: .chargingPower)
+        }
+        #expect(try await store.alDenteArchiveData(identifier: archive.identifier) == archive.data)
+    }
+
+    @Test func rejectsMissingBatch() async throws {
+        let store = try HistoryStore.inMemory()
+        await #expect(throws: AlDenteHistoryError.self) {
+            try await store.alDenteTableSummaries(importIdentifier: "missing")
+        }
+        await #expect(throws: AlDenteHistoryError.self) {
+            try await store.alDenteRecordPage(importIdentifier: "missing", table: .batteryCycles)
+        }
+        await #expect(throws: AlDenteHistoryError.self) {
+            try await store.alDenteRecords(importIdentifier: "missing", table: .batteryCycles)
+        }
     }
 }
 

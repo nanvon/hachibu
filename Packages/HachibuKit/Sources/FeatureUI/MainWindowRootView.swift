@@ -9,6 +9,7 @@ public struct MainWindowRootView: View {
     private let onExportDiagnostics: @MainActor () async -> Void
     private let onCheckForUpdates: (@MainActor () -> Void)?
     private let onImportHistory: (@MainActor () async -> Void)?
+    private let onBrowseImportedHistory: (@MainActor () -> Void)?
     @State private var selection: MainWindowPage? = .history
 
     /// `onExportDiagnostics` 由 App 层选择保存位置并写文件，完成后返回。
@@ -20,7 +21,8 @@ public struct MainWindowRootView: View {
         alerts: AlertMonitor,
         onExportDiagnostics: @escaping @MainActor () async -> Void,
         onCheckForUpdates: (@MainActor () -> Void)?,
-        onImportHistory: (@MainActor () async -> Void)? = nil
+        onImportHistory: (@MainActor () async -> Void)? = nil,
+        onBrowseImportedHistory: (@MainActor () -> Void)? = nil
     ) {
         self.history = history
         self.settings = settings
@@ -28,6 +30,7 @@ public struct MainWindowRootView: View {
         self.onExportDiagnostics = onExportDiagnostics
         self.onCheckForUpdates = onCheckForUpdates
         self.onImportHistory = onImportHistory
+        self.onBrowseImportedHistory = onBrowseImportedHistory
     }
 
     public var body: some View {
@@ -59,7 +62,8 @@ public struct MainWindowRootView: View {
                         settings: settings,
                         onExportDiagnostics: onExportDiagnostics,
                         onCheckForUpdates: onCheckForUpdates,
-                        onImportHistory: onImportHistory
+                        onImportHistory: onImportHistory,
+                        onBrowseImportedHistory: onBrowseImportedHistory
                     )
                 }
             }

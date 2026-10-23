@@ -14,10 +14,12 @@ struct SettingsPage: View {
     /// 为 nil 时不显示“检查更新”。
     let onCheckForUpdates: (@MainActor () -> Void)?
     let onImportHistory: (@MainActor () async -> Void)?
+    let onBrowseImportedHistory: (@MainActor () -> Void)?
     @State private var loginItem = LoginItem()
     @State private var isExporting = false
     @State private var couldNotOpenBatterySettings = false
     @State private var isImporting = false
+    @State private var exportPromptStatus: ExportPromptStatus?
 
     var body: some View {
         Form {
@@ -118,6 +120,36 @@ struct SettingsPage: View {
 
     private var historyImportSection: some View {
         Section {
+            DisclosureGroup {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("1. Copy the export prompt and give it to an AI tool that can read files and run commands on this Mac.", bundle: .module)
+                    Text("2. Ask it to inspect AlDente locally, export all source records, and verify the resulting JSON. If it reports an unsupported database or incomplete export, keep that report and do not import a partial file.", bundle: .module)
+                    Text("3. Choose Import AlDente History… below and select the verified JSON. Review the record counts before confirming.", bundle: .module)
+                    Text("Local database reading has been verified with AlDente 1.39.3 (111). Other versions need to be inspected first; compatibility is not guaranteed.", bundle: .module)
+                        .foregroundStyle(.secondary)
+                    Text("The export includes battery identifiers and history. Use a local AI tool with file access; you do not need to upload your database or exported file to a chat.", bundle: .module)
+                        .foregroundStyle(.secondary)
+                }
+                .font(.callout)
+                .padding(.vertical, 4)
+            } label: {
+                Text("How to Export from AlDente", bundle: .module)
+            }
+            Button(action: copyExportPrompt) {
+                Text("Copy AI Export Prompt", bundle: .module)
+            }
+            if let exportPromptStatus {
+                switch exportPromptStatus {
+                case .copied:
+                    Text("Export prompt copied. Paste it into your local AI tool.", bundle: .module)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                case .failed:
+                    Text("Could not copy the export prompt. Please try again.", bundle: .module)
+                        .font(.callout)
+                        .foregroundStyle(.red)
+                }
+            }
             Button {
                 guard let onImportHistory else { return }
                 isImporting = true
@@ -129,6 +161,12 @@ struct SettingsPage: View {
                 Text("Import AlDente History…", bundle: .module)
             }
             .disabled(isImporting || onImportHistory == nil)
+            Button {
+                onBrowseImportedHistory?()
+            } label: {
+                Text("View Imported History…", bundle: .module)
+            }
+            .disabled(isImporting || onBrowseImportedHistory == nil)
             if isImporting {
                 ProgressView()
                     .controlSize(.small)
@@ -139,6 +177,18 @@ struct SettingsPage: View {
             Text("Preserves all 13 source tables in a separate archive. Existing recordings and history charts are unchanged.", bundle: .module)
                 .font(.callout)
                 .foregroundStyle(.secondary)
+        }
+    }
+
+    private func copyExportPrompt() {
+        do {
+            let prompt = try AlDenteExportGuide.prompt()
+            let pasteboard = NSPasteboard.general
+            pasteboard.clearContents()
+            exportPromptStatus = pasteboard.setString(prompt, forType: .string) ? .copied : .failed
+        } catch {
+            exportPromptStatus = .failed
+            logger.error("Failed to load AlDente export prompt: \(String(describing: error), privacy: .public)")
         }
     }
 
@@ -204,6 +254,10 @@ struct SettingsPage: View {
             Text("About", bundle: .module)
         }
     }
+}
+
+private enum ExportPromptStatus {
+    case copied, failed
 }
 
 /// 设置页“关于”区显示的信息。
