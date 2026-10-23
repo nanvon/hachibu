@@ -12,6 +12,7 @@ ARCHS = arm64
 SWIFT_VERSION = 6.0
 
 INFOPLIST_FILE = App/Info.plist
+ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon
 
 // Sparkle 自动更新，见 docs/v1技术设计.md 第 17 节。appcast 地址是占位值，随代码仓库一起确定。
 // xcconfig 里 // 会被当成注释，URL 中用 $() 隔开。

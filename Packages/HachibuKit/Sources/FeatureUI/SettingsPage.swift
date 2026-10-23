@@ -97,6 +97,12 @@ struct SettingsPage: View {
 
     private var aboutSection: some View {
         Section {
+            Image("BrandLogo", bundle: .module)
+                .resizable()
+                .scaledToFit()
+                .frame(width: 220, height: 53)
+                .accessibilityLabel(Text(verbatim: "Hachibu"))
+                .padding(.vertical, 8)
             LabeledContent {
                 Text(verbatim: AboutInfo.version)
                     .textSelection(.enabled)
@@ -134,7 +140,7 @@ struct SettingsPage: View {
 
 /// 设置页“关于”区显示的信息。
 private enum AboutInfo {
-    /// 仓库地址是占位值，发布前确定，见 docs/v1技术设计.md 第 1 节。
+    /// 仓库地址，与 Config/Base.xcconfig 的 SPARKLE_FEED_URL 指向同一个仓库。
     static let repositoryURL = URL(string: "https://github.com/nanvon/hachibu")!
     static let repositoryDisplayName = "github.com/nanvon/hachibu"
     static let licenseURL = repositoryURL.appending(path: "blob/main/LICENSE")
