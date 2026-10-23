@@ -14,8 +14,11 @@
   <img alt="macOS 14+" src="https://img.shields.io/badge/macOS-14%2B-287DD0?labelColor=102C60&logo=apple&logoColor=white">
   <img alt="Apple Silicon" src="https://img.shields.io/badge/Apple%20Silicon-only-287DD0?labelColor=102C60">
   <img alt="Swift 6" src="https://img.shields.io/badge/Swift-6-287DD0?labelColor=102C60&logo=swift&logoColor=white">
+  <a href="https://github.com/nanvon/hachibu/releases/latest"><img alt="Release" src="https://img.shields.io/github/v/release/nanvon/hachibu?color=287DD0&labelColor=102C60"></a>
+  <a href="https://github.com/nanvon/hachibu/releases"><img alt="Total Downloads" src="https://img.shields.io/github/downloads/nanvon/hachibu/total?color=287DD0&labelColor=102C60"></a>
+  <a href="https://github.com/nanvon/hachibu/releases/latest"><img alt="Latest Downloads" src="https://img.shields.io/github/downloads/nanvon/hachibu/latest/total?label=latest%20downloads&color=287DD0&labelColor=102C60"></a>
+  <a href="https://github.com/nanvon/hachibu/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/nanvon/hachibu/ci.yml?branch=main&labelColor=102C60"></a>
   <img alt="GPL-3.0-only" src="https://img.shields.io/badge/license-GPL--3.0--only-287DD0?labelColor=102C60">
-  <img alt="开发中" src="https://img.shields.io/badge/状态-开发中-287DD0?labelColor=102C60">
 </p>
 
 <p align="center">
