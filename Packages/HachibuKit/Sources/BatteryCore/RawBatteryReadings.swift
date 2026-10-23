@@ -12,6 +12,8 @@ public struct RawBatteryReadings: Sendable, Equatable, Codable {
     public var adapterDetails: [String: RawValue]?
     /// 充电上限文件中 `policies` 字段解开后的 NSKeyedArchiver 归档结构。
     public var chargeLimitArchive: RawValue?
+    /// PowerUI 只读接口的充电上限结果，不可用时为 nil。
+    public var powerUIChargeLimit: PowerUIChargeLimit?
     public var lowPowerModeEnabled: Bool
 
     public init(
@@ -20,6 +22,7 @@ public struct RawBatteryReadings: Sendable, Equatable, Codable {
         smartBatteryPack: [String: RawValue]?,
         adapterDetails: [String: RawValue]?,
         chargeLimitArchive: RawValue?,
+        powerUIChargeLimit: PowerUIChargeLimit? = nil,
         lowPowerModeEnabled: Bool
     ) {
         self.powerSources = powerSources
@@ -27,6 +30,7 @@ public struct RawBatteryReadings: Sendable, Equatable, Codable {
         self.smartBatteryPack = smartBatteryPack
         self.adapterDetails = adapterDetails
         self.chargeLimitArchive = chargeLimitArchive
+        self.powerUIChargeLimit = powerUIChargeLimit
         self.lowPowerModeEnabled = lowPowerModeEnabled
     }
 
@@ -36,6 +40,7 @@ public struct RawBatteryReadings: Sendable, Equatable, Codable {
         case smartBatteryPack = "appleSmartBatteryPack"
         case adapterDetails = "externalPowerAdapterDetails"
         case chargeLimitArchive
+        case powerUIChargeLimit
         case lowPowerModeEnabled
     }
 
@@ -47,6 +52,7 @@ public struct RawBatteryReadings: Sendable, Equatable, Codable {
             smartBatteryPack: smartBatteryPack.map { RawValue.redact($0) },
             adapterDetails: adapterDetails.map { RawValue.redact($0) },
             chargeLimitArchive: chargeLimitArchive?.redacted(extraKeys: ["token"]),
+            powerUIChargeLimit: powerUIChargeLimit,
             lowPowerModeEnabled: lowPowerModeEnabled
         )
     }

@@ -57,8 +57,14 @@ public struct BatterySnapshot: Sendable, Equatable {
     /// 充电器信息，`IOPSCopyExternalPowerAdapterDetails()`。未接电时为 nil。
     public var adapter: PowerAdapter?
     public var lowPowerModeEnabled: Bool
-    /// 系统充电上限（%），读不到时为 nil（未知）。
-    public var chargeLimitPercent: Int?
+    /// 系统充电上限设置，读不到时为 nil（未知）。
+    public var chargeLimit: ChargeLimitSetting?
+
+    /// 已开启的系统充电上限（%）。未开启、不支持或未知时为 nil。
+    public var chargeLimitPercent: Int? {
+        guard case .on(let percent) = chargeLimit else { return nil }
+        return percent
+    }
 
     /// 容量比：满充容量 ÷ 设计容量（0–1）。
     public var capacityRatio: Double? {
@@ -87,7 +93,7 @@ public struct BatterySnapshot: Sendable, Equatable {
         designCycleCount: Int? = nil,
         adapter: PowerAdapter? = nil,
         lowPowerModeEnabled: Bool = false,
-        chargeLimitPercent: Int? = nil
+        chargeLimit: ChargeLimitSetting? = nil
     ) {
         self.percent = percent
         self.isExternalPower = isExternalPower
@@ -109,7 +115,7 @@ public struct BatterySnapshot: Sendable, Equatable {
         self.designCycleCount = designCycleCount
         self.adapter = adapter
         self.lowPowerModeEnabled = lowPowerModeEnabled
-        self.chargeLimitPercent = chargeLimitPercent
+        self.chargeLimit = chargeLimit
     }
 }
 
@@ -168,7 +174,7 @@ extension BatterySnapshot {
                 )
             },
             lowPowerModeEnabled: raw.lowPowerModeEnabled,
-            chargeLimitPercent: ChargeLimitFile.chargeLimit(inArchive: raw.chargeLimitArchive)
+            chargeLimit: ChargeLimitSetting.resolve(powerUI: raw.powerUIChargeLimit, archive: raw.chargeLimitArchive)
         )
     }
 

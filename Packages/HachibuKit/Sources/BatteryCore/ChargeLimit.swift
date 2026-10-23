@@ -1,6 +1,26 @@
 import Foundation
 
-/// 系统充电上限的私有文件。规则见 docs/v1技术设计.md 第 6 节。
+/// 系统充电上限设置（“系统设置 → 电池 → 充电上限”）。规则见 docs/v1技术设计.md 第 6 节。
+public enum ChargeLimitSetting: Sendable, Equatable {
+    /// 本机系统或机型不支持充电上限。
+    case unsupported
+    case off
+    case on(percent: Int)
+
+    /// 优先用 PowerUI 的结果；PowerUI 不可用或读不到开关、上限时，退回读取充电上限文件。都读不到时为 nil（未知）。
+    static func resolve(powerUI: PowerUIChargeLimit?, archive: RawValue?) -> ChargeLimitSetting? {
+        if let powerUI {
+            guard powerUI.isSupported else { return .unsupported }
+            if powerUI.isEnabled == false { return .off }
+            if powerUI.isEnabled == true, let limit = powerUI.limit, (50...100).contains(limit) {
+                return .on(percent: limit)
+            }
+        }
+        return ChargeLimitFile.chargeLimit(inArchive: archive).map { .on(percent: $0) }
+    }
+}
+
+/// 系统充电上限的私有文件。
 enum ChargeLimitFile {
     static let url = URL(fileURLWithPath: "/Library/Preferences/com.apple.powerd.charging.plist")
 

@@ -15,7 +15,7 @@ import Testing
             isExternalPower: external,
             isCharging: charging,
             batteryPowerMW: batteryPower,
-            chargeLimitPercent: limit
+            chargeLimit: limit.map { .on(percent: $0) }
         ))
     }
 
@@ -31,7 +31,8 @@ import Testing
         #expect(status(external: true, percent: 100, limit: 80) == .fullyCharged)
         #expect(status(external: true, percent: 79, limit: 80) == .chargeLimitReached(limit: 80))
         #expect(status(external: true, percent: 85, limit: 80) == .chargeLimitReached(limit: 80))
-        #expect(status(external: true, percent: 78, limit: 80) == .pluggedInNotCharging)
+        #expect(status(external: true, percent: 75, limit: 80) == .chargeLimitReached(limit: 80))
+        #expect(status(external: true, percent: 74, limit: 80) == .pluggedInNotCharging)
         #expect(status(external: true, percent: 80, limit: nil) == .pluggedInNotCharging)
         #expect(status(external: true, percent: nil, limit: 80) == .pluggedInNotCharging)
         #expect(status(external: true, charging: nil, batteryPower: nil) == .pluggedInNotCharging)

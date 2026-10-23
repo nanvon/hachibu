@@ -49,6 +49,29 @@ import Testing
         ])) == nil)
     }
 
+    @Test func powerUIResultTakesPrecedence() {
+        let file = archive(soclimit: .int(85))
+        #expect(ChargeLimitSetting.resolve(
+            powerUI: PowerUIChargeLimit(isSupported: true, isEnabled: true, limit: 80), archive: file
+        ) == .on(percent: 80))
+        #expect(ChargeLimitSetting.resolve(
+            powerUI: PowerUIChargeLimit(isSupported: true, isEnabled: false, limit: 80), archive: file
+        ) == .off)
+        #expect(ChargeLimitSetting.resolve(powerUI: PowerUIChargeLimit(isSupported: false), archive: file) == .unsupported)
+    }
+
+    @Test func fallsBackToFileWhenPowerUIIncomplete() {
+        let file = archive(soclimit: .int(85))
+        #expect(ChargeLimitSetting.resolve(powerUI: nil, archive: file) == .on(percent: 85))
+        #expect(ChargeLimitSetting.resolve(
+            powerUI: PowerUIChargeLimit(isSupported: true, isEnabled: nil, limit: 80), archive: file
+        ) == .on(percent: 85))
+        #expect(ChargeLimitSetting.resolve(
+            powerUI: PowerUIChargeLimit(isSupported: true, isEnabled: true, limit: 0), archive: file
+        ) == .on(percent: 85))
+        #expect(ChargeLimitSetting.resolve(powerUI: nil, archive: nil) == nil)
+    }
+
     @Test func missingFileReadsAsNil() {
         let url = URL(fileURLWithPath: "/nonexistent/com.apple.powerd.charging.plist")
         #expect(ChargeLimitFile.readArchive(at: url) == nil)

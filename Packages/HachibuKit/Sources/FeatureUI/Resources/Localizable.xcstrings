@@ -189,6 +189,16 @@
         }
       }
     },
+    "Battery Charging" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "电池充电"
+          }
+        }
+      }
+    },
     "Battery Health" : {
       "localizations" : {
         "zh-Hans" : {
@@ -245,6 +255,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "容量比"
+          }
+        }
+      }
+    },
+    "Change the charge limit in System Settings → Battery. Requires macOS 26.4 or later." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在“系统设置 → 电池”中修改充电上限，需要 macOS 26.4 或更高版本。"
           }
         }
       }
@@ -620,16 +640,6 @@
         }
       }
     },
-    "Manage charging options in System Settings → Battery. Hachibu only reads the charge limit; the value does not confirm that limiting is enabled or taking effect. Unknown does not mean off." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "请在“系统设置 → 电池”中调整充电选项。Hachibu 仅读取上限，设置值不能证明限充已启用或正在生效；未知不代表关闭。"
-          }
-        }
-      }
-    },
     "Maximum Capacity" : {
       "localizations" : {
         "zh-Hans" : {
@@ -716,6 +726,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "未请求"
+          }
+        }
+      }
+    },
+    "Not Supported" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "不支持"
           }
         }
       }
@@ -1067,16 +1087,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "时间范围"
-          }
-        }
-      }
-    },
-    "Unknown" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "未知"
           }
         }
       }

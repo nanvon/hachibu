@@ -4,11 +4,11 @@ import IOKit.ps
 
 /// 硬件数据的读取来源。v2 增加 SMC 读取时实现新的来源，不改调用方。
 public protocol BatteryDataSource: Sendable {
-    /// 完整读取一次：IOPS、IORegistry 两个节点、充电器信息、充电上限文件、低电量模式。
+    /// 完整读取一次：IOPS、IORegistry 两个节点、充电器信息、充电上限（PowerUI 和文件）、低电量模式。
     func read() -> RawBatteryReadings
 }
 
-/// 通过 IOKit 公开接口和充电上限文件读取。
+/// 通过 IOKit 公开接口、PowerUI 只读接口和充电上限文件读取。
 public struct IOKitBatteryDataSource: BatteryDataSource {
     public init() {}
 
@@ -19,6 +19,7 @@ public struct IOKitBatteryDataSource: BatteryDataSource {
             smartBatteryPack: Self.registryProperties(IOServiceNameMatching("AppleSmartBatteryPack")),
             adapterDetails: Self.adapterDetails(),
             chargeLimitArchive: ChargeLimitFile.readArchive(),
+            powerUIChargeLimit: PowerUIClient.read(),
             lowPowerModeEnabled: ProcessInfo.processInfo.isLowPowerModeEnabled
         )
     }

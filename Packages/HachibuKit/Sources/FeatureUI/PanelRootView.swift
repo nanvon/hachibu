@@ -116,13 +116,6 @@ private struct StatusHeader: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .monospacedDigit()
-                HStack(spacing: 4) {
-                    Text("System Charge Limit", bundle: .module)
-                    ChargeLimitValue(percent: snapshot.chargeLimitPercent)
-                }
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .monospacedDigit()
             }
             Spacer(minLength: 0)
         }
@@ -179,19 +172,6 @@ struct StatusLabel: View {
         case .chargeLimitReached(let limit): Text("Charge Limit Reached (\(limit)%)", bundle: .module)
         case .pluggedInNotCharging: Text("Plugged In, Not Charging", bundle: .module)
         case nil: Text(verbatim: DisplayFormat.missing)
-        }
-    }
-}
-
-/// 只展示读取到的设置值，不推断开关状态或控制是否生效。
-struct ChargeLimitValue: View {
-    let percent: Int?
-
-    var body: some View {
-        if let percent {
-            Text(verbatim: DisplayFormat.percent(percent))
-        } else {
-            Text("Unknown", bundle: .module)
         }
     }
 }
@@ -589,7 +569,7 @@ private enum PanelPreviewData {
         amperageMA: Int? = 0,
         timeToEmptyMinutes: Int? = nil,
         timeToFullMinutes: Int? = nil,
-        chargeLimitPercent: Int? = 80,
+        chargeLimit: ChargeLimitSetting? = .on(percent: 80),
         temperatureCelsius: Double? = 26.69
     ) -> BatterySnapshot {
         BatterySnapshot(
@@ -612,7 +592,7 @@ private enum PanelPreviewData {
             cycleCount: 68,
             designCycleCount: 1000,
             adapter: isExternalPower == true ? adapter : nil,
-            chargeLimitPercent: chargeLimitPercent
+            chargeLimit: chargeLimit
         )
     }
 }

@@ -7,6 +7,9 @@ public enum ChargeStatus: Sendable, Equatable {
     case chargeLimitReached(limit: Int)
     case pluggedInNotCharging
 
+    /// Apple 文档 102338：达到充电上限后，电量下降超过 5% 才恢复充电。这个区间内接电未充电都算已达到上限。
+    static let chargeLimitResumeMargin = 5
+
     /// 按顺序匹配，用第一条符合的。不知道是否接电时返回 nil。
     /// `NotChargingReason` 不参与判断。
     public init?(_ snapshot: BatterySnapshot) {
@@ -20,7 +23,8 @@ public enum ChargeStatus: Sendable, Equatable {
             self = .pluggedInDraining
         } else if snapshot.percent == 100 {
             self = .fullyCharged
-        } else if let limit = snapshot.chargeLimitPercent, let percent = snapshot.percent, percent >= limit - 1 {
+        } else if let limit = snapshot.chargeLimitPercent, let percent = snapshot.percent,
+                  percent >= limit - Self.chargeLimitResumeMargin {
             self = .chargeLimitReached(limit: limit)
         } else {
             self = .pluggedInNotCharging

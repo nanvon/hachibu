@@ -82,7 +82,7 @@ struct SettingsPage: View {
                 Text("No Battery Detected", bundle: .module)
             case .battery(let snapshot):
                 LabeledContent {
-                    ChargeLimitValue(percent: snapshot.chargeLimitPercent)
+                    ChargeLimitValue(setting: snapshot.chargeLimit)
                         .monospacedDigit()
                 } label: {
                     Text("System Charge Limit", bundle: .module)
@@ -105,9 +105,9 @@ struct SettingsPage: View {
                     .foregroundStyle(.red)
             }
         } header: {
-            Text("Charging", bundle: .module)
+            Text("Battery Charging", bundle: .module)
         } footer: {
-            Text("Manage charging options in System Settings → Battery. Hachibu only reads the charge limit; the value does not confirm that limiting is enabled or taking effect. Unknown does not mean off.", bundle: .module)
+            Text("Change the charge limit in System Settings → Battery. Requires macOS 26.4 or later.", bundle: .module)
                 .font(.callout)
                 .foregroundStyle(.secondary)
         }
@@ -173,6 +173,20 @@ struct SettingsPage: View {
             }
         } header: {
             Text("About", bundle: .module)
+        }
+    }
+}
+
+/// 系统充电上限的读数：百分比、关闭、不支持；未知时显示“—”。
+private struct ChargeLimitValue: View {
+    let setting: ChargeLimitSetting?
+
+    var body: some View {
+        switch setting {
+        case .on(let percent): Text(verbatim: DisplayFormat.percent(percent))
+        case .off: Text("Off", bundle: .module)
+        case .unsupported: Text("Not Supported", bundle: .module)
+        case nil: Text(verbatim: DisplayFormat.missing)
         }
     }
 }
