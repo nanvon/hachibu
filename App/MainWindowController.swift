@@ -10,7 +10,7 @@ import UniformTypeIdentifiers
 final class MainWindowController: NSWindowController, NSWindowDelegate {
     private var history: HistoryModel?
 
-    convenience init(history: HistoryModel, settings: AppSettings, alerts: AlertMonitor, updates: UpdateController) {
+    convenience init(history: HistoryModel, monitor: BatteryMonitor, settings: AppSettings, alerts: AlertMonitor, updates: UpdateController) {
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 960, height: 680),
             styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
@@ -36,7 +36,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
                 await self?.exportDiagnostics()
             },
             onCheckForUpdates: updates.isAvailable ? { @MainActor in updates.checkForUpdates() } : nil
-        ))
+        ).environment(monitor))
         hostingView.sceneBridgingOptions = [.toolbars, .title]
         window.contentView = hostingView
         window.delegate = self

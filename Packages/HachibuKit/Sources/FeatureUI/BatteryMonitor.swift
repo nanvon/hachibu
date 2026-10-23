@@ -46,6 +46,8 @@ public final class BatteryMonitor {
         powerSourceObserver = PowerSourceObserver { [weak self] in self?.readNow() }
         observe(NSWorkspace.didWakeNotification, in: NSWorkspace.shared.notificationCenter)
         observe(.NSProcessInfoPowerStateDidChange, in: .default)
+        // 用户在系统电池设置中修改上限后，切回主窗口时立即刷新。
+        observe(NSApplication.didBecomeActiveNotification, in: .default)
 
         startReadLoop()
         startMinuteLoop()

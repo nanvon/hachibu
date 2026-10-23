@@ -116,6 +116,13 @@ private struct StatusHeader: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .monospacedDigit()
+                HStack(spacing: 4) {
+                    Text("System Charge Limit", bundle: .module)
+                    ChargeLimitValue(percent: snapshot.chargeLimitPercent)
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .monospacedDigit()
             }
             Spacer(minLength: 0)
         }
@@ -134,7 +141,7 @@ private struct StatusHeader: View {
 }
 
 /// 状态文字和图标。充电相关用绿色，接电放电用橙色，其他用次要色。
-private struct StatusLabel: View {
+struct StatusLabel: View {
     let status: ChargeStatus?
 
     var body: some View {
@@ -172,6 +179,19 @@ private struct StatusLabel: View {
         case .chargeLimitReached(let limit): Text("Charge Limit Reached (\(limit)%)", bundle: .module)
         case .pluggedInNotCharging: Text("Plugged In, Not Charging", bundle: .module)
         case nil: Text(verbatim: DisplayFormat.missing)
+        }
+    }
+}
+
+/// 只展示读取到的设置值，不推断开关状态或控制是否生效。
+struct ChargeLimitValue: View {
+    let percent: Int?
+
+    var body: some View {
+        if let percent {
+            Text(verbatim: DisplayFormat.percent(percent))
+        } else {
+            Text("Unknown", bundle: .module)
         }
     }
 }

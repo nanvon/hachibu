@@ -349,6 +349,16 @@
         }
       }
     },
+    "Could not open Battery settings. Open System Settings → Battery manually." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法打开电池设置，请手动前往“系统设置 → 电池”。"
+          }
+        }
+      }
+    },
     "Current" : {
       "localizations" : {
         "zh-Hans" : {
@@ -365,6 +375,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "当前最大容量"
+          }
+        }
+      }
+    },
+    "Current Status" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当前状态"
           }
         }
       }
@@ -600,6 +620,16 @@
         }
       }
     },
+    "Manage charging options in System Settings → Battery. Hachibu only reads the charge limit; the value does not confirm that limiting is enabled or taking effect. Unknown does not mean off." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请在“系统设置 → 电池”中调整充电选项。Hachibu 仅读取上限，设置值不能证明限充已启用或正在生效；未知不代表关闭。"
+          }
+        }
+      }
+    },
     "Maximum Capacity" : {
       "localizations" : {
         "zh-Hans" : {
@@ -726,6 +756,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "使用电池"
+          }
+        }
+      }
+    },
+    "Open Battery Settings…" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开电池设置…"
           }
         }
       }
@@ -921,6 +961,16 @@
         }
       }
     },
+    "System Charge Limit" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "系统充电上限"
+          }
+        }
+      }
+    },
     "System Notifications" : {
       "localizations" : {
         "zh-Hans" : {
@@ -1017,6 +1067,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "时间范围"
+          }
+        }
+      }
+    },
+    "Unknown" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未知"
           }
         }
       }

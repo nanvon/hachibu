@@ -1,4 +1,5 @@
 import AppKit
+import BatteryCore
 import os
 import ServiceManagement
 import SwiftUI
@@ -7,17 +8,20 @@ private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Hachibu"
 
 /// 设置页。设置项见 docs/v1技术设计.md 第 13 节。
 struct SettingsPage: View {
+    @Environment(BatteryMonitor.self) private var monitor
     @Bindable var settings: AppSettings
     let onExportDiagnostics: @MainActor () async -> Void
     /// 为 nil 时不显示“检查更新”。
     let onCheckForUpdates: (@MainActor () -> Void)?
     @State private var loginItem = LoginItem()
     @State private var isExporting = false
+    @State private var couldNotOpenBatterySettings = false
 
     var body: some View {
         Form {
             menuBarSection
             generalSection
+            chargingSection
             diagnosticsSection
             aboutSection
         }
@@ -65,6 +69,47 @@ struct SettingsPage: View {
             }
         } header: {
             Text("General", bundle: .module)
+        }
+    }
+
+    private var chargingSection: some View {
+        Section {
+            switch monitor.reading {
+            case nil:
+                ProgressView()
+                    .controlSize(.small)
+            case .noBattery:
+                Text("No Battery Detected", bundle: .module)
+            case .battery(let snapshot):
+                LabeledContent {
+                    ChargeLimitValue(percent: snapshot.chargeLimitPercent)
+                        .monospacedDigit()
+                } label: {
+                    Text("System Charge Limit", bundle: .module)
+                }
+                LabeledContent {
+                    StatusLabel(status: ChargeStatus(snapshot))
+                } label: {
+                    Text("Current Status", bundle: .module)
+                }
+            }
+            Button {
+                let url = URL(string: "x-apple.systempreferences:com.apple.preference.battery")
+                couldNotOpenBatterySettings = url.map { NSWorkspace.shared.open($0) } != true
+            } label: {
+                Text("Open Battery Settings…", bundle: .module)
+            }
+            if couldNotOpenBatterySettings {
+                Text("Could not open Battery settings. Open System Settings → Battery manually.", bundle: .module)
+                    .font(.callout)
+                    .foregroundStyle(.red)
+            }
+        } header: {
+            Text("Charging", bundle: .module)
+        } footer: {
+            Text("Manage charging options in System Settings → Battery. Hachibu only reads the charge limit; the value does not confirm that limiting is enabled or taking effect. Unknown does not mean off.", bundle: .module)
+                .font(.callout)
+                .foregroundStyle(.secondary)
         }
     }
 
