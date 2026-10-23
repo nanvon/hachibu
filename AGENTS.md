@@ -39,7 +39,7 @@ Hachibu 是 macOS 菜单栏电池监控应用，定位为 AlDente 的平替，�
 - 材质：macOS 26+ 用 `NSGlassEffectView`，更早系统用 `NSVisualEffectView`。
 - 界面语言：英文和简体中文，文案用 String Catalog（`.xcstrings`），源语言为英文。界面文字不要硬编码在 `BatteryCore`、`HistoryStore` 里。
 - 工程：XcodeGen（`project.yml`）生成 Xcode 工程，`.xcodeproj` 不提交；逻辑放在本地 Swift Package `HachibuKit`，分 `BatteryCore`、`HistoryStore`、`FeatureUI` 三个 target。
-- 依赖：GRDB；Sparkle 2 在首次公开发布前接入。
+- 依赖：GRDB（HachibuKit）；Sparkle 2（App target，`project.yml` 引入）。EdDSA 公钥未填写前不启用更新。
 - 仓库里不放密钥和证书。Team ID、签名身份放在不提交的 `Config/Local.xcconfig`，这样别人 clone 后不改工程就能用本地签名编译。
 
 ## 数据来源要点

@@ -8,6 +8,9 @@ options:
 packages:
   HachibuKit:
     path: Packages/HachibuKit
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    from: 2.10.0
 
 targets:
   Hachibu:
@@ -25,4 +28,5 @@ targets:
         product: HistoryStore
       - package: HachibuKit
         product: FeatureUI
+      - package: Sparkle
     scheme: {}

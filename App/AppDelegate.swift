@@ -11,11 +11,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let batteryMonitor: BatteryMonitor
     private let settings = AppSettings()
     private lazy var alertMonitor = AlertMonitor(settings: settings, notifier: SystemAlertNotifier())
+    private let updateController = UpdateController()
     private var statusItemController: StatusItemController?
     private lazy var mainWindowController = MainWindowController(
         history: HistoryModel(store: historyStore),
         settings: settings,
-        alerts: alertMonitor
+        alerts: alertMonitor,
+        updates: updateController
     )
 
     override init() {

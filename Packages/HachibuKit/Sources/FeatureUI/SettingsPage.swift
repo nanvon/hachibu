@@ -9,6 +9,8 @@ private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Hachibu"
 struct SettingsPage: View {
     @Bindable var settings: AppSettings
     let onExportDiagnostics: @MainActor () async -> Void
+    /// 为 nil 时不显示“检查更新”。
+    let onCheckForUpdates: (@MainActor () -> Void)?
     @State private var loginItem = LoginItem()
     @State private var isExporting = false
 
@@ -115,6 +117,13 @@ struct SettingsPage: View {
                     }
                 } label: {
                     Text("License", bundle: .module)
+                }
+            }
+            if let onCheckForUpdates {
+                Button {
+                    onCheckForUpdates()
+                } label: {
+                    Text("Check for Updates…", bundle: .module)
                 }
             }
         } header: {
