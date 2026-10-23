@@ -12,27 +12,19 @@ struct ChartPoint: Identifiable, Equatable {
 
 /// 近期组的时间范围。
 enum RecentRange: CaseIterable, Hashable {
-    case hour, day, week, month, all
+    case hour, day, week
 
     var duration: TimeInterval {
         switch self {
         case .hour: 3600
         case .day: 24 * 3600
         case .week: 7 * 24 * 3600
-        case .month: 30 * 24 * 3600
-        case .all: 0
         }
     }
 
-    func start(now: Date, firstRecordedAt: Date?) -> Date {
-        guard self == .all else { return now.addingTimeInterval(-duration) }
-        let first = min(firstRecordedAt ?? now.addingTimeInterval(-3600), now.addingTimeInterval(-3600))
-        return Date(timeIntervalSince1970: (first.timeIntervalSince1970 / 3600).rounded(.down) * 3600)
-    }
-
-    /// 1 小时、24 小时画分钟原始点，更长范围按小时汇总。
+    /// 1 小时、24 小时画分钟原始点，7 天按小时汇总。
     var sampleInterval: TimeInterval {
-        self == .hour || self == .day ? 60 : 3600
+        self == .week ? 3600 : 60
     }
 }
 
@@ -62,7 +54,6 @@ struct RecentChartData: Equatable {
     var percent: [ChartPoint]
     var systemPowerWatts: [ChartPoint]
     var temperatureCelsius: [ChartPoint]
-    var chargeLimit: [ChartPoint] = []
 }
 
 /// 长期组三条曲线的数据。
@@ -74,7 +65,6 @@ struct LongTermChartData: Equatable {
     var maximumCapacityPercent: [ChartPoint]
     var fullChargeCapacityMAh: [ChartPoint]
     var cycleCount: [ChartPoint]
-    var designCapacityMAh: [ChartPoint] = []
 }
 
 /// 把数据库记录转换成曲线数据。规则见 docs/v1技术设计.md 第 11 节。
@@ -88,7 +78,6 @@ enum HistoryChartBuilder {
         var systemLoadMW: Double?
         var temperatureCelsius: Double?
         var isExternalPower: Bool
-        var chargeLimit: Double?
     }
 
     // MARK: - 近期
@@ -98,11 +87,10 @@ enum HistoryChartBuilder {
         let rows = minuteSamples.map { sample in
             RecentRow(
                 date: sample.timestamp,
-                percent: sample.percent.flatMap(Double.init(exactly:)),
+                percent: sample.percent.map(Double.init),
                 systemLoadMW: sample.systemLoadMW.map(Double.init),
                 temperatureCelsius: sample.temperatureCelsius,
-                isExternalPower: sample.isExternalPower == true,
-                chargeLimit: sample.chargeLimitPercent.flatMap(Double.init(exactly:))
+                isExternalPower: sample.isExternalPower == true
             )
         }
         return recent(rows: rows, range: range, now: now, firstRecordedAt: firstRecordedAt)
@@ -116,16 +104,14 @@ enum HistoryChartBuilder {
                 percent: sample.percentAverage,
                 systemLoadMW: sample.systemLoadAverageMW,
                 temperatureCelsius: sample.temperatureAverageCelsius,
-                isExternalPower: sample.externalMinutes > 0 && sample.externalMinutes * 2 >= sample.sampleCount,
-                chargeLimit: sample.chargeLimitPercent.flatMap(Double.init(exactly:))
+                isExternalPower: sample.externalMinutes > 0 && sample.externalMinutes * 2 >= sample.sampleCount
             )
         }
         return recent(rows: rows, range: range, now: now, firstRecordedAt: firstRecordedAt)
     }
 
     private static func recent(rows: [RecentRow], range: RecentRange, now: Date, firstRecordedAt: Date?) -> RecentChartData {
-        let start = range.start(now: now, firstRecordedAt: firstRecordedAt)
-        let domain = start...now
+        let domain = now.addingTimeInterval(-range.duration)...now
         let rows = rows.filter { domain.contains($0.date) }
         let maxGap = range.sampleInterval * maxGapIntervals
         return RecentChartData(
@@ -140,8 +126,7 @@ enum HistoryChartBuilder {
             ),
             percent: segmented(rows.map { ($0.date, $0.percent) }, maxGap: maxGap),
             systemPowerWatts: segmented(rows.map { ($0.date, $0.systemLoadMW.map { $0 / 1000 }) }, maxGap: maxGap),
-            temperatureCelsius: segmented(rows.map { ($0.date, $0.temperatureCelsius) }, maxGap: maxGap),
-            chargeLimit: segmented(rows.map { ($0.date, $0.chargeLimit) }, maxGap: maxGap)
+            temperatureCelsius: segmented(rows.map { ($0.date, $0.temperatureCelsius) }, maxGap: maxGap)
         )
     }
 
@@ -184,10 +169,9 @@ enum HistoryChartBuilder {
             domain: domain,
             maxGap: maxGap,
             notRecorded: notRecordedRange(in: domain, recordStart: firstRecordedStart),
-            maximumCapacityPercent: segmented(days.map { ($0.date, $0.sample.systemMaxCapacityPercent.flatMap(Double.init(exactly:))) }, maxGap: maxGap),
-            fullChargeCapacityMAh: segmented(days.map { ($0.date, $0.sample.fullChargeCapacityMAh.flatMap(Double.init(exactly:))) }, maxGap: maxGap),
-            cycleCount: segmented(days.map { ($0.date, $0.sample.cycleCount.flatMap(Double.init(exactly:))) }, maxGap: maxGap),
-            designCapacityMAh: segmented(days.map { ($0.date, $0.sample.designCapacityMAh.flatMap(Double.init(exactly:))) }, maxGap: maxGap)
+            maximumCapacityPercent: segmented(days.map { ($0.date, $0.sample.systemMaxCapacityPercent.map(Double.init)) }, maxGap: maxGap),
+            fullChargeCapacityMAh: segmented(days.map { ($0.date, $0.sample.fullChargeCapacityMAh.map(Double.init)) }, maxGap: maxGap),
+            cycleCount: segmented(days.map { ($0.date, $0.sample.cycleCount.map(Double.init)) }, maxGap: maxGap)
         )
     }
 

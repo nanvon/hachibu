@@ -15,7 +15,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItemController: StatusItemController?
     private lazy var mainWindowController = MainWindowController(
         history: HistoryModel(store: historyStore),
-        store: historyStore,
         monitor: batteryMonitor,
         settings: settings,
         alerts: alertMonitor,

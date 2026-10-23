@@ -13,19 +13,15 @@ struct SettingsPage: View {
     let onExportDiagnostics: @MainActor () async -> Void
     /// 为 nil 时不显示“检查更新”。
     let onCheckForUpdates: (@MainActor () -> Void)?
-    let onImportHistory: (@MainActor () async -> Bool)?
     @State private var loginItem = LoginItem()
     @State private var isExporting = false
     @State private var couldNotOpenBatterySettings = false
-    @State private var isImporting = false
-    @State private var exportPromptStatus: ExportPromptStatus?
 
     var body: some View {
         Form {
             menuBarSection
             generalSection
             chargingSection
-            historyImportSection
             diagnosticsSection
             aboutSection
         }
@@ -117,74 +113,6 @@ struct SettingsPage: View {
         }
     }
 
-    private var historyImportSection: some View {
-        Section {
-            DisclosureGroup {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("1. Copy the export prompt and give it to an AI tool that can read files and run commands on this Mac.", bundle: .module)
-                    Text("2. Ask it to export your previous battery history and verify the resulting JSON. Do not import an incomplete file.", bundle: .module)
-                    Text("3. Choose Import History… below and select the verified JSON. Review the record counts before confirming.", bundle: .module)
-                    Text("The export tool must verify compatibility before reading the previous database.", bundle: .module)
-                        .foregroundStyle(.secondary)
-                    Text("The export includes battery identifiers and history. Use a local AI tool with file access; you do not need to upload your database or exported file to a chat.", bundle: .module)
-                        .foregroundStyle(.secondary)
-                }
-                .font(.callout)
-                .padding(.vertical, 4)
-            } label: {
-                Text("How to Export History", bundle: .module)
-            }
-            Button(action: copyExportPrompt) {
-                Text("Copy AI Export Prompt", bundle: .module)
-            }
-            if let exportPromptStatus {
-                switch exportPromptStatus {
-                case .copied:
-                    Text("Export prompt copied. Paste it into your local AI tool.", bundle: .module)
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                case .failed:
-                    Text("Could not copy the export prompt. Please try again.", bundle: .module)
-                        .font(.callout)
-                        .foregroundStyle(.red)
-                }
-            }
-            Button {
-                guard let onImportHistory else { return }
-                isImporting = true
-                Task {
-                    defer { isImporting = false }
-                    _ = await onImportHistory()
-                }
-            } label: {
-                Text("Import History…", bundle: .module)
-            }
-            .disabled(isImporting || onImportHistory == nil)
-            if isImporting {
-                ProgressView()
-                    .controlSize(.small)
-            }
-        } header: {
-            Text("Historical Data", bundle: .module)
-        } footer: {
-            Text("Imported records become part of your battery history and appear alongside new measurements. Existing measurements take priority where records overlap.", bundle: .module)
-                .font(.callout)
-                .foregroundStyle(.secondary)
-        }
-    }
-
-    private func copyExportPrompt() {
-        do {
-            let prompt = try AlDenteExportGuide.prompt()
-            let pasteboard = NSPasteboard.general
-            pasteboard.clearContents()
-            exportPromptStatus = pasteboard.setString(prompt, forType: .string) ? .copied : .failed
-        } catch {
-            exportPromptStatus = .failed
-            logger.error("Failed to load AlDente export prompt: \(String(describing: error), privacy: .public)")
-        }
-    }
-
     private var diagnosticsSection: some View {
         Section {
             Button {
@@ -247,10 +175,6 @@ struct SettingsPage: View {
             Text("About", bundle: .module)
         }
     }
-}
-
-private enum ExportPromptStatus {
-    case copied, failed
 }
 
 /// 设置页“关于”区显示的信息。
