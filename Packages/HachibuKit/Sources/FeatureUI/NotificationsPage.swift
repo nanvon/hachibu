@@ -7,18 +7,12 @@ struct NotificationsPage: View {
     let alerts: AlertMonitor
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text("Notifications", bundle: .module)
-                .font(.title2.weight(.semibold))
-                .padding([.horizontal, .top], 24)
-
-            Form {
-                authorizationSection
-                temperatureSection
-                healthSection
-            }
-            .formStyle(.grouped)
+        Form {
+            authorizationSection
+            temperatureSection
+            healthSection
         }
+        .formStyle(.grouped)
         .task { await alerts.refreshAuthorization() }
         // 用户可能在系统设置里改了通知权限后切回来。
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in

@@ -13,11 +13,14 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     convenience init(history: HistoryModel, settings: AppSettings, alerts: AlertMonitor, updates: UpdateController) {
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 960, height: 680),
-            styleMask: [.titled, .closable, .miniaturizable, .resizable],
+            styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
             backing: .buffered,
             defer: false
         )
         window.title = "Hachibu"
+        // 工具栏和标题交给 SwiftUI（见下方 sceneBridgingOptions），侧栏由系统画成悬浮玻璃。见 docs/v1技术设计.md 19.3。
+        window.toolbar = NSToolbar(identifier: "MainWindowToolbar")
+        window.toolbarStyle = .unified
         window.isReleasedWhenClosed = false
         window.setFrameAutosaveName("MainWindow")
         if !window.setFrameUsingName("MainWindow") {
@@ -25,7 +28,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         }
         self.init(window: window)
         self.history = history
-        window.contentView = NSHostingView(rootView: MainWindowRootView(
+        let hostingView = NSHostingView(rootView: MainWindowRootView(
             history: history,
             settings: settings,
             alerts: alerts,
@@ -34,6 +37,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
             },
             onCheckForUpdates: updates.isAvailable ? { @MainActor in updates.checkForUpdates() } : nil
         ))
+        hostingView.sceneBridgingOptions = [.toolbars, .title]
+        window.contentView = hostingView
         window.delegate = self
     }
 

@@ -7,14 +7,14 @@ struct HistoryPage: View {
     var body: some View {
         if model.isAvailable {
             ScrollView {
-                VStack(alignment: .leading, spacing: 28) {
-                    header
+                VStack(alignment: .leading, spacing: 36) {
                     RecentSection(model: model)
                     LongTermSection(model: model)
                 }
                 .padding(24)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
+            .navigationSubtitle(lastUpdatedText)
         } else {
             ContentUnavailableView {
                 Label {
@@ -28,18 +28,10 @@ struct HistoryPage: View {
         }
     }
 
-    private var header: some View {
-        HStack(alignment: .firstTextBaseline) {
-            Text("History", bundle: .module)
-                .font(.title2.weight(.semibold))
-            Spacer(minLength: 8)
-            if let lastUpdated = model.lastUpdated {
-                Text("Last updated \(lastUpdated.formatted(date: .omitted, time: .shortened))", bundle: .module)
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .monospacedDigit()
-            }
-        }
+    /// “最近更新 HH:mm”，显示在工具栏标题下方。
+    private var lastUpdatedText: Text {
+        guard let lastUpdated = model.lastUpdated else { return Text(verbatim: "") }
+        return Text("Last updated \(lastUpdated.formatted(date: .omitted, time: .shortened))", bundle: .module)
     }
 }
 
@@ -50,11 +42,11 @@ private struct RecentSection: View {
     @State private var hoverDate: Date?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 20) {
             SectionHeader(title: Text("Recent", bundle: .module)) {
                 HStack(spacing: 6) {
                     RoundedRectangle(cornerRadius: 2)
-                        .fill(Color.blue.opacity(0.2))
+                        .fill(Color.green.opacity(0.2))
                         .frame(width: 12, height: 10)
                     Text("Plugged In", bundle: .module)
                         .font(.caption)
@@ -82,7 +74,7 @@ private struct RecentSection: View {
                     bands: data.pluggedIn,
                     notRecorded: data.notRecorded,
                     yScale: .fixed(0...100),
-                    color: .green,
+                    color: .brand,
                     formatValue: { DisplayFormat.percent(Int($0.rounded())) },
                     formatDate: formatDate,
                     hoverDate: $hoverDate
@@ -142,7 +134,7 @@ private struct LongTermSection: View {
     @State private var hoverDate: Date?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 20) {
             SectionHeader(title: Text("Long Term", bundle: .module)) {
                 Picker(selection: Binding(get: { model.longTermRange }, set: { model.setLongTermRange($0) })) {
                     ForEach(LongTermRange.allCases, id: \.self) { range in
@@ -164,7 +156,7 @@ private struct LongTermSection: View {
                     domain: data.domain,
                     maxGap: data.maxGap,
                     notRecorded: data.notRecorded,
-                    color: .teal,
+                    color: .brand,
                     formatValue: { DisplayFormat.percent(Int($0.rounded())) },
                     formatDate: formatDate,
                     hoverDate: $hoverDate
@@ -175,7 +167,7 @@ private struct LongTermSection: View {
                     domain: data.domain,
                     maxGap: data.maxGap,
                     notRecorded: data.notRecorded,
-                    color: .indigo,
+                    color: .brand,
                     formatValue: { "\(DisplayFormat.number(Int($0.rounded()))) mAh" },
                     formatDate: formatDate,
                     hoverDate: $hoverDate
@@ -188,7 +180,7 @@ private struct LongTermSection: View {
                     maxGap: data.maxGap,
                     notRecorded: data.notRecorded,
                     interpolation: .stepEnd,
-                    color: .purple,
+                    color: .brand,
                     formatValue: { DisplayFormat.number(Int($0.rounded())) },
                     formatDate: formatDate,
                     hoverDate: $hoverDate

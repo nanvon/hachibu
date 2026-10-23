@@ -14,6 +14,8 @@ SWIFT_VERSION = 6.0
 
 INFOPLIST_FILE = App/Info.plist
 ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon
+// App 级强调色为品牌蓝，与 FeatureUI 的 BrandBlue 取值相同。用户在系统设置里选了其他强调色时以用户为准。
+ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor
 
 // Sparkle 自动更新，见 docs/打包发布.md。appcast 作为附件随每个 GitHub Release 上传，
 // 这个地址总是指向最新正式 Release 里的 appcast.xml。

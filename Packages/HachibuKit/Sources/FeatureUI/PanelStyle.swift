@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// 面板的颜色、材质和动效。规则见 docs/v1技术设计.md 第 19 节。
+/// 面板和主窗口共用的颜色、材质，以及面板动效。规则见 docs/v1技术设计.md 第 19 节。
 extension Color {
     /// 品牌蓝 `#287DD0`，深色模式下调亮，定义在 Asset Catalog。
     static let brand = Color("BrandBlue", bundle: .module)

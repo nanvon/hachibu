@@ -44,18 +44,22 @@ public struct MainWindowRootView: View {
             .navigationSplitViewColumnWidth(min: 180, ideal: 200, max: 260)
         } detail: {
             let page = selection ?? .history
-            switch page {
-            case .history:
-                HistoryPage(model: history)
-            case .notifications:
-                NotificationsPage(settings: settings, alerts: alerts)
-            case .settings:
-                SettingsPage(
-                    settings: settings,
-                    onExportDiagnostics: onExportDiagnostics,
-                    onCheckForUpdates: onCheckForUpdates
-                )
+            Group {
+                switch page {
+                case .history:
+                    HistoryPage(model: history)
+                case .notifications:
+                    NotificationsPage(settings: settings, alerts: alerts)
+                case .settings:
+                    SettingsPage(
+                        settings: settings,
+                        onExportDiagnostics: onExportDiagnostics,
+                        onCheckForUpdates: onCheckForUpdates
+                    )
+                }
             }
+            // 标题由 sceneBridgingOptions 显示在窗口工具栏，页面内不再手写标题。
+            .navigationTitle(page.title)
         }
         .frame(minWidth: 760, minHeight: 520)
     }

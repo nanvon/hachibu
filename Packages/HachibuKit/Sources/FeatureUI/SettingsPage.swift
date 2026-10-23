@@ -15,19 +15,13 @@ struct SettingsPage: View {
     @State private var isExporting = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text("Settings", bundle: .module)
-                .font(.title2.weight(.semibold))
-                .padding([.horizontal, .top], 24)
-
-            Form {
-                menuBarSection
-                generalSection
-                diagnosticsSection
-                aboutSection
-            }
-            .formStyle(.grouped)
+        Form {
+            menuBarSection
+            generalSection
+            diagnosticsSection
+            aboutSection
         }
+        .formStyle(.grouped)
         .onAppear { loginItem.refresh() }
         // 用户可能在系统设置里批准或关闭登录项后切回来。
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
