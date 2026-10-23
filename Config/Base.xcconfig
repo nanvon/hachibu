@@ -5,7 +5,7 @@ PRODUCT_NAME = Hachibu
 // 首次发布后不能再改，见 docs/v1技术设计.md 第 1 节。
 PRODUCT_BUNDLE_IDENTIFIER = io.github.nanvon.hachibu
 // 发布版本号 X.Y.Z，必须与发布 tag vX.Y.Z 一致；构建版本跟随它，Sparkle 用它比较新旧。见 docs/打包发布.md。
-MARKETING_VERSION = 0.1.0
+MARKETING_VERSION = 0.0.1
 CURRENT_PROJECT_VERSION = $(MARKETING_VERSION)
 
 MACOSX_DEPLOYMENT_TARGET = 14.0
@@ -21,7 +21,7 @@ ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon
 SPARKLE_FEED_URL = https:/$()/github.com/nanvon/hachibu/releases/latest/download/appcast.xml
 // EdDSA 公钥，用 Sparkle 的 generate_keys 生成后填写，与 GitHub variable SPARKLE_PUBLIC_ED_KEY 相同。
 // 公钥可以提交，私钥只放在钥匙串和 GitHub secret 里。为空时不启用更新。
-SPARKLE_PUBLIC_ED_KEY =
+SPARKLE_PUBLIC_ED_KEY = VxTejaIFX3+nr/Mk2tH8MeiJcYcINGM5spSyRhGxtao=
 CODE_SIGN_ENTITLEMENTS = App/Hachibu.entitlements
 ENABLE_HARDENED_RUNTIME = YES
 
