@@ -21,6 +21,11 @@ public final class BatteryMonitor {
     /// 最近一次 `system_profiler` 读到的健康信息。读取失败时保留上一次的值。
     public private(set) var health: BatteryHealthInfo?
 
+    /// 每次读取完成后调用，读数没变也调用。提醒判定用。
+    @ObservationIgnored public var onRead: (@MainActor (BatteryReading, Date) -> Void)?
+    /// 每次 `system_profiler` 读取成功后调用，健康信息没变也调用。
+    @ObservationIgnored public var onHealthRefresh: (@MainActor (BatteryHealthInfo) -> Void)?
+
     @ObservationIgnored private let sampler: BatterySampler
     @ObservationIgnored private var lastReadAt: Date?
     @ObservationIgnored private var isPanelVisible = false
@@ -115,6 +120,7 @@ public final class BatteryMonitor {
         if reading != result.reading {
             reading = result.reading
         }
+        onRead?(result.reading, result.date)
     }
 
     private func writeMinuteSample() async {
@@ -125,8 +131,11 @@ public final class BatteryMonitor {
     }
 
     private func refreshHealth() async {
-        if let health = await sampler.refreshHealth(at: Date()), health != self.health {
-            self.health = health
+        if let health = await sampler.refreshHealth(at: Date()) {
+            if health != self.health {
+                self.health = health
+            }
+            onHealthRefresh?(health)
         }
         await sampler.aggregateHistory(now: Date())
     }

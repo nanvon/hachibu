@@ -69,16 +69,6 @@
         }
       }
     },
-    "7 Days" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "7 天"
-          }
-        }
-      }
-    },
     "24 Hours" : {
       "localizations" : {
         "zh-Hans" : {
@@ -99,12 +89,82 @@
         }
       }
     },
+    "7 Days" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "7 天"
+          }
+        }
+      }
+    },
+    "Alerted" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已提醒"
+          }
+        }
+      }
+    },
+    "Alerts are checked only while notifications are allowed." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "只有允许通知时才会检查提醒。"
+          }
+        }
+      }
+    },
+    "Alerts once after the temperature stays above %lld °C for 3 minutes." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "温度连续 3 分钟高于 %lld °C 时提醒一次。"
+          }
+        }
+      }
+    },
     "All" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "全部"
+          }
+        }
+      }
+    },
+    "Allow Notifications…" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "允许通知…"
+          }
+        }
+      }
+    },
+    "Allowed" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已允许"
+          }
+        }
+      }
+    },
+    "Already alerted at this threshold. Alerts again only after you change the threshold." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已按当前阈值提醒过，修改阈值后才会再次提醒。"
           }
         }
       }
@@ -129,12 +189,42 @@
         }
       }
     },
+    "Battery Health Low" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "电池健康度低"
+          }
+        }
+      }
+    },
     "Battery Level" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "电量"
+          }
+        }
+      }
+    },
+    "Battery Temperature High" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "电池温度过高"
+          }
+        }
+      }
+    },
+    "Can alert again after the temperature stays below %lld °C for 5 minutes." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "温度连续 5 分钟低于 %lld °C 后，可再次提醒。"
           }
         }
       }
@@ -209,6 +299,16 @@
         }
       }
     },
+    "Checked hourly against the maximum capacity reported by the system. Alerts once." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "每小时用系统报告的最大容量检查一次，只提醒一次。"
+          }
+        }
+      }
+    },
     "Computer" : {
       "localizations" : {
         "zh-Hans" : {
@@ -235,6 +335,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "电流"
+          }
+        }
+      }
+    },
+    "Current Maximum Capacity" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当前最大容量"
+          }
+        }
+      }
+    },
+    "Current Temperature" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当前温度"
           }
         }
       }
@@ -459,6 +579,16 @@
         }
       }
     },
+    "Maximum capacity is %lld%%, below your threshold of %lld%%." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最大容量为 %lld%%，低于设定的 %lld%%。"
+          }
+        }
+      }
+    },
     "Menu Bar" : {
       "localizations" : {
         "zh-Hans" : {
@@ -489,12 +619,12 @@
         }
       }
     },
-    "Not available yet." : {
+    "Not Allowed" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "尚未实现。"
+            "value" : "未允许"
           }
         }
       }
@@ -505,6 +635,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "未记录"
+          }
+        }
+      }
+    },
+    "Not Requested" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未请求"
           }
         }
       }
@@ -565,6 +705,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "打开主窗口"
+          }
+        }
+      }
+    },
+    "Open Notification Settings…" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开通知设置…"
           }
         }
       }
@@ -709,6 +859,26 @@
         }
       }
     },
+    "Status" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "状态"
+          }
+        }
+      }
+    },
+    "System Notifications" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "系统通知"
+          }
+        }
+      }
+    },
     "System Power" : {
       "localizations" : {
         "zh-Hans" : {
@@ -735,6 +905,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "温度高于 %lld °C"
+          }
+        }
+      }
+    },
+    "The battery has stayed above %lld °C for 3 minutes. Current temperature: %@." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "电池温度已连续 3 分钟高于 %lld °C，当前 %@。"
           }
         }
       }
@@ -815,6 +995,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "电压"
+          }
+        }
+      }
+    },
+    "Waiting" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "等待中"
           }
         }
       }

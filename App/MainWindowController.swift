@@ -10,7 +10,7 @@ import UniformTypeIdentifiers
 final class MainWindowController: NSWindowController, NSWindowDelegate {
     private var history: HistoryModel?
 
-    convenience init(history: HistoryModel, settings: AppSettings) {
+    convenience init(history: HistoryModel, settings: AppSettings, alerts: AlertMonitor) {
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 960, height: 680),
             styleMask: [.titled, .closable, .miniaturizable, .resizable],
@@ -28,6 +28,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         window.contentView = NSHostingView(rootView: MainWindowRootView(
             history: history,
             settings: settings,
+            alerts: alerts,
             onExportDiagnostics: { [weak self] in
                 await self?.exportDiagnostics()
             }

@@ -21,7 +21,6 @@ struct SettingsPage: View {
             Form {
                 menuBarSection
                 generalSection
-                notificationsSection
                 diagnosticsSection
             }
             .formStyle(.grouped)
@@ -69,31 +68,6 @@ struct SettingsPage: View {
             }
         } header: {
             Text("General", bundle: .module)
-        }
-    }
-
-    private var notificationsSection: some View {
-        Section {
-            Toggle(isOn: $settings.temperatureAlertEnabled) {
-                Text("High Battery Temperature", bundle: .module)
-            }
-            Stepper(value: $settings.temperatureAlertThreshold, in: AppSettings.temperatureThresholdRange) {
-                Text("Temperature above \(settings.temperatureAlertThreshold) °C", bundle: .module)
-                    .monospacedDigit()
-            }
-            Toggle(isOn: $settings.healthAlertEnabled) {
-                Text("Low Battery Health", bundle: .module)
-            }
-            Stepper(value: $settings.healthAlertThreshold, in: AppSettings.healthThresholdRange) {
-                Text("Maximum capacity below \(settings.healthAlertThreshold)%", bundle: .module)
-                    .monospacedDigit()
-            }
-        } header: {
-            Text("Notifications", bundle: .module)
-        } footer: {
-            Text("The panel marks the temperature as High at or above the temperature threshold.", bundle: .module)
-                .font(.callout)
-                .foregroundStyle(.secondary)
         }
     }
 

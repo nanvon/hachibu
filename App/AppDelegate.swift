@@ -10,10 +10,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let historyStore: HistoryStore?
     private let batteryMonitor: BatteryMonitor
     private let settings = AppSettings()
+    private lazy var alertMonitor = AlertMonitor(settings: settings, notifier: SystemAlertNotifier())
     private var statusItemController: StatusItemController?
     private lazy var mainWindowController = MainWindowController(
         history: HistoryModel(store: historyStore),
-        settings: settings
+        settings: settings,
+        alerts: alertMonitor
     )
 
     override init() {
@@ -24,6 +26,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.mainMenu = MainMenu.make()
+        batteryMonitor.onRead = { [alertMonitor] reading, date in
+            alertMonitor.handleReading(reading, at: date)
+        }
+        batteryMonitor.onHealthRefresh = { [alertMonitor] health in
+            alertMonitor.handleHealth(health)
+        }
+        alertMonitor.start()
         batteryMonitor.start()
 
         let panelController = PanelController(

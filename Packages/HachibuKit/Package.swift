@@ -42,7 +42,7 @@ let package = Package(
         ),
         .testTarget(
             name: "FeatureUITests",
-            dependencies: ["FeatureUI", "HistoryStore"]
+            dependencies: ["FeatureUI", "HistoryStore", "BatteryCore"]
         ),
     ]
 )

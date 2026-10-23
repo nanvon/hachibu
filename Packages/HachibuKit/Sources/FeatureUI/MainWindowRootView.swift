@@ -5,6 +5,7 @@ import SwiftUI
 public struct MainWindowRootView: View {
     private let history: HistoryModel
     private let settings: AppSettings
+    private let alerts: AlertMonitor
     private let onExportDiagnostics: @MainActor () async -> Void
     @State private var selection: MainWindowPage? = .history
 
@@ -12,10 +13,12 @@ public struct MainWindowRootView: View {
     public init(
         history: HistoryModel,
         settings: AppSettings,
+        alerts: AlertMonitor,
         onExportDiagnostics: @escaping @MainActor () async -> Void
     ) {
         self.history = history
         self.settings = settings
+        self.alerts = alerts
         self.onExportDiagnostics = onExportDiagnostics
     }
 
@@ -41,7 +44,7 @@ public struct MainWindowRootView: View {
             case .history:
                 HistoryPage(model: history)
             case .notifications:
-                PlaceholderPage(page: page)
+                NotificationsPage(settings: settings, alerts: alerts)
             case .settings:
                 SettingsPage(settings: settings, onExportDiagnostics: onExportDiagnostics)
             }
@@ -88,22 +91,5 @@ private struct RecordingSummaryView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
-    }
-}
-
-/// 通知页尚未实现。
-private struct PlaceholderPage: View {
-    let page: MainWindowPage
-
-    var body: some View {
-        ContentUnavailableView {
-            Label {
-                page.title
-            } icon: {
-                Image(systemName: page.systemImage)
-            }
-        } description: {
-            Text("Not available yet.", bundle: .module)
-        }
     }
 }
