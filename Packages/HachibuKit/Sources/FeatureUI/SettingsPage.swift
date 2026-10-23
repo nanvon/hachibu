@@ -138,8 +138,8 @@ private enum AboutInfo {
     static let repositoryURL = URL(string: "https://github.com/nanvon/hachibu")!
     static let repositoryDisplayName = "github.com/nanvon/hachibu"
     static let licenseURL = repositoryURL.appending(path: "blob/main/LICENSE")
-    /// 许可证名称，如 "MIT"。许可证还没定（docs/v1技术设计.md 第 1 节），加入 LICENSE 文件后填写；为 nil 时不显示。
-    static let license: String? = nil
+    /// 许可证的 SPDX 标识，见仓库根目录 LICENSE。为 nil 时不显示。
+    static let license: String? = "GPL-3.0-only"
 
     /// 例如 “0.1.0 (1)”。读不到时显示“—”。
     static var version: String {

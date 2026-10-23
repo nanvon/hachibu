@@ -114,4 +114,4 @@ xcodebuild -project Hachibu.xcodeproj -scheme Hachibu -configuration Debug build
 
 ## 📄 许可证
 
-许可证将在首个版本发布前确定。
+本项目按 [GNU 通用公共许可证第 3 版](LICENSE)发布，仅限第 3 版（GPL-3.0-only）。

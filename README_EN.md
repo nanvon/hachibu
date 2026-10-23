@@ -114,4 +114,4 @@ To sign with your own certificate, copy `Config/Local.xcconfig.example` to `Conf
 
 ## 📄 License
 
-The license will be chosen before the first release.
+Hachibu is licensed under the [GNU General Public License v3.0](LICENSE), version 3 only (GPL-3.0-only).
