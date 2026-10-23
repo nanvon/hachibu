@@ -99,6 +99,16 @@
         }
       }
     },
+    "About" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "关于"
+          }
+        }
+      }
+    },
     "Alerted" : {
       "localizations" : {
         "zh-Hans" : {
@@ -519,6 +529,16 @@
         }
       }
     },
+    "License" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "许可证"
+          }
+        }
+      }
+    },
     "Live" : {
       "localizations" : {
         "zh-Hans" : {
@@ -849,6 +869,16 @@
         }
       }
     },
+    "Source Code" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "源代码"
+          }
+        }
+      }
+    },
     "Start" : {
       "localizations" : {
         "zh-Hans" : {
@@ -985,6 +1015,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "数值"
+          }
+        }
+      }
+    },
+    "Version" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "版本"
           }
         }
       }

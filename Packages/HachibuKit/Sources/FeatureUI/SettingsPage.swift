@@ -22,6 +22,7 @@ struct SettingsPage: View {
                 menuBarSection
                 generalSection
                 diagnosticsSection
+                aboutSection
             }
             .formStyle(.grouped)
         }
@@ -90,6 +91,57 @@ struct SettingsPage: View {
                 .font(.callout)
                 .foregroundStyle(.secondary)
         }
+    }
+
+    private var aboutSection: some View {
+        Section {
+            LabeledContent {
+                Text(verbatim: AboutInfo.version)
+                    .textSelection(.enabled)
+            } label: {
+                Text("Version", bundle: .module)
+            }
+            LabeledContent {
+                Link(destination: AboutInfo.repositoryURL) {
+                    Text(verbatim: AboutInfo.repositoryDisplayName)
+                }
+            } label: {
+                Text("Source Code", bundle: .module)
+            }
+            if let license = AboutInfo.license {
+                LabeledContent {
+                    Link(destination: AboutInfo.licenseURL) {
+                        Text(verbatim: license)
+                    }
+                } label: {
+                    Text("License", bundle: .module)
+                }
+            }
+        } header: {
+            Text("About", bundle: .module)
+        }
+    }
+}
+
+/// 设置页“关于”区显示的信息。
+private enum AboutInfo {
+    /// 仓库地址是占位值，发布前确定，见 docs/v1技术设计.md 第 1 节。
+    static let repositoryURL = URL(string: "https://github.com/nanvon/hachibu")!
+    static let repositoryDisplayName = "github.com/nanvon/hachibu"
+    static let licenseURL = repositoryURL.appending(path: "blob/main/LICENSE")
+    /// 许可证名称，如 "MIT"。许可证还没定（docs/v1技术设计.md 第 1 节），加入 LICENSE 文件后填写；为 nil 时不显示。
+    static let license: String? = nil
+
+    /// 例如 “0.1.0 (1)”。读不到时显示“—”。
+    static var version: String {
+        let info = Bundle.main.infoDictionary
+        guard let shortVersion = info?["CFBundleShortVersionString"] as? String else {
+            return DisplayFormat.missing
+        }
+        guard let build = info?["CFBundleVersion"] as? String else {
+            return shortVersion
+        }
+        return "\(shortVersion) (\(build))"
     }
 }
 
