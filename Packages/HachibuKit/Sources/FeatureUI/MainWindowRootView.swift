@@ -8,22 +8,26 @@ public struct MainWindowRootView: View {
     private let alerts: AlertMonitor
     private let onExportDiagnostics: @MainActor () async -> Void
     private let onCheckForUpdates: (@MainActor () -> Void)?
+    private let onImportHistory: (@MainActor () async -> Void)?
     @State private var selection: MainWindowPage? = .history
 
     /// `onExportDiagnostics` 由 App 层选择保存位置并写文件，完成后返回。
     /// `onCheckForUpdates` 为 nil 时（更新器未启用）设置页不显示“检查更新”。
+    /// `onImportHistory` 由 App 层选择文件、预览确认并导入；为 nil 时禁用导入。
     public init(
         history: HistoryModel,
         settings: AppSettings,
         alerts: AlertMonitor,
         onExportDiagnostics: @escaping @MainActor () async -> Void,
-        onCheckForUpdates: (@MainActor () -> Void)?
+        onCheckForUpdates: (@MainActor () -> Void)?,
+        onImportHistory: (@MainActor () async -> Void)? = nil
     ) {
         self.history = history
         self.settings = settings
         self.alerts = alerts
         self.onExportDiagnostics = onExportDiagnostics
         self.onCheckForUpdates = onCheckForUpdates
+        self.onImportHistory = onImportHistory
     }
 
     public var body: some View {
@@ -54,7 +58,8 @@ public struct MainWindowRootView: View {
                     SettingsPage(
                         settings: settings,
                         onExportDiagnostics: onExportDiagnostics,
-                        onCheckForUpdates: onCheckForUpdates
+                        onCheckForUpdates: onCheckForUpdates,
+                        onImportHistory: onImportHistory
                     )
                 }
             }

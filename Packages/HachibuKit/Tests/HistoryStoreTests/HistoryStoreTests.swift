@@ -235,6 +235,6 @@ private func minute(_ offset: Int) -> Date {
         let migrations = try await reopened.dbQueue.read { db in
             try HistoryStore.migrator.appliedIdentifiers(db)
         }
-        #expect(migrations == ["v1"])
+        #expect(migrations == ["v1", "aldenteRawImports"])
     }
 }

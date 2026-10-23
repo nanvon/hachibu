@@ -1,6 +1,136 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "%lld records" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 条记录"
+          }
+        }
+      }
+    },
+    "%lld source records" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 条来源记录"
+          }
+        }
+      }
+    },
+    "Added %lld records; %lld records were already stored." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新增 %lld 条记录；%lld 条记录此前已保存。"
+          }
+        }
+      }
+    },
+    "All source records, including battery identifiers and unchanged timestamps, will be saved locally. Existing recordings and charts will not change." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "全部来源记录将保存在本机，包括电池标识和未经转换的原始时间。现有采样记录和曲线保持不变。"
+          }
+        }
+      }
+    },
+    "Battery Condition" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "电池健康状态"
+          }
+        }
+      }
+    },
+    "Battery Identifier" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "电池标识"
+          }
+        }
+      }
+    },
+    "Battery Level" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "电量"
+          }
+        }
+      }
+    },
+    "Battery Power" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "电池功率"
+          }
+        }
+      }
+    },
+    "Calibration Records" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "校准记录"
+          }
+        }
+      }
+    },
+    "Cancel" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "取消"
+          }
+        }
+      }
+    },
+    "Charge Limit History" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "充电上限历史"
+          }
+        }
+      }
+    },
+    "Choose a full AlDente history export in the supported format." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请选择受支持格式的 AlDente 全量历史导出文件。"
+          }
+        }
+      }
+    },
+    "Choose a full AlDente history export." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择 AlDente 全量历史导出文件。"
+          }
+        }
+      }
+    },
     "Close" : {
       "localizations" : {
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "关闭" } }
@@ -11,14 +141,104 @@
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "拷贝" } }
       }
     },
+    "Could Not Import History" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法导入历史"
+          }
+        }
+      }
+    },
     "Cut" : {
       "localizations" : {
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "剪切" } }
       }
     },
+    "Cycle Count" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "循环次数"
+          }
+        }
+      }
+    },
+    "Design Capacity" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "设计容量"
+          }
+        }
+      }
+    },
     "Edit" : {
       "localizations" : {
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "编辑" } }
+      }
+    },
+    "Full Charge Capacity" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "满充容量"
+          }
+        }
+      }
+    },
+    "History Import Complete" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "历史导入完成"
+          }
+        }
+      }
+    },
+    "Import" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "导入"
+          }
+        }
+      }
+    },
+    "Import AlDente History" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "导入 AlDente 历史"
+          }
+        }
+      }
+    },
+    "Input Power" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "输入功率"
+          }
+        }
+      }
+    },
+    "Invalid records, columns, or record count in table: %@." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "表 %@ 的记录、字段或记录数量不符合格式。"
+          }
+        }
       }
     },
     "Minimize" : {
@@ -36,9 +256,89 @@
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "退出 Hachibu" } }
       }
     },
+    "Record verification failed. The entire import was rolled back." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "记录核对失败，本次导入已全部回滚。"
+          }
+        }
+      }
+    },
     "Select All" : {
       "localizations" : {
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "全选" } }
+      }
+    },
+    "System Maximum Capacity" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "系统最大容量"
+          }
+        }
+      }
+    },
+    "System Power" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "系统功率"
+          }
+        }
+      }
+    },
+    "Temperature" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "温度"
+          }
+        }
+      }
+    },
+    "The export must contain all 13 source tables and their schema." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "导出文件必须包含全部 13 张来源表及表结构。"
+          }
+        }
+      }
+    },
+    "The file is missing valid AlDente source information." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "文件缺少有效的 AlDente 来源信息。"
+          }
+        }
+      }
+    },
+    "The file is not valid JSON." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "文件不是有效的 JSON。"
+          }
+        }
+      }
+    },
+    "This export format version is not supported." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "暂不支持此导出格式版本。"
+          }
+        }
       }
     },
     "Window" : {

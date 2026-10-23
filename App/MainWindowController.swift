@@ -1,6 +1,7 @@
 import AppKit
 import BatteryCore
 import FeatureUI
+import HistoryStore
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -9,8 +10,9 @@ import UniformTypeIdentifiers
 @MainActor
 final class MainWindowController: NSWindowController, NSWindowDelegate {
     private var history: HistoryModel?
+    private var store: HistoryStore?
 
-    convenience init(history: HistoryModel, monitor: BatteryMonitor, settings: AppSettings, alerts: AlertMonitor, updates: UpdateController) {
+    convenience init(history: HistoryModel, store: HistoryStore?, monitor: BatteryMonitor, settings: AppSettings, alerts: AlertMonitor, updates: UpdateController) {
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 960, height: 680),
             styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
@@ -28,6 +30,13 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         }
         self.init(window: window)
         self.history = history
+        self.store = store
+        let importAction: (@MainActor @Sendable () async -> Void)?
+        if store != nil {
+            importAction = { [weak self] in await self?.importHistory() }
+        } else {
+            importAction = nil
+        }
         let hostingView = NSHostingView(rootView: MainWindowRootView(
             history: history,
             settings: settings,
@@ -35,7 +44,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
             onExportDiagnostics: { [weak self] in
                 await self?.exportDiagnostics()
             },
-            onCheckForUpdates: updates.isAvailable ? { @MainActor in updates.checkForUpdates() } : nil
+            onCheckForUpdates: updates.isAvailable ? { @MainActor in updates.checkForUpdates() } : nil,
+            onImportHistory: importAction
         ).environment(monitor))
         hostingView.sceneBridgingOptions = [.toolbars, .title]
         window.contentView = hostingView
@@ -66,6 +76,104 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
             try report.jsonData().write(to: url, options: .atomic)
         } catch {
             await NSAlert(error: error).beginSheetModal(for: window)
+        }
+    }
+
+    /// 文件选择、预览确认和结果窗口均由 AppKit 管理；解析在后台，确认后才写入。
+    private func importHistory() async {
+        guard let window, let store else { return }
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.json]
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+        panel.message = String(localized: "Choose a full AlDente history export.")
+        guard await panel.beginSheetModal(for: window) == .OK, let url = panel.url else { return }
+        do {
+            let archive = try await Task.detached(priority: .userInitiated) {
+                try AlDenteArchive(data: Data(contentsOf: url))
+            }.value
+            guard window.isVisible else { return }
+            let confirmation = NSAlert()
+            confirmation.messageText = String(localized: "Import AlDente History")
+            confirmation.informativeText = "AlDente \(archive.sourceVersion) (\(archive.sourceBuild))\n"
+                + String(localized: "\(archive.recordCount) source records") + "\n\n"
+                + String(localized: "All source records, including battery identifiers and unchanged timestamps, will be saved locally. Existing recordings and charts will not change.")
+            confirmation.addButton(withTitle: String(localized: "Import"))
+            confirmation.addButton(withTitle: String(localized: "Cancel"))
+            confirmation.accessoryView = Self.importPreview(archive.tables)
+            guard await confirmation.beginSheetModal(for: window) == .alertFirstButtonReturn else { return }
+
+            let result = try await store.importAlDenteArchive(archive)
+            guard window.isVisible else { return }
+            let finished = NSAlert()
+            finished.messageText = String(localized: "History Import Complete")
+            finished.informativeText = String(localized: "Added \(result.addedRecords) records; \(result.existingRecords) records were already stored.")
+            await finished.beginSheetModal(for: window)
+        } catch {
+            guard window.isVisible else { return }
+            let alert = NSAlert()
+            alert.alertStyle = .warning
+            alert.messageText = String(localized: "Could Not Import History")
+            alert.informativeText = Self.importErrorDescription(error)
+            await alert.beginSheetModal(for: window)
+        }
+    }
+
+    private static func importPreview(_ tables: [AlDenteTableSummary]) -> NSView {
+        let scroll = NSScrollView(frame: NSRect(x: 0, y: 0, width: 480, height: 300))
+        scroll.hasVerticalScroller = true
+        scroll.autohidesScrollers = true
+        let text = NSTextView(frame: scroll.bounds)
+        text.isEditable = false
+        text.drawsBackground = false
+        text.font = .systemFont(ofSize: 12)
+        text.textColor = .labelColor
+        text.isVerticallyResizable = true
+        text.isHorizontallyResizable = false
+        text.textContainer?.widthTracksTextView = true
+        text.string = tables.map { table in
+            let count = String(localized: "\(table.recordCount) records")
+            return "\(tableTitle(table.table)) · \(count)\n\(table.firstTimestamp ?? "—") → \(table.lastTimestamp ?? "—")"
+        }.joined(separator: "\n\n")
+        scroll.documentView = text
+        return scroll
+    }
+
+    private static func tableTitle(_ table: AlDenteTable) -> String {
+        switch table {
+        case .batteryCycles: String(localized: "Cycle Count")
+        case .batteryDesignCap: String(localized: "Design Capacity")
+        case .batteryMaxCap: String(localized: "Full Charge Capacity")
+        case .batteryPercentage: String(localized: "Battery Level")
+        case .batterySerial: String(localized: "Battery Identifier")
+        case .batteryTemp: String(localized: "Temperature")
+        case .chargeLimit: String(localized: "Charge Limit History")
+        case .chargingPower: String(localized: "Battery Power")
+        case .lastCalibration: String(localized: "Calibration Records")
+        case .macOSbatteryCondition: String(localized: "Battery Condition")
+        case .macOSbatteryMaxCap: String(localized: "System Maximum Capacity")
+        case .systemLoad: String(localized: "System Power")
+        case .systemPowerIn: String(localized: "Input Power")
+        }
+    }
+
+    private static func importErrorDescription(_ error: any Error) -> String {
+        guard let error = error as? AlDenteArchiveError else { return error.localizedDescription }
+        switch error {
+        case .invalidJSON:
+            return String(localized: "The file is not valid JSON.")
+        case .unsupportedFormat:
+            return String(localized: "Choose a full AlDente history export in the supported format.")
+        case .unsupportedVersion:
+            return String(localized: "This export format version is not supported.")
+        case .invalidSource:
+            return String(localized: "The file is missing valid AlDente source information.")
+        case .incompleteTables:
+            return String(localized: "The export must contain all 13 source tables and their schema.")
+        case .invalidTable(let name):
+            return String(localized: "Invalid records, columns, or record count in table: \(name).")
+        case .verificationFailed:
+            return String(localized: "Record verification failed. The entire import was rolled back.")
         }
     }
 

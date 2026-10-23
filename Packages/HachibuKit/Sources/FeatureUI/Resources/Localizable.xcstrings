@@ -519,6 +519,16 @@
         }
       }
     },
+    "Historical Data" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "历史数据"
+          }
+        }
+      }
+    },
     "History" : {
       "localizations" : {
         "zh-Hans" : {
@@ -535,6 +545,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "历史数据不可用"
+          }
+        }
+      }
+    },
+    "Import AlDente History…" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "导入 AlDente 历史…"
           }
         }
       }
@@ -836,6 +856,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "功率"
+          }
+        }
+      }
+    },
+    "Preserves all 13 source tables in a separate archive. Existing recordings and history charts are unchanged." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "完整保存来源的 13 张表。现有采样记录和历史曲线保持不变。"
           }
         }
       }

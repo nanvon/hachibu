@@ -13,15 +13,18 @@ struct SettingsPage: View {
     let onExportDiagnostics: @MainActor () async -> Void
     /// 为 nil 时不显示“检查更新”。
     let onCheckForUpdates: (@MainActor () -> Void)?
+    let onImportHistory: (@MainActor () async -> Void)?
     @State private var loginItem = LoginItem()
     @State private var isExporting = false
     @State private var couldNotOpenBatterySettings = false
+    @State private var isImporting = false
 
     var body: some View {
         Form {
             menuBarSection
             generalSection
             chargingSection
+            historyImportSection
             diagnosticsSection
             aboutSection
         }
@@ -108,6 +111,32 @@ struct SettingsPage: View {
             Text("Charging", bundle: .module)
         } footer: {
             Text("Manage charging options in System Settings → Battery. Hachibu only reads the charge limit; the value does not confirm that limiting is enabled or taking effect. Unknown does not mean off.", bundle: .module)
+                .font(.callout)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private var historyImportSection: some View {
+        Section {
+            Button {
+                guard let onImportHistory else { return }
+                isImporting = true
+                Task {
+                    defer { isImporting = false }
+                    await onImportHistory()
+                }
+            } label: {
+                Text("Import AlDente History…", bundle: .module)
+            }
+            .disabled(isImporting || onImportHistory == nil)
+            if isImporting {
+                ProgressView()
+                    .controlSize(.small)
+            }
+        } header: {
+            Text("Historical Data", bundle: .module)
+        } footer: {
+            Text("Preserves all 13 source tables in a separate archive. Existing recordings and history charts are unchanged.", bundle: .module)
                 .font(.callout)
                 .foregroundStyle(.secondary)
         }

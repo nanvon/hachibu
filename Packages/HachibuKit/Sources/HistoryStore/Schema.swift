@@ -42,6 +42,30 @@ extension HistoryStore {
             }
         }
 
+        migrator.registerMigration("aldenteRawImports") { db in
+            try db.create(table: "aldente_imports") { t in
+                t.primaryKey("id", .text)
+                t.column("imported_at", .double).notNull()
+                t.column("source_version", .text).notNull()
+                t.column("source_build", .text).notNull()
+                t.column("record_count", .integer).notNull()
+                t.column("archive", .blob).notNull()
+            }
+            try db.create(table: "aldente_records") { t in
+                t.primaryKey("id", .text)
+                t.column("source_table", .text).notNull().indexed()
+                t.column("source_id", .integer).notNull()
+                t.column("timestamp", .text).notNull()
+                t.column("value_type", .text).notNull()
+                t.column("value", .blob).notNull()
+            }
+            try db.create(table: "aldente_import_records") { t in
+                t.column("import_id", .text).notNull().references("aldente_imports", onDelete: .cascade)
+                t.column("record_id", .text).notNull().references("aldente_records")
+                t.primaryKey(["import_id", "record_id"])
+            }
+        }
+
         return migrator
     }
 }
