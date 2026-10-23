@@ -4,11 +4,14 @@
 
 ## 项目现状
 
-Hachibu 是 macOS 菜单栏电池监控应用，定位为 AlDente 的平替，准备开源并公开发布。名字来自“腹八分目”，对应只充到约 80% 的护电思路。目前只有工程骨架：菜单栏图标、空面板、空主窗口，还没有数据采集和存储代码。
+Hachibu 是 macOS 菜单栏电池监控应用，定位为 AlDente 的平替，准备开源并公开发布。名字来自“腹八分目”，对应只充到约 80% 的护电思路。v1 的功能（下文“v1 功能范围”）已经实现：数据采集、历史存储与聚合、菜单栏、面板、历史曲线、通知、设置、诊断导出、Sparkle 更新。发布流水线已就绪，首次发布前还要配置 Sparkle 密钥（见 `docs/打包发布.md` 第 3 节）。测试 fixture 目前只有“接电未充电”一种状态。
 
 文档：
 
-- `docs/v1技术设计.md`：v1 写代码的依据，包括已定决策、数据来源、状态规则、存储结构。与其他文档冲突时以它为准。
+- `docs/v1技术设计.md`：v1 写代码的依据，包括已定决策、数据来源、状态规则、存储结构。与其他文档冲突时以它为准。其中第 19 节是界面改版计划：菜单栏面板已实现，主窗口和颜色待实现，哪些与现有代码不一致见 19.8，改完一项要更新 19.8。
+- `design/brand/README.md`：品牌素材（应用图标、菜单栏图标、logo、宣传图、DMG 背景）的来源和导出方式，素材由 `scripts/generate-brand-assets.swift` 生成。
+- `docs/打包发布.md`：`scripts/build.sh` 打包、GitHub Actions 发布、Sparkle 密钥配置。
+- `release-notes/README.md`：每个版本更新说明的写法。
 - `docs/macOS菜单栏电池监控应用技术方案调研.md`：调研记录，只作背景参考。其中的防御性建议不要直接照做，以设计文档为准。
 
 版本规划：
@@ -17,7 +20,7 @@ Hachibu 是 macOS 菜单栏电池监控应用，定位为 AlDente 的平替，�
 - v2：充电控制（需要写 SMC 和特权 helper，届时单独设计）。
 - v3：导入 AlDente 的历史数据。
 
-视觉设计稿（菜单栏面板 + 主窗口历史曲线，Liquid Glass 风格的 HTML 近似稿）暂未放入仓库。设计稿只用来参考布局和视觉，部分内容已过时：侧栏的“概览”页、“耗电量（系统负载）”标题、应用名“电池监控”、面板状态文字、流向图说明句和温度“正常 / 偏高”标签。这些以设计文档为准。
+视觉设计稿（菜单栏面板 + 主窗口历史曲线，Liquid Glass 风格的 HTML 近似稿）暂未放入仓库。设计稿只用来参考布局和视觉，部分内容已过时：侧栏的“概览”页、“耗电量（系统负载）”标题、应用名“电池监控”、面板状态文字、流向图说明句和温度“正常 / 偏高”标签。这些以设计文档为准，视觉以设计文档第 19 节为准。
 
 ## v1 功能范围
 
@@ -34,13 +37,13 @@ Hachibu 是 macOS 菜单栏电池监控应用，定位为 AlDente 的平替，�
 完整内容见 `docs/v1技术设计.md` 第 2–4 节，要点：
 
 - 最低 macOS 14，只出 arm64，Swift 6 语言模式。
-- 分发：Developer ID 签名 + 公证 + Hardened Runtime，不上 App Store，关闭 App Sandbox（需要读取系统 plist、运行 `system_profiler`，v2 还要访问 SMC）。
+- 分发：与 cc-bar 相同，ad-hoc 签名 + Hardened Runtime，不用付费开发者账号，不做公证；推送 tag 后由 GitHub Actions 发布到 GitHub Releases，appcast 作为 Release 附件。不上 App Store，关闭 App Sandbox（需要读取系统 plist、运行 `system_profiler`，v2 还要访问 SMC）。
 - 界面：AppKit 管应用外壳和所有窗口行为（`NSStatusItem` + `NSPanel([.borderless, .nonactivatingPanel])` + `NSWindowController`，`LSUIElement`）；窗口内容用 SwiftUI，经 `NSHostingView` 承载。SwiftUI 只写展示内容，窗口定位、关闭、焦点一律放在 AppKit 层。某个视图在 SwiftUI 里两次修不好就改用 AppKit 实现。
 - 材质：macOS 26+ 用 `NSGlassEffectView`，更早系统用 `NSVisualEffectView`。
 - 界面语言：英文和简体中文，文案用 String Catalog（`.xcstrings`），源语言为英文。界面文字不要硬编码在 `BatteryCore`、`HistoryStore` 里。
 - 工程：XcodeGen（`project.yml`）生成 Xcode 工程，`.xcodeproj` 不提交；逻辑放在本地 Swift Package `HachibuKit`，分 `BatteryCore`、`HistoryStore`、`FeatureUI` 三个 target。
 - 依赖：GRDB（HachibuKit）；Sparkle 2（App target，`project.yml` 引入）。EdDSA 公钥未填写前不启用更新。
-- 仓库里不放密钥和证书。Team ID、签名身份放在不提交的 `Config/Local.xcconfig`，这样别人 clone 后不改工程就能用本地签名编译。
+- 仓库里不放密钥和证书。Sparkle 私钥只放在本机钥匙串和 GitHub secret 里；公钥写在 `Config/Base.xcconfig`。想用自己证书编译时，Team ID、签名身份放在不提交的 `Config/Local.xcconfig`，别人 clone 后不改工程就能用本地签名编译。
 
 ## 数据来源要点
 
@@ -64,6 +67,37 @@ swift build --package-path Packages/HachibuKit      # 单独编译本地包
 ```
 
 `Hachibu.xcodeproj` 由 XcodeGen 生成，不提交，不要手改。
+
+## 打包分发
+
+打包的唯一入口是 `scripts/build.sh`，不要用 Xcode 的 Archive / Export 分发，也不要手动 `codesign`、`ditto` 拼流程：
+
+```bash
+SPARKLE_PUBLIC_ED_KEY="公钥" ./scripts/build.sh     # 产物：dist/Hachibu.dmg、dist/Hachibu.app.zip
+```
+
+- 脚本会先运行 `xcodegen generate`，再清空 `build/` 重新构建，用 `CODE_SIGNING_ALLOWED=NO` 做 Release 构建后逐层 ad-hoc 签名。
+- 公钥缺失时脚本停止，避免分发无法验证更新的 App。密钥配置见 `docs/打包发布.md` 第 3 节，由维护者手动完成。
+- 不要直接替换 `/Applications/Hachibu.app`，打包验证在 `dist/` 或临时目录里查看。
+- 本地打包是耗时命令，只在用户要求时运行。
+
+## 标准发布流程
+
+用户说“发版”或明显同义的表述（“发布一下”“发个新版本”“提交代码、版本号 +1、打 tag 推送”）时，这是预先授权的固定指令，按下面四步顺序执行，不用逐步等确认：
+
+1. **提交代码**：把工作区未提交的改动按仓库惯例提交，无关改动分开提交。没有改动就跳过。
+2. **编写更新说明**：对比上一个 `v*` tag 与当前代码、提交和文档，按 `release-notes/README.md` 的撰写流程和自检问题，创建 `release-notes/vX.Y.Z.md`，并按同一文档“近期新功能”一节检查、更新 `release-notes/highlights.md`。
+3. **版本号 +1**：修改 `Config/Base.xcconfig` 的 `MARKETING_VERSION`，patch 位 +1（如 `0.1.0` → `0.1.1`），除非用户明确要求升 minor / major。把版本号、本版更新说明和改动过的 `highlights.md` 一起单独提交，提交信息为 `chore: 发布 vX.Y.Z`。
+4. **推送并打 tag**：
+   ```bash
+   git push origin main
+   git tag vX.Y.Z
+   git push origin vX.Y.Z
+   ```
+
+- tag 必须和已提交的 `MARKETING_VERSION` 一致；tag 只做标记，不改版本号。打错可撤销：`git tag -d vX.Y.Z && git push origin :vX.Y.Z`。
+- 推送 tag 成功即完成，只汇报版本号、提交、Actions / Release 链接和本版更新说明全文。不主动查询、等待或轮询 CI 和 Release 状态，用户要求时才查。
+- 首次发布用当前的 `MARKETING_VERSION`（`0.1.0`），不加 1。
 
 ## 改完代码后的校验
 
