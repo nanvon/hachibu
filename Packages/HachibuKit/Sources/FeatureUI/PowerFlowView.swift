@@ -1,7 +1,7 @@
 import BatteryCore
 import SwiftUI
 
-/// 三节点功率流向图。左列放供电方，右列放用电方，电池按方向换列。规则见 docs/v1技术设计.md 第 8 节。
+/// 三节点功率流向图。左列放供电方，右列放用电方，电池按方向换列。规则见 docs/v1技术设计.md 第 8 节，样式见第 19 节。
 struct PowerFlowView: View {
     private static let height: CGFloat = 112
     private static let nodeSize = CGSize(width: 104, height: 40)
@@ -27,16 +27,21 @@ struct PowerFlowView: View {
                             control1: CGPoint(x: midX, y: ribbon.start.y),
                             control2: CGPoint(x: midX, y: ribbon.end.y)
                         )
-                        let color: Color = ribbon.link.from == .battery ? .orange : .green
+                        // 从供电方颜色渐变到用电方颜色。
+                        let opacity = ribbon.link.powerMW == nil ? 0.25 : 0.55
+                        let gradient = Gradient(colors: [
+                            tint(of: ribbon.link.from).opacity(opacity),
+                            tint(of: ribbon.link.to).opacity(opacity),
+                        ])
                         context.stroke(
                             path,
-                            with: .color(color.opacity(ribbon.link.powerMW == nil ? 0.25 : 0.5)),
+                            with: .linearGradient(gradient, startPoint: ribbon.start, endPoint: ribbon.end),
                             style: StrokeStyle(lineWidth: ribbon.width, lineCap: .butt)
                         )
                     }
                 }
                 ForEach(layout.nodes, id: \.node) { placed in
-                    NodeView(node: placed.node, milliwatts: milliwatts(for: placed.node))
+                    NodeView(node: placed.node, milliwatts: milliwatts(for: placed.node), tint: tint(of: placed.node))
                         .frame(width: Self.nodeSize.width, height: Self.nodeSize.height)
                         .opacity(placed.node == .charger && !isExternalPower ? 0.4 : 1)
                         .position(placed.center)
@@ -52,6 +57,15 @@ struct PowerFlowView: View {
         case .charger: flow.chargerMW
         case .computer: flow.computerMW
         case .battery: flow.batteryMW
+        }
+    }
+
+    /// 充电器绿色；电池供电时橙色，充电时绿色；电脑为品牌蓝。
+    private func tint(of node: PowerFlow.Node) -> Color {
+        switch node {
+        case .charger: .green
+        case .battery: flow.links.contains { $0.from == .battery } ? .orange : .green
+        case .computer: .brand
         }
     }
 
@@ -137,14 +151,17 @@ private struct Layout {
 
 // MARK: - 节点
 
+/// 节点为玻璃胶囊，图标带颜色。
 private struct NodeView: View {
     let node: PowerFlow.Node
     let milliwatts: Int?
+    let tint: Color
 
     var body: some View {
         HStack(spacing: 6) {
             Image(systemName: symbolName)
                 .font(.body)
+                .foregroundStyle(tint)
                 .frame(width: 20)
             VStack(alignment: .leading, spacing: 0) {
                 title
@@ -154,12 +171,13 @@ private struct NodeView: View {
                 Text(verbatim: DisplayFormat.watts(milliwatts: milliwatts))
                     .font(.caption.weight(.semibold))
                     .monospacedDigit()
+                    .contentTransition(.numericText())
             }
             Spacer(minLength: 0)
         }
-        .padding(.horizontal, 8)
+        .padding(.horizontal, 10)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(.quinary, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .panelGlass(in: Capsule())
     }
 
     private var symbolName: String {

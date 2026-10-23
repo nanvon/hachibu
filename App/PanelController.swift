@@ -9,6 +9,8 @@ final class PanelController: NSObject, NSWindowDelegate {
     private static let cornerRadius: CGFloat = 26
     private static let gapBelowMenuBar: CGFloat = 6
     private static let screenMargin: CGFloat = 8
+    /// 与 FeatureUI 中内容展开、收起的动画时长接近。
+    private static let resizeDuration: TimeInterval = 0.3
 
     private let panel: StatusPanel
     private let onVisibilityChange: @MainActor (Bool) -> Void
@@ -46,7 +48,7 @@ final class PanelController: NSObject, NSWindowDelegate {
         content.onIntrinsicContentSizeChange = { [weak self] in
             guard let self else { return }
             // 在当前布局过程结束后再改窗口大小。
-            Task { self.fitToContent() }
+            Task { self.fitToContent(animated: true) }
         }
         self.content = content
 
@@ -109,12 +111,22 @@ final class PanelController: NSObject, NSWindowDelegate {
     }
 
     /// 按内容的理想尺寸调整面板大小，保持顶边位置不变（面板挂在菜单栏下方）。
-    private func fitToContent() {
+    /// 面板显示时内容展开、收起（例如插拔电、展开健康详情）用动画跟随，见 docs/v1技术设计.md 第 19.7 节。
+    private func fitToContent(animated: Bool = false) {
         guard let size = content?.fittingSize, size != panel.frame.size else { return }
         var frame = panel.frame
         frame.origin.y = frame.maxY - size.height
         frame.size = size
-        panel.setFrame(frame, display: panel.isVisible)
+
+        guard animated, panel.isVisible, !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else {
+            panel.setFrame(frame, display: panel.isVisible)
+            return
+        }
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = Self.resizeDuration
+            context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            panel.animator().setFrame(frame, display: true)
+        }
     }
 
     private func installEventMonitors() {
