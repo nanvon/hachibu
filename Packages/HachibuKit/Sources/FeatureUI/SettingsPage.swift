@@ -13,8 +13,7 @@ struct SettingsPage: View {
     let onExportDiagnostics: @MainActor () async -> Void
     /// 为 nil 时不显示“检查更新”。
     let onCheckForUpdates: (@MainActor () -> Void)?
-    let onImportHistory: (@MainActor () async -> Void)?
-    let onBrowseImportedHistory: (@MainActor () -> Void)?
+    let onImportHistory: (@MainActor () async -> Bool)?
     @State private var loginItem = LoginItem()
     @State private var isExporting = false
     @State private var couldNotOpenBatterySettings = false
@@ -123,9 +122,9 @@ struct SettingsPage: View {
             DisclosureGroup {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("1. Copy the export prompt and give it to an AI tool that can read files and run commands on this Mac.", bundle: .module)
-                    Text("2. Ask it to inspect AlDente locally, export all source records, and verify the resulting JSON. If it reports an unsupported database or incomplete export, keep that report and do not import a partial file.", bundle: .module)
-                    Text("3. Choose Import AlDente History… below and select the verified JSON. Review the record counts before confirming.", bundle: .module)
-                    Text("Local database reading has been verified with AlDente 1.39.3 (111). Other versions need to be inspected first; compatibility is not guaranteed.", bundle: .module)
+                    Text("2. Ask it to export your previous battery history and verify the resulting JSON. Do not import an incomplete file.", bundle: .module)
+                    Text("3. Choose Import History… below and select the verified JSON. Review the record counts before confirming.", bundle: .module)
+                    Text("The export tool must verify compatibility before reading the previous database.", bundle: .module)
                         .foregroundStyle(.secondary)
                     Text("The export includes battery identifiers and history. Use a local AI tool with file access; you do not need to upload your database or exported file to a chat.", bundle: .module)
                         .foregroundStyle(.secondary)
@@ -133,7 +132,7 @@ struct SettingsPage: View {
                 .font(.callout)
                 .padding(.vertical, 4)
             } label: {
-                Text("How to Export from AlDente", bundle: .module)
+                Text("How to Export History", bundle: .module)
             }
             Button(action: copyExportPrompt) {
                 Text("Copy AI Export Prompt", bundle: .module)
@@ -155,18 +154,12 @@ struct SettingsPage: View {
                 isImporting = true
                 Task {
                     defer { isImporting = false }
-                    await onImportHistory()
+                    _ = await onImportHistory()
                 }
             } label: {
-                Text("Import AlDente History…", bundle: .module)
+                Text("Import History…", bundle: .module)
             }
             .disabled(isImporting || onImportHistory == nil)
-            Button {
-                onBrowseImportedHistory?()
-            } label: {
-                Text("View Imported History…", bundle: .module)
-            }
-            .disabled(isImporting || onBrowseImportedHistory == nil)
             if isImporting {
                 ProgressView()
                     .controlSize(.small)
@@ -174,7 +167,7 @@ struct SettingsPage: View {
         } header: {
             Text("Historical Data", bundle: .module)
         } footer: {
-            Text("Preserves all 13 source tables in a separate archive. Existing recordings and history charts are unchanged.", bundle: .module)
+            Text("Imported records become part of your battery history and appear alongside new measurements. Existing measurements take priority where records overlap.", bundle: .module)
                 .font(.callout)
                 .foregroundStyle(.secondary)
         }

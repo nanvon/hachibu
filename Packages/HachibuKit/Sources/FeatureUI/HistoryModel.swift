@@ -21,6 +21,10 @@ public final class HistoryModel {
     /// 最近一次分钟采样的时间。
     private(set) var lastUpdated: Date?
     private(set) var summary: RecordingSummary?
+    private(set) var records: HistoryRecordPage?
+    private(set) var recordMetric: HistoryMetric?
+    private(set) var recordError: String?
+    @ObservationIgnored private var recordGeneration = 0
     /// 最早一条分钟或小时数据的时间，用于近期曲线的“未记录”区间。
     @ObservationIgnored private var firstRecordedAt: Date?
 
@@ -65,11 +69,43 @@ public final class HistoryModel {
 
     // MARK: - 查询
 
+    public func reload() async {
+        await reloadAll()
+    }
+
+    public func reloadAfterImport() async {
+        recentRange = .all
+        longTermRange = .all
+        await reloadAll()
+    }
+
+    func selectRecordMetric(_ metric: HistoryMetric?) async {
+        recordMetric = metric
+        await loadRecords(offset: 0)
+    }
+
+    func loadRecords(offset: Int) async {
+        guard let store else { return }
+        recordGeneration += 1
+        let generation = recordGeneration
+        do {
+            let page = try await store.historyRecords(metric: recordMetric, offset: offset)
+            guard generation == recordGeneration else { return }
+            records = page
+            recordError = nil
+        } catch {
+            guard generation == recordGeneration else { return }
+            recordError = String(localized: "Could not load historical records. Please try again.", bundle: .module)
+            logger.error("Failed to load historical records: \(String(describing: error), privacy: .public)")
+        }
+    }
+
     private func reloadAll() async {
         // 两组的“未记录”区间要用最早记录时间和记录概况，先查。
         await loadSummary()
         await loadRecent()
         await loadLongTerm()
+        await loadRecords(offset: records?.offset ?? 0)
     }
 
     private func loadSummary() async {
@@ -95,14 +131,14 @@ public final class HistoryModel {
         let generation = recentGeneration
         let range = recentRange
         let now = Date()
-        let start = now.addingTimeInterval(-range.duration)
+        let start = range.start(now: now, firstRecordedAt: firstRecordedAt)
         do {
             let data: RecentChartData
             switch range {
             case .hour, .day:
                 let samples = try await store.minuteSamples(from: start, to: now)
                 data = HistoryChartBuilder.recent(minuteSamples: samples, range: range, now: now, firstRecordedAt: firstRecordedAt)
-            case .week:
+            case .week, .month, .all:
                 let samples = try await store.minuteSamplesByHour(from: start, to: now)
                 data = HistoryChartBuilder.recent(hourlySamples: samples, range: range, now: now, firstRecordedAt: firstRecordedAt)
             }

@@ -1,6 +1,56 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Choose a complete history export." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择完整的历史导出文件。"
+          }
+        }
+      }
+    },
+    "Import History" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "导入历史"
+          }
+        }
+      }
+    },
+    "History will be added to your existing charts. Existing measurements take priority where records overlap. All original values are preserved locally, including battery identifiers." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "历史记录会加入现有曲线。时间重叠时优先保留应用已采集的值。全部原值均保存在本机，包含电池标识。"
+          }
+        }
+      }
+    },
+    "Choose a complete history export in the supported format." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请选择受支持格式的完整历史导出文件。"
+          }
+        }
+      }
+    },
+    "The file is missing valid export metadata." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "文件缺少有效的导出元数据。"
+          }
+        }
+      }
+    },
     "%lld records" : {
       "localizations" : {
         "zh-Hans" : {

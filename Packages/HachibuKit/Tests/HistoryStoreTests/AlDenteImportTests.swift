@@ -3,7 +3,7 @@ import GRDB
 import Testing
 @testable import HistoryStore
 
-private func archiveFixture(edit: (inout [String: Any]) -> Void = { _ in }) throws -> Data {
+func archiveFixture(edit: (inout [String: Any]) -> Void = { _ in }) throws -> Data {
     var tables: [String: Any] = [:]
     var schema: [[String: Any]] = []
     for table in AlDenteTable.allCases {
@@ -37,7 +37,7 @@ private func archiveFixture(edit: (inout [String: Any]) -> Void = { _ in }) thro
     return try JSONSerialization.data(withJSONObject: root, options: [.sortedKeys])
 }
 
-private func editTable(_ root: inout [String: Any], _ name: String, edit: (inout [String: Any]) -> Void) {
+func editTable(_ root: inout [String: Any], _ name: String, edit: (inout [String: Any]) -> Void) {
     var tables = root["tables"] as! [String: [String: Any]]
     var table = tables[name]!
     edit(&table)

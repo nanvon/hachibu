@@ -10,11 +10,7 @@ public struct AlDenteImportSummary: Sendable, Identifiable {
 }
 
 /// 来源值不换算单位；整数和浮点从导入时保存的位模式还原。
-public enum AlDenteValue: Sendable, Equatable {
-    case integer(Int64)
-    case real(Double)
-    case text(String)
-}
+public typealias AlDenteValue = HistoryValue
 
 public struct AlDenteHistoryRecord: Sendable, Identifiable {
     public let id: String

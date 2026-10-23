@@ -11,7 +11,6 @@ import UniformTypeIdentifiers
 final class MainWindowController: NSWindowController, NSWindowDelegate {
     private var history: HistoryModel?
     private var store: HistoryStore?
-    private var alDenteHistoryWindow: AlDenteHistoryWindowController?
 
     convenience init(history: HistoryModel, store: HistoryStore?, monitor: BatteryMonitor, settings: AppSettings, alerts: AlertMonitor, updates: UpdateController) {
         let window = NSWindow(
@@ -32,17 +31,11 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         self.init(window: window)
         self.history = history
         self.store = store
-        let importAction: (@MainActor @Sendable () async -> Void)?
+        let importAction: (@MainActor @Sendable () async -> Bool)?
         if store != nil {
-            importAction = { [weak self] in await self?.importHistory() }
+            importAction = { [weak self] in await self?.importHistory() ?? false }
         } else {
             importAction = nil
-        }
-        let browseAction: (@MainActor @Sendable () -> Void)?
-        if store != nil {
-            browseAction = { [weak self] in self?.showImportedHistory() }
-        } else {
-            browseAction = nil
         }
         let hostingView = NSHostingView(rootView: MainWindowRootView(
             history: history,
@@ -52,8 +45,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
                 await self?.exportDiagnostics()
             },
             onCheckForUpdates: updates.isAvailable ? { @MainActor in updates.checkForUpdates() } : nil,
-            onImportHistory: importAction,
-            onBrowseImportedHistory: browseAction
+            onImportHistory: importAction
         ).environment(monitor))
         hostingView.sceneBridgingOptions = [.toolbars, .title]
         window.contentView = hostingView
@@ -69,14 +61,6 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
 
     func windowWillClose(_ notification: Notification) {
         history?.stop()
-    }
-
-    private func showImportedHistory() {
-        guard let store else { return }
-        if alDenteHistoryWindow == nil {
-            alDenteHistoryWindow = AlDenteHistoryWindowController(store: store)
-        }
-        alDenteHistoryWindow?.showAndActivate()
     }
 
     /// 选择保存位置后读取当前数据（已脱敏），写成 JSON。见 docs/v1技术设计.md 第 14 节。
@@ -96,43 +80,44 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     }
 
     /// 文件选择、预览确认和结果窗口均由 AppKit 管理；解析在后台，确认后才写入。
-    private func importHistory() async {
-        guard let window, let store else { return }
+    private func importHistory() async -> Bool {
+        guard let window, let store else { return false }
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.json]
         panel.canChooseDirectories = false
         panel.allowsMultipleSelection = false
-        panel.message = String(localized: "Choose a full AlDente history export.")
-        guard await panel.beginSheetModal(for: window) == .OK, let url = panel.url else { return }
+        panel.message = String(localized: "Choose a complete history export.")
+        guard await panel.beginSheetModal(for: window) == .OK, let url = panel.url else { return false }
         do {
             let archive = try await Task.detached(priority: .userInitiated) {
                 try AlDenteArchive(data: Data(contentsOf: url))
             }.value
-            guard window.isVisible else { return }
+            guard window.isVisible else { return false }
             let confirmation = NSAlert()
-            confirmation.messageText = String(localized: "Import AlDente History")
-            confirmation.informativeText = "AlDente \(archive.sourceVersion) (\(archive.sourceBuild))\n"
-                + String(localized: "\(archive.recordCount) source records") + "\n\n"
-                + String(localized: "All source records, including battery identifiers and unchanged timestamps, will be saved locally. Existing recordings and charts will not change.")
+            confirmation.messageText = String(localized: "Import History")
+            confirmation.informativeText = String(localized: "\(archive.recordCount) records") + "\n\n"
+                + String(localized: "History will be added to your existing charts. Existing measurements take priority where records overlap. All original values are preserved locally, including battery identifiers.")
             confirmation.addButton(withTitle: String(localized: "Import"))
             confirmation.addButton(withTitle: String(localized: "Cancel"))
             confirmation.accessoryView = Self.importPreview(archive.tables)
-            guard await confirmation.beginSheetModal(for: window) == .alertFirstButtonReturn else { return }
+            guard await confirmation.beginSheetModal(for: window) == .alertFirstButtonReturn else { return false }
 
             let result = try await store.importAlDenteArchive(archive)
-            alDenteHistoryWindow?.refreshIfVisible()
-            guard window.isVisible else { return }
+            await history?.reloadAfterImport()
+            guard window.isVisible else { return true }
             let finished = NSAlert()
             finished.messageText = String(localized: "History Import Complete")
             finished.informativeText = String(localized: "Added \(result.addedRecords) records; \(result.existingRecords) records were already stored.")
             await finished.beginSheetModal(for: window)
+            return true
         } catch {
-            guard window.isVisible else { return }
+            guard window.isVisible else { return false }
             let alert = NSAlert()
             alert.alertStyle = .warning
             alert.messageText = String(localized: "Could Not Import History")
             alert.informativeText = Self.importErrorDescription(error)
             await alert.beginSheetModal(for: window)
+            return false
         }
     }
 
@@ -180,11 +165,11 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         case .invalidJSON:
             return String(localized: "The file is not valid JSON.")
         case .unsupportedFormat:
-            return String(localized: "Choose a full AlDente history export in the supported format.")
+            return String(localized: "Choose a complete history export in the supported format.")
         case .unsupportedVersion:
             return String(localized: "This export format version is not supported.")
         case .invalidSource:
-            return String(localized: "The file is missing valid AlDente source information.")
+            return String(localized: "The file is missing valid export metadata.")
         case .incompleteTables:
             return String(localized: "The export must contain all 13 source tables and their schema.")
         case .invalidTable(let name):

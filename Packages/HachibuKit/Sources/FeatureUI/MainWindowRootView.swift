@@ -8,8 +8,7 @@ public struct MainWindowRootView: View {
     private let alerts: AlertMonitor
     private let onExportDiagnostics: @MainActor () async -> Void
     private let onCheckForUpdates: (@MainActor () -> Void)?
-    private let onImportHistory: (@MainActor () async -> Void)?
-    private let onBrowseImportedHistory: (@MainActor () -> Void)?
+    private let onImportHistory: (@MainActor () async -> Bool)?
     @State private var selection: MainWindowPage? = .history
 
     /// `onExportDiagnostics` 由 App 层选择保存位置并写文件，完成后返回。
@@ -21,8 +20,7 @@ public struct MainWindowRootView: View {
         alerts: AlertMonitor,
         onExportDiagnostics: @escaping @MainActor () async -> Void,
         onCheckForUpdates: (@MainActor () -> Void)?,
-        onImportHistory: (@MainActor () async -> Void)? = nil,
-        onBrowseImportedHistory: (@MainActor () -> Void)? = nil
+        onImportHistory: (@MainActor () async -> Bool)? = nil
     ) {
         self.history = history
         self.settings = settings
@@ -30,7 +28,15 @@ public struct MainWindowRootView: View {
         self.onExportDiagnostics = onExportDiagnostics
         self.onCheckForUpdates = onCheckForUpdates
         self.onImportHistory = onImportHistory
-        self.onBrowseImportedHistory = onBrowseImportedHistory
+    }
+
+    private var importHistoryAction: (@MainActor @Sendable () async -> Bool)? {
+        guard let onImportHistory else { return nil }
+        return { @MainActor in
+            let imported = await onImportHistory()
+            if imported { selection = .history }
+            return imported
+        }
     }
 
     public var body: some View {
@@ -62,8 +68,7 @@ public struct MainWindowRootView: View {
                         settings: settings,
                         onExportDiagnostics: onExportDiagnostics,
                         onCheckForUpdates: onCheckForUpdates,
-                        onImportHistory: onImportHistory,
-                        onBrowseImportedHistory: onBrowseImportedHistory
+                        onImportHistory: importHistoryAction
                     )
                 }
             }

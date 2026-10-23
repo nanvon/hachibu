@@ -8,7 +8,7 @@ public struct AlDenteImportResult: Sendable {
 }
 
 extension HistoryStore {
-    /// 原始文件、记录和批次关系在一个事务中提交；不写入现有采样表。
+    /// 原始档案和应用历史在同一事务中提交，导入后由现有历史查询统一读取。
     public func importAlDenteArchive(_ archive: AlDenteArchive) async throws -> AlDenteImportResult {
         try await dbQueue.write { db in
             if try Bool.fetchOne(db, sql: "SELECT EXISTS(SELECT 1 FROM aldente_imports WHERE id = ?)",
@@ -29,12 +29,14 @@ extension HistoryStore {
                 INSERT INTO aldente_import_records (import_id, record_id) VALUES (?, ?)
                 """)
             var added = 0
+            let formatter = Self.historyTimestampFormatter()
             for record in archive.records {
                 try Task.checkCancellation()
                 try insertRecord.execute(arguments: [record.identifier, record.table.rawValue,
                     record.sourceID, record.timestamp, record.table.valueType, record.value])
                 added += db.changesCount
                 try insertMembership.execute(arguments: [archive.identifier, record.identifier])
+                try Self.insertHistoryRecord(record, in: db, formatter: formatter)
             }
             // 按表逐字段核对，包括浮点位模式；失败则连同完整文件一起回滚。
             let expected = Dictionary(uniqueKeysWithValues: archive.records.map { ($0.identifier, $0) })

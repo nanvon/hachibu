@@ -1,3 +1,4 @@
+import HistoryStore
 import SwiftUI
 
 /// 历史曲线页：近期、长期两组，各自独立的时间范围。规则见 docs/v1技术设计.md 第 11 节。
@@ -10,6 +11,7 @@ struct HistoryPage: View {
                 VStack(alignment: .leading, spacing: 36) {
                     RecentSection(model: model)
                     LongTermSection(model: model)
+                    HistoryRecordsSection(model: model)
                 }
                 .padding(24)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -75,7 +77,7 @@ private struct RecentSection: View {
                     notRecorded: data.notRecorded,
                     yScale: .fixed(0...100),
                     color: .brand,
-                    formatValue: { DisplayFormat.percent(Int($0.rounded())) },
+                    formatValue: { DisplayFormat.percent(Int(exactly: $0.rounded())) },
                     formatDate: formatDate,
                     hoverDate: $hoverDate
                 )
@@ -88,7 +90,7 @@ private struct RecentSection: View {
                     notRecorded: data.notRecorded,
                     yScale: .automatic(includesZero: true),
                     color: .orange,
-                    formatValue: { DisplayFormat.watts(milliwatts: Int(($0 * 1000).rounded())) },
+                    formatValue: { DisplayFormat.watts(milliwatts: Int(exactly: ($0 * 1000).rounded())) },
                     formatDate: formatDate,
                     hoverDate: $hoverDate
                 )
@@ -104,6 +106,15 @@ private struct RecentSection: View {
                     formatDate: formatDate,
                     hoverDate: $hoverDate
                 )
+                if !data.chargeLimit.isEmpty {
+                    MetricChart(
+                        title: Text("Charge Limit History", bundle: .module),
+                        points: data.chargeLimit, domain: data.domain, maxGap: data.maxGap,
+                        interpolation: .stepEnd, color: .brand,
+                        formatValue: { DisplayFormat.percent(Int(exactly: $0.rounded())) },
+                        formatDate: formatDate, hoverDate: $hoverDate
+                    )
+                }
             } else {
                 LoadingPlaceholder()
             }
@@ -115,6 +126,8 @@ private struct RecentSection: View {
         case .hour: Text("1 Hour", bundle: .module)
         case .day: Text("24 Hours", bundle: .module)
         case .week: Text("7 Days", bundle: .module)
+        case .month: Text("30 Days", bundle: .module)
+        case .all: Text("All", bundle: .module)
         }
     }
 
@@ -122,7 +135,8 @@ private struct RecentSection: View {
         switch range {
         case .hour: { $0.formatted(.dateTime.hour().minute()) }
         case .day: { $0.formatted(.dateTime.weekday(.abbreviated).hour().minute()) }
-        case .week: { $0.formatted(.dateTime.month(.abbreviated).day().hour()) }
+        case .week, .month: { $0.formatted(.dateTime.month(.abbreviated).day().hour()) }
+        case .all: { $0.formatted(.dateTime.year().month(.abbreviated).day().hour()) }
         }
     }
 }
@@ -157,7 +171,7 @@ private struct LongTermSection: View {
                     maxGap: data.maxGap,
                     notRecorded: data.notRecorded,
                     color: .brand,
-                    formatValue: { DisplayFormat.percent(Int($0.rounded())) },
+                    formatValue: { DisplayFormat.percent(Int(exactly: $0.rounded())) },
                     formatDate: formatDate,
                     hoverDate: $hoverDate
                 )
@@ -168,7 +182,7 @@ private struct LongTermSection: View {
                     maxGap: data.maxGap,
                     notRecorded: data.notRecorded,
                     color: .brand,
-                    formatValue: { "\(DisplayFormat.number(Int($0.rounded()))) mAh" },
+                    formatValue: { "\(DisplayFormat.number(Int(exactly: $0.rounded()))) mAh" },
                     formatDate: formatDate,
                     hoverDate: $hoverDate
                 )
@@ -181,10 +195,19 @@ private struct LongTermSection: View {
                     notRecorded: data.notRecorded,
                     interpolation: .stepEnd,
                     color: .brand,
-                    formatValue: { DisplayFormat.number(Int($0.rounded())) },
+                    formatValue: { DisplayFormat.number(Int(exactly: $0.rounded())) },
                     formatDate: formatDate,
                     hoverDate: $hoverDate
                 )
+                if !data.designCapacityMAh.isEmpty {
+                    MetricChart(
+                        title: Text("Design Capacity", bundle: .module),
+                        points: data.designCapacityMAh, domain: data.domain, maxGap: data.maxGap,
+                        color: .brand,
+                        formatValue: { "\(DisplayFormat.number(Int(exactly: $0.rounded()))) mAh" },
+                        formatDate: formatDate, hoverDate: $hoverDate
+                    )
+                }
             } else {
                 LoadingPlaceholder()
             }

@@ -66,6 +66,30 @@ extension HistoryStore {
             }
         }
 
+        migrator.registerMigration("unifiedHistory") { db in
+            try db.alter(table: "minute_samples") { t in t.add(column: "charge_limit_pct", .integer) }
+            try db.alter(table: "hourly_samples") { t in t.add(column: "charge_limit_pct", .integer) }
+            try db.create(table: "history_records") { t in
+                t.primaryKey("id", .text)
+                t.column("metric", .text).notNull()
+                t.column("ts", .double)
+                t.column("original_timestamp", .text).notNull()
+                t.column("value_type", .text).notNull()
+                t.column("value", .blob).notNull()
+            }
+            try db.create(index: "history_records_metric_time", on: "history_records", columns: ["metric", "ts"])
+            try db.create(index: "history_records_time", on: "history_records", columns: ["ts"])
+            // 已有导入自动进入统一历史；不要求重新选择文件，不改动原始档案或实时采样。
+            let formatter = Self.historyTimestampFormatter()
+            for row in try Row.fetchAll(db, sql: "SELECT * FROM aldente_records ORDER BY id") {
+                guard let table = AlDenteTable(rawValue: row["source_table"]) else {
+                    throw AlDenteHistoryError.invalidStoredRecord
+                }
+                let record = AlDenteRecord(table: table, sourceID: row["source_id"], timestamp: row["timestamp"], value: row["value"])
+                try Self.insertHistoryRecord(record, in: db, formatter: formatter)
+            }
+        }
+
         return migrator
     }
 }

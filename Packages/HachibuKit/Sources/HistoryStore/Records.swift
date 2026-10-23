@@ -8,6 +8,7 @@ public struct MinuteSample: Sendable, Equatable {
     /// 采样时间，按分钟取整。
     public var timestamp: Date
     public var percent: Int?
+    public var chargeLimitPercent: Int?
     public var isExternalPower: Bool?
     public var isCharging: Bool?
     public var systemLoadMW: Int?
@@ -20,6 +21,7 @@ public struct MinuteSample: Sendable, Equatable {
     public init(
         timestamp: Date,
         percent: Int? = nil,
+        chargeLimitPercent: Int? = nil,
         isExternalPower: Bool? = nil,
         isCharging: Bool? = nil,
         systemLoadMW: Int? = nil,
@@ -31,6 +33,7 @@ public struct MinuteSample: Sendable, Equatable {
     ) {
         self.timestamp = Date(timeIntervalSince1970: TimeInterval(UnixTime.floor(timestamp, to: 60)))
         self.percent = percent
+        self.chargeLimitPercent = chargeLimitPercent
         self.isExternalPower = isExternalPower
         self.isCharging = isCharging
         self.systemLoadMW = systemLoadMW
@@ -46,6 +49,7 @@ public struct MinuteSample: Sendable, Equatable {
         self.init(
             timestamp: timestamp,
             percent: snapshot.percent,
+            chargeLimitPercent: snapshot.chargeLimitPercent,
             isExternalPower: snapshot.isExternalPower,
             isCharging: snapshot.isCharging,
             systemLoadMW: snapshot.systemLoadMW,
@@ -69,6 +73,7 @@ public struct HourlySample: Sendable, Equatable {
     public var percentAverage: Double?
     public var percentMin: Int?
     public var percentMax: Int?
+    public var chargeLimitPercent: Int?
     public var systemLoadAverageMW: Double?
     public var systemLoadMaxMW: Int?
     public var temperatureAverageCelsius: Double?
@@ -81,6 +86,7 @@ public struct HourlySample: Sendable, Equatable {
         percentAverage: Double? = nil,
         percentMin: Int? = nil,
         percentMax: Int? = nil,
+        chargeLimitPercent: Int? = nil,
         systemLoadAverageMW: Double? = nil,
         systemLoadMaxMW: Int? = nil,
         temperatureAverageCelsius: Double? = nil,
@@ -92,6 +98,7 @@ public struct HourlySample: Sendable, Equatable {
         self.percentAverage = percentAverage
         self.percentMin = percentMin
         self.percentMax = percentMax
+        self.chargeLimitPercent = chargeLimitPercent
         self.systemLoadAverageMW = systemLoadAverageMW
         self.systemLoadMaxMW = systemLoadMaxMW
         self.temperatureAverageCelsius = temperatureAverageCelsius
@@ -172,6 +179,7 @@ extension MinuteSample: FetchableRecord, PersistableRecord {
         self.init(
             timestamp: UnixTime.date(row["ts"]),
             percent: row["percent"],
+            chargeLimitPercent: row["charge_limit_pct"],
             isExternalPower: row["is_external"],
             isCharging: row["is_charging"],
             systemLoadMW: row["system_load_mw"],
@@ -185,6 +193,7 @@ extension MinuteSample: FetchableRecord, PersistableRecord {
 
     public func encode(to container: inout PersistenceContainer) throws {
         container["ts"] = UnixTime.seconds(timestamp)
+        container["charge_limit_pct"] = chargeLimitPercent
         container["percent"] = percent
         container["is_external"] = isExternalPower
         container["is_charging"] = isCharging
@@ -208,6 +217,7 @@ extension HourlySample: FetchableRecord, PersistableRecord {
             percentAverage: row["percent_avg"],
             percentMin: row["percent_min"],
             percentMax: row["percent_max"],
+            chargeLimitPercent: row["charge_limit_pct"],
             systemLoadAverageMW: row["system_load_avg_mw"],
             systemLoadMaxMW: row["system_load_max_mw"],
             temperatureAverageCelsius: row["temperature_avg_c"],
@@ -222,6 +232,7 @@ extension HourlySample: FetchableRecord, PersistableRecord {
         container["percent_avg"] = percentAverage
         container["percent_min"] = percentMin
         container["percent_max"] = percentMax
+        container["charge_limit_pct"] = chargeLimitPercent
         container["system_load_avg_mw"] = systemLoadAverageMW
         container["system_load_max_mw"] = systemLoadMaxMW
         container["temperature_avg_c"] = temperatureAverageCelsius
