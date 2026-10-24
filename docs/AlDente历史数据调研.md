@@ -30,9 +30,9 @@ Hachibu 当前设计的 `minute_samples`、`hourly_samples`、`daily_samples` �
 
 调研时文件大小为 2,605,056 字节，约 2.6 MB。`~/Library/Application Support/AlDente` 不是本次找到的历史数据库位置。
 
-该数据库经过 SQLCipher 加密，普通 SQLite 打开后查询会报 `file is not a database`。本机安装包包含 `SQLCipher.framework` 和 `SQLite.framework`。通过静态检查数据库初始化逻辑，使用安装包中的 SQLCipher 及其初始化参数，成功读取真实表结构和记录。本文不保存解密参数、电池序列号或授权信息。
+该数据库经过加密，普通 SQLite 打开后查询会报 `file is not a database`。本文的表结构和统计来自调研时在本机的一次只读读取，不记录读取方法和参数，也不保存电池序列号或授权信息。Hachibu 不提供解密 AlDente 数据库的方法或指引，v3 的数据来源见 `v1技术设计.md` 第 18 节。
 
-最终统计使用 `SQLITE_OPEN_READONLY | SQLITE_OPEN_URI`、`mode=ro`、`PRAGMA query_only=ON`，在只读事务中查询。库的 `journal_mode` 为 `delete`，`user_version` 为 0；加载的 SQLCipher 报告版本为 `4.9.0 community`。没有生成明文副本。
+查询在只读事务中进行，没有生成明文副本。库的 `journal_mode` 为 `delete`，`user_version` 为 0。
 
 AlDente 在调研期间继续更新高频数据，后续查询的首末时间会变化。下文的高频范围是本次查询时的快照，不能作为固定保留起点。
 
@@ -302,7 +302,7 @@ Hachibu 当前代码通过 `PowerTelemetryData` 读取功率，通过 `AppleSmar
 - 温度传感器来源，以及历史版本电量百分比采用系统口径还是硬件口径。
 - 导入统计时区，设计容量向后沿用的范围与推导标记。
 - 完整保留来源数据还是仅导入目标曲线，以及对应的来源、撤销和聚合冲突设计。
-- SQLCipher 读取方案在其他 AlDente 版本上的兼容性。本次成功读取只证明本机 1.39.3 的可行性，不能承诺所有版本均可读取。
+- 合法的数据来源：AlDente 自身能否导出历史数据。
 
 ## 9. 依据与复核入口
 
@@ -310,7 +310,7 @@ Hachibu 当前代码通过 `PowerTelemetryData` 读取功率，通过 `AppleSmar
 
 - `~/Library/Preferences/com.apphousekitchen.aldente-pro_stats.sqlite3`：真实 schema、记录、时间范围和异常组合。
 - `/Applications/AlDente.app/Contents/Info.plist`：版本和 Bundle ID。
-- `/Applications/AlDente.app/Contents/MacOS/AlDente`：数据库初始化、容量读取与采样分支的静态证据。
+- `/Applications/AlDente.app/Contents/MacOS/AlDente`：容量读取与采样分支的静态证据。
 - `/Applications/AlDente.app/Contents/Frameworks/SQLite.framework/SQLite`：日期序列化格式与 UTC 时区。
 - `/Applications/AlDente.app/Contents/Resources/en-US.lproj/Localizable.strings`：容量和健康状态的界面命名辅助证据。
 
@@ -324,7 +324,7 @@ Hachibu 当前代码通过 `PowerTelemetryData` 读取功率，通过 `AppleSmar
 
 - [SQLite.swift 日期序列化实现](https://github.com/stephencelis/SQLite.swift/blob/master/Sources/SQLite/Foundation.swift)。时区结论同时经过本机安装包静态代码核实。
 
-成功以只读方式打开加密数据库后，可使用以下查询复核结构和基础统计；普通 SQLite 未设置正确的读取参数时无法执行这些查询：
+调研时用于复核结构和基础统计的查询，仅作记录：
 
 ```sql
 SELECT type, name, sql
