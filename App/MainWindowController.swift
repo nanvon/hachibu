@@ -12,7 +12,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
 
     convenience init(history: HistoryModel, monitor: BatteryMonitor, settings: AppSettings, alerts: AlertMonitor, updates: UpdateController) {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 960, height: 680),
+            contentRect: NSRect(x: 0, y: 0, width: 1200, height: 840),
             styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
             backing: .buffered,
             defer: false
@@ -45,7 +45,9 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     func showAndActivate() {
         history?.start()
         showWindow(nil)
-        NSApp.activate()
+        // 面板是 .nonactivatingPanel，点击后本应用仍不是前台应用，NSApp.activate() 会被系统拒绝，
+        // 窗口留在其他应用后面。见 https://developer.apple.com/forums/thread/836619
+        (NSApp as any LegacyActivation).activate(ignoringOtherApps: true)
         window?.makeKeyAndOrderFront(nil)
     }
 
@@ -76,3 +78,12 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         return formatter.string(from: date)
     }
 }
+
+/// `activate(ignoringOtherApps:)` 自 macOS 14 弃用，但菜单栏应用从非激活面板打开窗口时只有它能把窗口带到前面。
+/// 经协议调用，避免弃用警告。
+@MainActor
+private protocol LegacyActivation {
+    func activate(ignoringOtherApps flag: Bool)
+}
+
+extension NSApplication: LegacyActivation {}

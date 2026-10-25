@@ -104,7 +104,7 @@ public final class HistoryModel {
                 data = HistoryChartBuilder.recent(minuteSamples: samples, range: range, now: now, firstRecordedAt: firstRecordedAt)
             case .week:
                 let samples = try await store.minuteSamplesByHour(from: start, to: now)
-                data = HistoryChartBuilder.recent(hourlySamples: samples, range: range, now: now, firstRecordedAt: firstRecordedAt)
+                data = HistoryChartBuilder.recent(hourlyAverages: samples, range: range, now: now, firstRecordedAt: firstRecordedAt)
             }
             guard generation == recentGeneration else { return }
             recent = data

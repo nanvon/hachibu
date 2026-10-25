@@ -179,6 +179,9 @@
         }
       }
     },
+    "Baseline" : {
+
+    },
     "Battery" : {
       "localizations" : {
         "zh-Hans" : {
@@ -195,6 +198,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "电池充电"
+          }
+        }
+      }
+    },
+    "Battery Current" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "电池电流"
           }
         }
       }
@@ -229,12 +242,52 @@
         }
       }
     },
+    "Battery Power" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "电池功率"
+          }
+        }
+      }
+    },
+    "Battery Power (Charging +, Draining −)" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "电池功率（充电为正，放电为负）"
+          }
+        }
+      }
+    },
+    "Battery Temperature" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "电池温度"
+          }
+        }
+      }
+    },
     "Battery Temperature High" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "电池温度过高"
+          }
+        }
+      }
+    },
+    "Battery Voltage" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "电池电压"
           }
         }
       }
@@ -250,11 +303,22 @@
       }
     },
     "Capacity Ratio" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "容量比"
+          }
+        }
+      }
+    },
+    "Capacity Ratio (Full Charge / Design)" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "容量比（满充 / 设计）"
           }
         }
       }
@@ -300,6 +364,7 @@
       }
     },
     "Charger input %@, battery supplying %@, computer using %@." : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -310,6 +375,7 @@
       }
     },
     "Charger input %@: computer using %@, charging battery %@." : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -319,7 +385,18 @@
         }
       }
     },
+    "Charger Input Power" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "充电器输入功率"
+          }
+        }
+      }
+    },
     "Charger supplies %@ to the computer; battery not charging." : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -370,6 +447,7 @@
       }
     },
     "Computer running on battery: %@." : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -400,6 +478,7 @@
       }
     },
     "Current" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -449,12 +528,22 @@
         }
       }
     },
+    "Design Capacity" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "设计容量"
+          }
+        }
+      }
+    },
     "Details" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "详情"
+            "value" : "详细数据"
           }
         }
       }
@@ -490,6 +579,7 @@
       }
     },
     "Full Charge / Design" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -590,6 +680,16 @@
         }
       }
     },
+    "Input Voltage · Current" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "输入电压 · 电流"
+          }
+        }
+      }
+    },
     "Last updated %@" : {
       "localizations" : {
         "zh-Hans" : {
@@ -631,6 +731,7 @@
       }
     },
     "Live" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -676,6 +777,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "最大容量"
+          }
+        }
+      }
+    },
+    "Maximum Capacity (System)" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最大容量（系统）"
           }
         }
       }
@@ -790,12 +901,44 @@
         }
       }
     },
+    "Off (Short)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Off"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "关"
+          }
+        }
+      }
+    },
     "On" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "开启"
+          }
+        }
+      }
+    },
+    "On (Short)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "On"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开"
           }
         }
       }
@@ -1021,6 +1164,16 @@
         }
       }
     },
+    "System" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "系统"
+          }
+        }
+      }
+    },
     "System Charge Limit" : {
       "localizations" : {
         "zh-Hans" : {
@@ -1162,11 +1315,32 @@
       }
     },
     "Voltage" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "电压"
+          }
+        }
+      }
+    },
+    "Voltage, Current" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "电压、电流"
+          }
+        }
+      }
+    },
+    "Voltage, Current, Charger" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "电压、电流、充电器"
           }
         }
       }
@@ -1180,6 +1354,9 @@
           }
         }
       }
+    },
+    "Zero" : {
+
     }
   },
   "version" : "1.0"

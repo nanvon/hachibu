@@ -6,7 +6,7 @@ import SwiftUI
 /// 关闭时机：再次点击菜单栏图标、点击面板以外的位置、按 Esc、面板失去 key 状态。
 @MainActor
 final class PanelController: NSObject, NSWindowDelegate {
-    private static let cornerRadius: CGFloat = 26
+    private static let cornerRadius: CGFloat = 28
     private static let gapBelowMenuBar: CGFloat = 6
     private static let screenMargin: CGFloat = 8
     /// 与 FeatureUI 中内容展开、收起的动画时长接近。

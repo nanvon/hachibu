@@ -28,6 +28,8 @@ public final class BatteryMonitor {
     public private(set) var chargeLimitWriteFailed = false
     /// AlDente 等充电控制工具正在运行。此时不提供充电上限控制，避免两套工具同时控制充电。
     public private(set) var isChargeControlAppRunning = false
+    /// 菜单栏面板正在显示。面板关闭时停止功率流动画。
+    public private(set) var isPanelVisible = false
 
     /// 能否修改系统充电上限（PowerUI 写入方法可用）。
     public var canWriteChargeLimit: Bool {
@@ -41,7 +43,6 @@ public final class BatteryMonitor {
 
     @ObservationIgnored private let sampler: BatterySampler
     @ObservationIgnored private var lastReadAt: Date?
-    @ObservationIgnored private var isPanelVisible = false
     @ObservationIgnored private var readTask: Task<Void, Never>?
     @ObservationIgnored private var minuteTask: Task<Void, Never>?
     @ObservationIgnored private var healthTask: Task<Void, Never>?

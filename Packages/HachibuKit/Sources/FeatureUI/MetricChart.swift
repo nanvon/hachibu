@@ -1,13 +1,20 @@
 import Charts
 import SwiftUI
 
-/// 一个指标的历史曲线：标题行显示最新点的读数，下方是曲线和渐变面积。
-/// 悬停时在曲线上方用气泡显示最近一个点的读数。同组的几张图共享 `hoverDate`，一起显示同一时刻的竖线和读数。
+/// 一个指标的历史曲线：上方是指标名和大号读数，下方卡片里是曲线和渐变面积。
+/// 读数平时显示最新点；悬停时换成悬停处最近一个点的值和时间。同组的几张图共享 `hoverDate`，一起显示同一时刻的竖线和读数。
 /// 样式见 docs/v1技术设计.md 19.3。
 struct MetricChart: View {
     enum YScale {
         case fixed(ClosedRange<Double>)
         case automatic(includesZero: Bool)
+    }
+
+    enum Style {
+        /// 单色曲线加同色渐变面积。
+        case line(Color)
+        /// 正值绿色、负值橙色，面积以 0 为基线。用于电池功率。
+        case signed
     }
 
     let title: Text
@@ -19,37 +26,91 @@ struct MetricChart: View {
     var notRecorded: Range<Date>?
     var yScale: YScale = .automatic(includesZero: false)
     var interpolation: InterpolationMethod = .linear
-    let color: Color
+    let style: Style
     let formatValue: (Double) -> String
     let formatDate: (Date) -> String
     @Binding var hoverDate: Date?
 
-    private static let bandColor = Color.green.opacity(0.1)
+    private static let bandColor = Color.green.opacity(0.09)
     private static let lineWidth: CGFloat = 2
+    private static let chartHeight: CGFloat = 200
     /// “未记录”区间窄于横轴的这个比例时不显示文字，只画底色。
     private static let notRecordedLabelMinFraction = 0.12
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .firstTextBaseline) {
-                title
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                Spacer(minLength: 8)
-                readout
-                    .font(.callout)
-                    .monospacedDigit()
-            }
+            header
+                .padding(.horizontal, 4)
             scaledChart
-                .frame(height: 160)
+                .frame(height: Self.chartHeight)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 12)
+                .background {
+                    let shape = RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    shape.fill(.background.opacity(0.7))
+                    shape.strokeBorder(Color.primary.opacity(0.06), lineWidth: 0.5)
+                }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
+
+    // MARK: - 读数
 
     private var hoveredPoint: ChartPoint? {
         guard let hoverDate else { return nil }
         return HistoryChartBuilder.nearest(in: points, to: hoverDate, within: maxGap)
     }
+
+    private var header: some View {
+        let shown = hoveredPoint ?? points.last
+        return HStack(alignment: .lastTextBaseline) {
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 6) {
+                    legendDot
+                    title
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                }
+                Text(verbatim: shown.map { formatValue($0.value) } ?? DisplayFormat.missing)
+                    .font(.system(size: 26, weight: .semibold, design: .rounded))
+                    .monospacedDigit()
+                    .contentTransition(.numericText())
+            }
+            Spacer(minLength: 8)
+            if let shown {
+                Text(verbatim: formatDate(shown.date))
+                    .font(.system(size: 11.5))
+                    .fontWeight(hoveredPoint == nil ? .regular : .medium)
+                    .foregroundStyle(hoveredPoint == nil ? HierarchicalShapeStyle.tertiary : .primary)
+                    .monospacedDigit()
+            }
+        }
+        .lineLimit(1)
+    }
+
+    @ViewBuilder
+    private var legendDot: some View {
+        switch style {
+        case .line(let color):
+            Circle().fill(color).frame(width: 8, height: 8)
+        case .signed:
+            // 左半绿、右半橙。
+            Circle()
+                .fill(LinearGradient(
+                    stops: [
+                        .init(color: .green, location: 0),
+                        .init(color: .green, location: 0.5),
+                        .init(color: .orange, location: 0.5),
+                        .init(color: .orange, location: 1),
+                    ],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                ))
+                .frame(width: 8, height: 8)
+        }
+    }
+
+    // MARK: - 曲线
 
     /// 面积填充的下边界：固定刻度取下限，自动刻度取数据最小值（包含 0 时取 0）。
     /// 不用 AreaMark 默认的 0 基线，以免把不含 0 的纵轴撑到 0。
@@ -63,21 +124,8 @@ struct MetricChart: View {
         }
     }
 
-    private var areaGradient: LinearGradient {
-        LinearGradient(colors: [color.opacity(0.25), color.opacity(0)], startPoint: .top, endPoint: .bottom)
-    }
-
-    private var readout: some View {
-        HStack(spacing: 6) {
-            if let point = points.last {
-                Text(verbatim: formatValue(point.value))
-                Text(verbatim: formatDate(point.date))
-                    .foregroundStyle(.secondary)
-            } else {
-                Text(verbatim: DisplayFormat.missing)
-                    .foregroundStyle(.secondary)
-            }
-        }
+    private static func areaGradient(_ color: Color) -> LinearGradient {
+        LinearGradient(colors: [color.opacity(0.28), color.opacity(0)], startPoint: .top, endPoint: .bottom)
     }
 
     @ViewBuilder
@@ -107,40 +155,23 @@ struct MetricChart: View {
                         }
                     }
             }
-            let baseline = areaBaseline
-            ForEach(points) { point in
-                AreaMark(
-                    x: .value("Time", point.date),
-                    yStart: .value("Baseline", baseline),
-                    yEnd: .value("Value", point.value),
-                    series: .value("Segment", point.segment)
-                )
-                .interpolationMethod(interpolation)
-                .foregroundStyle(areaGradient)
-            }
-            ForEach(points) { point in
-                LineMark(
-                    x: .value("Time", point.date),
-                    y: .value("Value", point.value),
-                    series: .value("Segment", point.segment)
-                )
-                .interpolationMethod(interpolation)
-                .lineStyle(StrokeStyle(lineWidth: Self.lineWidth, lineCap: .round, lineJoin: .round))
-                .foregroundStyle(color)
+            switch style {
+            case .line(let color):
+                lineMarks(points, series: { "\($0.segment)" }, baseline: areaBaseline, color: color)
+            case .signed:
+                RuleMark(y: .value("Zero", 0.0))
+                    .foregroundStyle(Color.primary.opacity(0.25))
+                    .lineStyle(StrokeStyle(lineWidth: 1))
+                ForEach(HistoryChartBuilder.signedRuns(points)) { run in
+                    lineMarks(run.points, series: { _ in "\(run.id)" }, baseline: 0, color: run.isPositive ? .green : .orange)
+                }
             }
             if let point = hoveredPoint {
                 RuleMark(x: .value("Time", point.date))
-                    .foregroundStyle(Color.secondary.opacity(0.4))
+                    .foregroundStyle(Color.primary.opacity(0.3))
                 PointMark(x: .value("Time", point.date), y: .value("Value", point.value))
-                    .foregroundStyle(color)
-                    .symbolSize(30)
-                    .annotation(
-                        position: .top,
-                        spacing: 8,
-                        overflowResolution: .init(x: .fit(to: .chart), y: .fit(to: .chart))
-                    ) {
-                        HoverBubble(value: formatValue(point.value), date: formatDate(point.date))
-                    }
+                    .foregroundStyle(pointColor(point))
+                    .symbolSize(50)
             }
         }
         .chartXScale(domain: domain)
@@ -170,29 +201,45 @@ struct MetricChart: View {
         }
     }
 
+    @ChartContentBuilder
+    private func lineMarks(
+        _ points: [ChartPoint],
+        series: @escaping (ChartPoint) -> String,
+        baseline: Double,
+        color: Color
+    ) -> some ChartContent {
+        ForEach(points) { point in
+            AreaMark(
+                x: .value("Time", point.date),
+                yStart: .value("Baseline", baseline),
+                yEnd: .value("Value", point.value),
+                series: .value("Segment", series(point))
+            )
+            .interpolationMethod(interpolation)
+            .foregroundStyle(Self.areaGradient(color))
+        }
+        ForEach(points) { point in
+            LineMark(
+                x: .value("Time", point.date),
+                y: .value("Value", point.value),
+                series: .value("Segment", series(point))
+            )
+            .interpolationMethod(interpolation)
+            .lineStyle(StrokeStyle(lineWidth: Self.lineWidth, lineCap: .round, lineJoin: .round))
+            .foregroundStyle(color)
+        }
+    }
+
+    private func pointColor(_ point: ChartPoint) -> Color {
+        switch style {
+        case .line(let color): color
+        case .signed: point.value >= 0 ? .green : .orange
+        }
+    }
+
     private func showsNotRecordedLabel(_ range: Range<Date>) -> Bool {
         let total = domain.upperBound.timeIntervalSince(domain.lowerBound)
         guard total > 0 else { return false }
         return range.upperBound.timeIntervalSince(range.lowerBound) / total >= Self.notRecordedLabelMinFraction
-    }
-}
-
-/// 悬停读数气泡：macOS 26+ 为玻璃，更早系统为 `.regularMaterial`。
-private struct HoverBubble: View {
-    let value: String
-    let date: String
-
-    var body: some View {
-        HStack(spacing: 6) {
-            Text(verbatim: value)
-                .fontWeight(.semibold)
-            Text(verbatim: date)
-                .foregroundStyle(.secondary)
-        }
-        .font(.caption)
-        .monospacedDigit()
-        .padding(.horizontal, 10)
-        .padding(.vertical, 5)
-        .panelGlass(in: Capsule())
     }
 }

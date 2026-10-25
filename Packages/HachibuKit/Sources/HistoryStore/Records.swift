@@ -58,7 +58,7 @@ public struct MinuteSample: Sendable, Equatable {
     }
 }
 
-/// 一小时的汇总。既是 `hourly_samples` 的一行，也是近期 7 天曲线按小时 GROUP BY 的结果。
+/// 一小时的汇总，`hourly_samples` 的一行。近期 7 天曲线用的是 `HourlyAverage`。
 /// 平均值、最大值只统计非 NULL 的样本，全部为 NULL 时为 nil。
 public struct HourlySample: Sendable, Equatable {
     /// 小时起点。
@@ -96,6 +96,44 @@ public struct HourlySample: Sendable, Equatable {
         self.systemLoadMaxMW = systemLoadMaxMW
         self.temperatureAverageCelsius = temperatureAverageCelsius
         self.temperatureMaxCelsius = temperatureMaxCelsius
+    }
+}
+
+/// 分钟数据按小时求平均的结果，用于近期 7 天曲线，不对应数据表。
+/// 平均值只统计非 NULL 的样本，全部为 NULL 时为 nil。
+public struct HourlyAverage: Sendable, Equatable {
+    /// 小时起点。
+    public var hour: Date
+    public var sampleCount: Int
+    /// 该小时内接电的分钟数。
+    public var externalMinutes: Int
+    public var percent: Double?
+    public var systemLoadMW: Double?
+    public var batteryPowerMW: Double?
+    public var powerInMW: Double?
+    public var temperatureCelsius: Double?
+    public var voltageMV: Double?
+
+    public init(
+        hour: Date,
+        sampleCount: Int,
+        externalMinutes: Int,
+        percent: Double? = nil,
+        systemLoadMW: Double? = nil,
+        batteryPowerMW: Double? = nil,
+        powerInMW: Double? = nil,
+        temperatureCelsius: Double? = nil,
+        voltageMV: Double? = nil
+    ) {
+        self.hour = hour
+        self.sampleCount = sampleCount
+        self.externalMinutes = externalMinutes
+        self.percent = percent
+        self.systemLoadMW = systemLoadMW
+        self.batteryPowerMW = batteryPowerMW
+        self.powerInMW = powerInMW
+        self.temperatureCelsius = temperatureCelsius
+        self.voltageMV = voltageMV
     }
 }
 
@@ -226,6 +264,22 @@ extension HourlySample: FetchableRecord, PersistableRecord {
         container["system_load_max_mw"] = systemLoadMaxMW
         container["temperature_avg_c"] = temperatureAverageCelsius
         container["temperature_max_c"] = temperatureMaxCelsius
+    }
+}
+
+extension HourlyAverage: FetchableRecord {
+    public init(row: Row) throws {
+        self.init(
+            hour: UnixTime.date(row["hour_ts"]),
+            sampleCount: row["sample_count"],
+            externalMinutes: row["external_minutes"],
+            percent: row["percent_avg"],
+            systemLoadMW: row["system_load_avg_mw"],
+            batteryPowerMW: row["battery_power_avg_mw"],
+            powerInMW: row["power_in_avg_mw"],
+            temperatureCelsius: row["temperature_avg_c"],
+            voltageMV: row["voltage_avg_mv"]
+        )
     }
 }
 

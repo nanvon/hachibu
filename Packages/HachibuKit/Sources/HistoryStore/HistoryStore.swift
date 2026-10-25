@@ -84,12 +84,22 @@ public final class HistoryStore: Sendable {
     }
 
     /// `[start, end)` 内的分钟样本按小时汇总，按时间排序。用于近期 7 天曲线。没有分钟数据的小时没有结果。
-    public func minuteSamplesByHour(from start: Date, to end: Date) async throws -> [HourlySample] {
+    public func minuteSamplesByHour(from start: Date, to end: Date) async throws -> [HourlyAverage] {
         try await dbQueue.read { db in
-            try HourlySample.fetchAll(
+            try HourlyAverage.fetchAll(
                 db,
                 sql: """
-                    \(Self.hourlySelect)
+                    SELECT
+                        (ts / 3600) * 3600 AS hour_ts,
+                        COUNT(*) AS sample_count,
+                        SUM(CASE WHEN is_external = 1 THEN 1 ELSE 0 END) AS external_minutes,
+                        AVG(percent) AS percent_avg,
+                        AVG(system_load_mw) AS system_load_avg_mw,
+                        AVG(battery_power_mw) AS battery_power_avg_mw,
+                        AVG(power_in_mw) AS power_in_avg_mw,
+                        AVG(temperature_c) AS temperature_avg_c,
+                        AVG(voltage_mv) AS voltage_avg_mv
+                    FROM minute_samples
                     WHERE ts >= ? AND ts < ?
                     GROUP BY hour_ts
                     ORDER BY hour_ts

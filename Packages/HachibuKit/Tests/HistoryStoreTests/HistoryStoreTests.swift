@@ -101,9 +101,9 @@ private func minute(_ offset: Int) -> Date {
 @Suite struct AggregationTests {
     /// 第 0 小时：3 个样本，2 个接电，温度一个 NULL；第 1 小时：1 个样本，全部指标 NULL。
     private func seed(_ store: HistoryStore) async throws {
-        try await store.write(MinuteSample(timestamp: minute(0), percent: 60, isExternalPower: true, systemLoadMW: 10000, temperatureCelsius: 30))
-        try await store.write(MinuteSample(timestamp: minute(1), percent: 62, isExternalPower: true, systemLoadMW: 20000))
-        try await store.write(MinuteSample(timestamp: minute(59), percent: 64, isExternalPower: false, systemLoadMW: 15000, temperatureCelsius: 32))
+        try await store.write(MinuteSample(timestamp: minute(0), percent: 60, isExternalPower: true, systemLoadMW: 10000, batteryPowerMW: 2000, powerInMW: 12000, temperatureCelsius: 30))
+        try await store.write(MinuteSample(timestamp: minute(1), percent: 62, isExternalPower: true, systemLoadMW: 20000, batteryPowerMW: -1000))
+        try await store.write(MinuteSample(timestamp: minute(59), percent: 64, isExternalPower: false, systemLoadMW: 15000, temperatureCelsius: 32, voltageMV: 12000))
         try await store.write(MinuteSample(timestamp: minute(60)))
     }
 
@@ -126,7 +126,20 @@ private func minute(_ offset: Int) -> Date {
         let store = try HistoryStore.inMemory()
         try await seed(store)
         let hours = try await store.minuteSamplesByHour(from: base, to: minute(120))
-        #expect(hours == [firstHour, secondHour])
+        #expect(hours == [
+            HourlyAverage(
+                hour: base,
+                sampleCount: 3,
+                externalMinutes: 2,
+                percent: 62,
+                systemLoadMW: 15000,
+                batteryPowerMW: 500,
+                powerInMW: 12000,
+                temperatureCelsius: 31,
+                voltageMV: 12000
+            ),
+            HourlyAverage(hour: base.addingTimeInterval(3600), sampleCount: 1, externalMinutes: 0),
+        ])
     }
 
     @Test func aggregatesOnlyFinishedHoursOlderThanRetention() async throws {

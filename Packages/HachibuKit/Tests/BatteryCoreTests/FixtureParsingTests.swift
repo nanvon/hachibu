@@ -54,8 +54,9 @@ import Testing
         #expect(snapshot.remainingTime == nil)
 
         let flow = try #require(PowerFlow(snapshot))
-        #expect(flow.links == [PowerFlow.Link(from: .charger, to: .computer, powerMW: 18099)])
-        #expect(flow.caption == .pluggedInIdle(loadMW: 18099))
+        #expect(flow.inputs == [PowerFlow.Stream(.charger, powerMW: snapshot.powerInMW)])
+        #expect(flow.outputs == [PowerFlow.Stream(.system, powerMW: 18099)])
+        #expect(flow.computerMW == 18099)
     }
 
     @Test func health() {

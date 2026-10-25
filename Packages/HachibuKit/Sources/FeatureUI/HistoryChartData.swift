@@ -10,6 +10,13 @@ struct ChartPoint: Identifiable, Equatable {
     var id: Date { date }
 }
 
+/// 正负分开着色的曲线中同号的一段，见 `HistoryChartBuilder.signedRuns(_:)`。
+struct SignedRun: Identifiable, Equatable {
+    var id: Int
+    var isPositive: Bool
+    var points: [ChartPoint]
+}
+
 /// 近期组的时间范围。
 enum RecentRange: CaseIterable, Hashable {
     case hour, day, week
@@ -42,7 +49,7 @@ enum LongTermRange: CaseIterable, Hashable {
     }
 }
 
-/// 近期组三条曲线的数据。
+/// 近期组六条曲线的数据。
 struct RecentChartData: Equatable {
     var domain: ClosedRange<Date>
     /// 超过该间隔的相邻两点不连线；悬停时也只取这个距离内的点。
@@ -52,17 +59,23 @@ struct RecentChartData: Equatable {
     /// 接电时段，画底色。
     var pluggedIn: [Range<Date>]
     var percent: [ChartPoint]
-    var systemPowerWatts: [ChartPoint]
     var temperatureCelsius: [ChartPoint]
+    var systemPowerWatts: [ChartPoint]
+    /// 电池功率，充电为正、放电为负。
+    var batteryPowerWatts: [ChartPoint]
+    var powerInWatts: [ChartPoint]
+    var voltageVolts: [ChartPoint]
 }
 
-/// 长期组三条曲线的数据。
+/// 长期组四条曲线的数据。
 struct LongTermChartData: Equatable {
     var domain: ClosedRange<Date>
     var maxGap: TimeInterval
     /// 早于第一条记录的区间，标“未记录”。
     var notRecorded: Range<Date>?
     var maximumCapacityPercent: [ChartPoint]
+    /// 容量比：满充容量 / 设计容量，百分数。两者任一缺失时该天没有点。
+    var capacityRatioPercent: [ChartPoint]
     var fullChargeCapacityMAh: [ChartPoint]
     var cycleCount: [ChartPoint]
 }
@@ -76,7 +89,10 @@ enum HistoryChartBuilder {
         var date: Date
         var percent: Double?
         var systemLoadMW: Double?
+        var batteryPowerMW: Double?
+        var powerInMW: Double?
         var temperatureCelsius: Double?
+        var voltageMV: Double?
         var isExternalPower: Bool
     }
 
@@ -89,7 +105,10 @@ enum HistoryChartBuilder {
                 date: sample.timestamp,
                 percent: sample.percent.map(Double.init),
                 systemLoadMW: sample.systemLoadMW.map(Double.init),
+                batteryPowerMW: sample.batteryPowerMW.map(Double.init),
+                powerInMW: sample.powerInMW.map(Double.init),
                 temperatureCelsius: sample.temperatureCelsius,
+                voltageMV: sample.voltageMV.map(Double.init),
                 isExternalPower: sample.isExternalPower == true
             )
         }
@@ -97,13 +116,16 @@ enum HistoryChartBuilder {
     }
 
     /// 7 天：分钟数据按小时汇总后的平均值。一小时内接电分钟数过半算作接电。
-    static func recent(hourlySamples: [HourlySample], range: RecentRange, now: Date, firstRecordedAt: Date?) -> RecentChartData {
-        let rows = hourlySamples.map { sample in
+    static func recent(hourlyAverages: [HourlyAverage], range: RecentRange, now: Date, firstRecordedAt: Date?) -> RecentChartData {
+        let rows = hourlyAverages.map { sample in
             RecentRow(
                 date: sample.hour,
-                percent: sample.percentAverage,
-                systemLoadMW: sample.systemLoadAverageMW,
-                temperatureCelsius: sample.temperatureAverageCelsius,
+                percent: sample.percent,
+                systemLoadMW: sample.systemLoadMW,
+                batteryPowerMW: sample.batteryPowerMW,
+                powerInMW: sample.powerInMW,
+                temperatureCelsius: sample.temperatureCelsius,
+                voltageMV: sample.voltageMV,
                 isExternalPower: sample.externalMinutes > 0 && sample.externalMinutes * 2 >= sample.sampleCount
             )
         }
@@ -125,8 +147,11 @@ enum HistoryChartBuilder {
                 end: domain.upperBound
             ),
             percent: segmented(rows.map { ($0.date, $0.percent) }, maxGap: maxGap),
+            temperatureCelsius: segmented(rows.map { ($0.date, $0.temperatureCelsius) }, maxGap: maxGap),
             systemPowerWatts: segmented(rows.map { ($0.date, $0.systemLoadMW.map { $0 / 1000 }) }, maxGap: maxGap),
-            temperatureCelsius: segmented(rows.map { ($0.date, $0.temperatureCelsius) }, maxGap: maxGap)
+            batteryPowerWatts: segmented(rows.map { ($0.date, $0.batteryPowerMW.map { $0 / 1000 }) }, maxGap: maxGap),
+            powerInWatts: segmented(rows.map { ($0.date, $0.powerInMW.map { $0 / 1000 }) }, maxGap: maxGap),
+            voltageVolts: segmented(rows.map { ($0.date, $0.voltageMV.map { $0 / 1000 }) }, maxGap: maxGap)
         )
     }
 
@@ -170,9 +195,15 @@ enum HistoryChartBuilder {
             maxGap: maxGap,
             notRecorded: notRecordedRange(in: domain, recordStart: firstRecordedStart),
             maximumCapacityPercent: segmented(days.map { ($0.date, $0.sample.systemMaxCapacityPercent.map(Double.init)) }, maxGap: maxGap),
+            capacityRatioPercent: segmented(days.map { ($0.date, capacityRatioPercent($0.sample)) }, maxGap: maxGap),
             fullChargeCapacityMAh: segmented(days.map { ($0.date, $0.sample.fullChargeCapacityMAh.map(Double.init)) }, maxGap: maxGap),
             cycleCount: segmented(days.map { ($0.date, $0.sample.cycleCount.map(Double.init)) }, maxGap: maxGap)
         )
+    }
+
+    private static func capacityRatioPercent(_ sample: DailySample) -> Double? {
+        guard let fullCharge = sample.fullChargeCapacityMAh, let design = sample.designCapacityMAh, design > 0 else { return nil }
+        return Double(fullCharge) / Double(design) * 100
     }
 
     private static func firstDay(dayCount: Int, now: Date, calendar: Calendar) -> Date {
@@ -248,6 +279,41 @@ enum HistoryChartBuilder {
         }
         close()
         return result
+    }
+
+    /// 正负分开着色的曲线：按正负切成若干段，跨过 0 时在两点间按线性插值补一个值为 0 的点，前后两段共用。
+    /// 原来就断开的地方（`segment` 不同）仍然断开。0 算作正。
+    static func signedRuns(_ points: [ChartPoint]) -> [SignedRun] {
+        var runs: [SignedRun] = []
+        var current: SignedRun?
+        for point in points {
+            let isPositive = point.value >= 0
+            guard var run = current, let last = run.points.last, last.segment == point.segment else {
+                if let current {
+                    runs.append(current)
+                }
+                current = SignedRun(id: runs.count, isPositive: isPositive, points: [point])
+                continue
+            }
+            if run.isPositive == isPositive {
+                run.points.append(point)
+                current = run
+                continue
+            }
+            let fraction = last.value / (last.value - point.value)
+            let zero = ChartPoint(
+                date: last.date.addingTimeInterval(point.date.timeIntervalSince(last.date) * fraction),
+                value: 0,
+                segment: point.segment
+            )
+            run.points.append(zero)
+            runs.append(run)
+            current = SignedRun(id: runs.count, isPositive: isPositive, points: [zero, point])
+        }
+        if let current {
+            runs.append(current)
+        }
+        return runs
     }
 
     /// 离 `date` 最近的点，距离超过 `maxDistance` 时为 nil。`points` 按时间排序。

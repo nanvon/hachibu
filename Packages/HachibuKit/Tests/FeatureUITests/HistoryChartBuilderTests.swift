@@ -93,10 +93,11 @@ private let utc: Calendar = {
     @Test func hourIsPluggedInWhenMostMinutesAre() {
         let now = base.addingTimeInterval(3 * 3600)
         let samples = [
-            HourlySample(hour: base, sampleCount: 60, externalMinutes: 30, percentAverage: 80),
-            HourlySample(hour: base.addingTimeInterval(3600), sampleCount: 60, externalMinutes: 29),
+            HourlyAverage(hour: base, sampleCount: 60, externalMinutes: 30, percent: 80, batteryPowerMW: -2500),
+            HourlyAverage(hour: base.addingTimeInterval(3600), sampleCount: 60, externalMinutes: 29),
         ]
-        let data = HistoryChartBuilder.recent(hourlySamples: samples, range: .week, now: now, firstRecordedAt: base)
+        let data = HistoryChartBuilder.recent(hourlyAverages: samples, range: .week, now: now, firstRecordedAt: base)
+        #expect(data.batteryPowerWatts.map(\.value) == [-2.5])
         #expect(data.pluggedIn == [base..<base.addingTimeInterval(3600)])
         #expect(data.percent.map(\.value) == [80])
         #expect(data.maxGap == 3 * 3600)
@@ -152,9 +153,43 @@ private let utc: Calendar = {
         #expect(data.maximumCapacityPercent.map(\.segment) == [0, 0, 1])
     }
 
+    @Test func capacityRatioNeedsBothCapacities() {
+        let data = HistoryChartBuilder.longTerm(
+            dailySamples: [
+                DailySample(day: "2026-10-19", fullChargeCapacityMAh: 7942, designCapacityMAh: 8694, updatedAt: base),
+                DailySample(day: "2026-10-20", fullChargeCapacityMAh: 7900, updatedAt: base),
+            ],
+            range: .month,
+            now: now,
+            firstRecordedDay: "2026-10-19",
+            calendar: utc
+        )
+        #expect(data.capacityRatioPercent.count == 1)
+        #expect(abs((data.capacityRatioPercent.first?.value ?? 0) - 7942.0 / 8694 * 100) < 1e-9)
+    }
+
     @Test func firstDayForQuery() {
         #expect(HistoryChartBuilder.longTermFirstDay(range: .month, now: now, calendar: utc) == "2026-09-21")
         #expect(HistoryChartBuilder.longTermFirstDay(range: .all, now: now, calendar: utc) == nil)
+    }
+}
+
+@Suite struct SignedRunTests {
+    @Test func splitsAtZeroCrossingWithInterpolatedPoint() {
+        let points = [
+            ChartPoint(date: minute(0), value: 2, segment: 0),
+            ChartPoint(date: minute(2), value: -6, segment: 0),
+            ChartPoint(date: minute(3), value: -1, segment: 0),
+            ChartPoint(date: minute(10), value: -3, segment: 1),
+        ]
+        let runs = HistoryChartBuilder.signedRuns(points)
+        let crossing = ChartPoint(date: minute(0).addingTimeInterval(30), value: 0, segment: 0)
+
+        #expect(runs.map(\.isPositive) == [true, false, false])
+        #expect(runs[0].points == [points[0], crossing])
+        #expect(runs[1].points == [crossing, points[1], points[2]])
+        // 原来的断开处不补点。
+        #expect(runs[2].points == [points[3]])
     }
 }
 

@@ -10,6 +10,13 @@ enum DisplayFormat {
         return "\(decimal(Double(milliwatts) / 1000, fractionLength: 1)) W"
     }
 
+    /// 电池功率：W，一位小数，充电带“+”，放电带“−”。
+    static func signedWatts(milliwatts: Int?) -> String {
+        guard let milliwatts else { return missing }
+        let sign = milliwatts > 0 ? "+" : milliwatts < 0 ? "−" : ""
+        return "\(sign)\(decimal(Double(abs(milliwatts)) / 1000, fractionLength: 1)) W"
+    }
+
     /// 充电器额定功率：整数 W。
     static func watts(_ watts: Int?) -> String {
         watts.map { "\($0) W" } ?? missing

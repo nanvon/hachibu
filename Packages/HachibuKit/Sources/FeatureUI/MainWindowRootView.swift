@@ -41,7 +41,7 @@ public struct MainWindowRootView: View {
                     RecordingSummaryView(summary: summary)
                 }
             }
-            .navigationSplitViewColumnWidth(min: 180, ideal: 200, max: 260)
+            .navigationSplitViewColumnWidth(min: 200, ideal: 232, max: 280)
         } detail: {
             let page = selection ?? .history
             Group {
@@ -61,7 +61,9 @@ public struct MainWindowRootView: View {
             // 标题由 sceneBridgingOptions 显示在窗口工具栏，页面内不再手写标题。
             .navigationTitle(page.title)
         }
-        .frame(minWidth: 760, minHeight: 520)
+        .frame(minWidth: 960, minHeight: 660)
+        // 与菜单栏面板一致，不显示控件的焦点环。
+        .focusEffectDisabled()
     }
 }
 
@@ -87,21 +89,26 @@ enum MainWindowPage: CaseIterable, Identifiable, Hashable {
     }
 }
 
-/// 侧栏底部：“自 {日期} 开始记录 · 已记录 {N} 天”。
+/// 侧栏底部的记录概况：“已记录 {N} 天”，下面一行“自 {日期} 开始记录”。
 private struct RecordingSummaryView: View {
     let summary: RecordingSummary
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
+            Text("\(summary.dayCount) days recorded", bundle: .module)
+                .font(.system(size: 12, weight: .semibold))
             if let firstDay = HistoryChartBuilder.startOfDay(summary.firstDay) {
                 Text("Recording since \(firstDay.formatted(date: .abbreviated, time: .omitted))", bundle: .module)
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(.secondary)
             }
-            Text("\(summary.dayCount) days recorded", bundle: .module)
         }
-        .font(.caption)
-        .foregroundStyle(.secondary)
+        .lineLimit(1)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .padding(.horizontal, 10)
+        .padding(.bottom, 10)
     }
 }

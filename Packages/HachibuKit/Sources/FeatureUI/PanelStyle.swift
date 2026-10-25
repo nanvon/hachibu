@@ -4,6 +4,8 @@ import SwiftUI
 extension Color {
     /// 品牌蓝 `#287DD0`，深色模式下调亮，定义在 Asset Catalog。
     static let brand = Color("BrandBlue", bundle: .module)
+    /// 系统功率：曲线、流向图中流向系统的流带、面板功率卡片的图标。
+    static let systemPower = Color.indigo
 }
 
 enum PanelMotion {
@@ -36,5 +38,39 @@ extension View {
         } else {
             buttonStyle(.bordered)
         }
+    }
+
+    /// 面板里的一块内容：玻璃底板上的浅色圆角块，铺满宽度。
+    func panelTile(padding: EdgeInsets = EdgeInsets(top: 12, leading: 14, bottom: 12, trailing: 14)) -> some View {
+        modifier(PanelTile(padding: padding))
+    }
+}
+
+/// 面板浅色块的填充和描边，`panelTile()` 和低电量模式胶囊共用。
+enum PanelTileStyle {
+    /// 浅色模式为半透明白，深色模式为很淡的白。
+    static func fill(_ colorScheme: ColorScheme) -> Color {
+        Color.white.opacity(colorScheme == .dark ? 0.07 : 0.6)
+    }
+
+    static let edge = Color.primary.opacity(0.06)
+}
+
+/// 圆角 18，带一道细描边。
+private struct PanelTile: ViewModifier {
+    static let cornerRadius: CGFloat = 18
+
+    let padding: EdgeInsets
+    @Environment(\.colorScheme) private var colorScheme
+
+    func body(content: Content) -> some View {
+        let shape = RoundedRectangle(cornerRadius: Self.cornerRadius, style: .continuous)
+        content
+            .padding(padding)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background {
+                shape.fill(PanelTileStyle.fill(colorScheme))
+                shape.strokeBorder(PanelTileStyle.edge, lineWidth: 0.5)
+            }
     }
 }
