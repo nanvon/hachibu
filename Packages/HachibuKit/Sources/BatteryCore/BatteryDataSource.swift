@@ -14,7 +14,7 @@ public struct IOKitBatteryDataSource: BatteryDataSource {
 
     public func read() -> RawBatteryReadings {
         RawBatteryReadings(
-            powerSources: Self.powerSources(),
+            powerSources: Self.powerSources() ?? [],
             smartBattery: Self.registryProperties(IOServiceMatching("AppleSmartBattery")),
             smartBatteryPack: Self.registryProperties(IOServiceNameMatching("AppleSmartBatteryPack")),
             adapterDetails: Self.adapterDetails(),
@@ -24,10 +24,21 @@ public struct IOKitBatteryDataSource: BatteryDataSource {
         )
     }
 
-    private static func powerSources() -> [[String: RawValue]] {
+    /// 菜单栏和面板的快速状态读取；不访问 IORegistry、PowerUI 或充电上限文件。
+    /// 读取失败返回 nil；读取成功但没有内置电池时返回 .noBattery。
+    public static func readPowerSource() -> BatteryReading? {
+        guard let sources = powerSources() else { return nil }
+        return BatteryReading(RawBatteryReadings(
+            powerSources: sources, smartBattery: nil, smartBatteryPack: nil,
+            adapterDetails: nil, chargeLimitArchive: nil,
+            lowPowerModeEnabled: ProcessInfo.processInfo.isLowPowerModeEnabled
+        ))
+    }
+
+    private static func powerSources() -> [[String: RawValue]]? {
         guard let info = IOPSCopyPowerSourcesInfo()?.takeRetainedValue(),
               let list = IOPSCopyPowerSourcesList(info)?.takeRetainedValue()
-        else { return [] }
+        else { return nil }
         return (list as [CFTypeRef]).compactMap { source in
             guard let description = IOPSGetPowerSourceDescription(info, source)?.takeUnretainedValue() else {
                 return nil

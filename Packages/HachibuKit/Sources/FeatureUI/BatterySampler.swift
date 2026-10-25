@@ -35,9 +35,11 @@ public actor BatterySampler {
 
     /// 完整读取一次，返回结果和读取时间。
     func read() -> (reading: BatteryReading, date: Date) {
+        // IOPS 在完整读取的最开始采集；不能用 PowerUI 等调用结束的时间把旧状态标成新状态。
+        let date = Date()
         let reading = BatteryReading(dataSource.read())
         latest = reading
-        return (reading, Date())
+        return (reading, date)
     }
 
     /// 修改系统充电上限，再完整读取一次。`applied` 表示写入成功且读回的设置已符合这次修改。

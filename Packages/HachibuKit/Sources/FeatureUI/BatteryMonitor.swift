@@ -4,7 +4,7 @@ import Foundation
 import Observation
 
 /// 当前电池读数，供菜单栏、面板显示；修改系统充电上限也经由这里，完成后立即刷新读数。
-/// 按 docs/v1技术设计.md 第 9、10 节安排读取和写库的时机，实际读写在 BatterySampler 里执行。
+/// 按 docs/v1技术设计.md 第 9、10 节安排采样；完整读写在 BatterySampler，快速 IOPS 读取单独执行。
 @MainActor
 @Observable
 public final class BatteryMonitor {
@@ -42,22 +42,31 @@ public final class BatteryMonitor {
     @ObservationIgnored public var onHealthRefresh: (@MainActor (BatteryHealthInfo) -> Void)?
 
     @ObservationIgnored private let sampler: BatterySampler
+    @ObservationIgnored private let powerSourceReader: @Sendable () -> BatteryReading?
+    @ObservationIgnored private var latestPowerSource: (reading: BatteryReading, date: Date)?
     @ObservationIgnored private var lastReadAt: Date?
+    @ObservationIgnored private var powerSourceTask: Task<Void, Never>?
+    @ObservationIgnored private var immediateReadTask: Task<Void, Never>?
+    @ObservationIgnored private var needsImmediateRead = false
     @ObservationIgnored private var readTask: Task<Void, Never>?
     @ObservationIgnored private var minuteTask: Task<Void, Never>?
     @ObservationIgnored private var healthTask: Task<Void, Never>?
     @ObservationIgnored private var powerSourceObserver: PowerSourceObserver?
     @ObservationIgnored private var notificationObservers: [any NSObjectProtocol] = []
 
-    public init(sampler: BatterySampler) {
+    public init(
+        sampler: BatterySampler,
+        powerSourceReader: @escaping @Sendable () -> BatteryReading? = { IOKitBatteryDataSource.readPowerSource() }
+    ) {
         self.sampler = sampler
+        self.powerSourceReader = powerSourceReader
     }
 
     /// 开始采样。重复调用无效果。
     public func start() {
         guard readTask == nil else { return }
 
-        powerSourceObserver = PowerSourceObserver { [weak self] in self?.readNow() }
+        powerSourceObserver = PowerSourceObserver { [weak self] in self?.powerSourceDidChange() }
         observe(NSWorkspace.didWakeNotification, in: NSWorkspace.shared.notificationCenter)
         observe(.NSProcessInfoPowerStateDidChange, in: .default)
         // 用户在系统电池设置中修改上限后，切回主窗口时立即刷新。
@@ -118,6 +127,7 @@ public final class BatteryMonitor {
     private func startHealthLoop() {
         healthTask = Task { [weak self] in
             // 每日数据要用当时的 IORegistry 读数，启动时先读一次。
+            await self?.refreshPowerSource()
             await self?.read()
             while !Task.isCancelled {
                 await self?.refreshHealth()
@@ -128,11 +138,57 @@ public final class BatteryMonitor {
 
     // MARK: - 读写
 
-    private func readNow() {
-        Task { await read() }
+    /// 事件刷新入口；快速读取不参与完整请求的排队与合并。
+    func readNow() {
+        Task { [weak self] in
+            await self?.refreshPowerSource()
+            self?.requestCompleteRead()
+        }
     }
 
-    private func read() async {
+    private func requestCompleteRead() {
+        // 两类 IOPS 通知可能同时到达；完整读取最多执行一个并保留一次待刷新请求。
+        needsImmediateRead = true
+        guard immediateReadTask == nil else { return }
+        immediateReadTask = Task { [weak self] in
+            while let self, self.needsImmediateRead {
+                self.needsImmediateRead = false
+                await self.read()
+            }
+            self?.immediateReadTask = nil
+        }
+    }
+
+    private func powerSourceDidChange() {
+        readNow()
+        powerSourceTask?.cancel()
+        powerSourceTask = Task { [weak self] in
+            // 通知与 IOPS 缓存可能不同步；仅在事件后短时补读，不增加常驻轮询。
+            for delay: Duration in [.milliseconds(250), .milliseconds(750), .seconds(2)] {
+                do { try await Task.sleep(for: delay) } catch { return }
+                guard !Task.isCancelled else { return }
+                await self?.refreshPowerSource()
+            }
+        }
+    }
+
+    /// 独立于采样 actor，完整读取被 PowerUI 阻塞时仍能更新接电/充电状态。
+    func refreshPowerSource() async {
+        let reader = powerSourceReader
+        let result = await Task.detached(priority: .userInitiated) {
+            let date = Date()
+            return (reading: reader(), date: date)
+        }.value
+        guard !Task.isCancelled, let powerSource = result.reading else { return }
+        if let latestPowerSource, result.date < latestPowerSource.date { return }
+        if let lastReadAt, result.date < lastReadAt { return }
+        latestPowerSource = (powerSource, result.date)
+        let updated = reading?.updatingPowerSource(from: powerSource) ?? powerSource
+        if reading != updated { reading = updated }
+        // 快速读数不更新完整采样的新鲜度，也不重复触发温度提醒。
+    }
+
+    func read() async {
         let result = await sampler.read()
         update(result.reading, at: result.date)
     }
@@ -141,10 +197,14 @@ public final class BatteryMonitor {
         // 多个触发同时读取时可能乱序返回，只保留较新的结果。
         if let lastReadAt, date < lastReadAt { return }
         lastReadAt = date
-        if reading != newReading {
-            reading = newReading
+        let updated: BatteryReading
+        if let latestPowerSource, latestPowerSource.date > date {
+            updated = newReading.updatingPowerSource(from: latestPowerSource.reading)
+        } else {
+            updated = newReading
         }
-        onRead?(newReading, date)
+        if reading != updated { reading = updated }
+        onRead?(updated, date)
     }
 
     /// 修改系统充电上限，完成后立即用读回的值刷新。上一次修改未完成时忽略。
@@ -198,5 +258,20 @@ public final class BatteryMonitor {
             }
         }
         notificationObservers.append(observer)
+    }
+}
+
+private extension BatteryReading {
+    /// 只合并 IOPS 字段；功率、温度和遥测时间保留原值，等待完整采样。
+    func updatingPowerSource(from fresh: BatteryReading) -> BatteryReading {
+        guard case .battery(var snapshot) = self, case .battery(let powerSource) = fresh else { return fresh }
+        snapshot.percent = powerSource.percent
+        snapshot.isExternalPower = powerSource.isExternalPower
+        snapshot.isCharging = powerSource.isCharging
+        snapshot.timeToEmptyMinutes = powerSource.timeToEmptyMinutes
+        snapshot.timeToFullMinutes = powerSource.timeToFullMinutes
+        snapshot.lowPowerModeEnabled = powerSource.lowPowerModeEnabled
+        if powerSource.isExternalPower == false { snapshot.adapter = nil }
+        return .battery(snapshot)
     }
 }
