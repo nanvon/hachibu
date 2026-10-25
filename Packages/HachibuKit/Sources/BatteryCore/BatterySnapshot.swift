@@ -59,6 +59,8 @@ public struct BatterySnapshot: Sendable, Equatable {
     public var lowPowerModeEnabled: Bool
     /// 系统充电上限设置，读不到时为 nil（未知）。
     public var chargeLimit: ChargeLimitSetting?
+    /// 系统充电上限的可选值（%，升序），来自 PowerUI 的 `availableChargeLimitsWithError:`。读不到时为 nil。
+    public var chargeLimitOptions: [Int]?
 
     /// 已开启的系统充电上限（%）。未开启、不支持或未知时为 nil。
     public var chargeLimitPercent: Int? {
@@ -93,7 +95,8 @@ public struct BatterySnapshot: Sendable, Equatable {
         designCycleCount: Int? = nil,
         adapter: PowerAdapter? = nil,
         lowPowerModeEnabled: Bool = false,
-        chargeLimit: ChargeLimitSetting? = nil
+        chargeLimit: ChargeLimitSetting? = nil,
+        chargeLimitOptions: [Int]? = nil
     ) {
         self.percent = percent
         self.isExternalPower = isExternalPower
@@ -116,6 +119,7 @@ public struct BatterySnapshot: Sendable, Equatable {
         self.adapter = adapter
         self.lowPowerModeEnabled = lowPowerModeEnabled
         self.chargeLimit = chargeLimit
+        self.chargeLimitOptions = chargeLimitOptions
     }
 }
 
@@ -174,8 +178,17 @@ extension BatterySnapshot {
                 )
             },
             lowPowerModeEnabled: raw.lowPowerModeEnabled,
-            chargeLimit: ChargeLimitSetting.resolve(powerUI: raw.powerUIChargeLimit, archive: raw.chargeLimitArchive)
+            chargeLimit: ChargeLimitSetting.resolve(powerUI: raw.powerUIChargeLimit, archive: raw.chargeLimitArchive),
+            chargeLimitOptions: Self.chargeLimitOptions(raw.powerUIChargeLimit)
         )
+    }
+
+    /// 只保留 50–100 的值；不支持、出错或没有可用值时为 nil。
+    private static func chargeLimitOptions(_ powerUI: PowerUIChargeLimit?) -> [Int]? {
+        guard let powerUI, powerUI.isSupported,
+              let options = powerUI.availableLimits?.filter({ (50...100).contains($0) }), !options.isEmpty
+        else { return nil }
+        return options.sorted()
     }
 
     /// 剩余时间：`≤ 0` 或 `≥ 65535` 视为没有值。

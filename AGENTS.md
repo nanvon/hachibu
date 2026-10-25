@@ -17,7 +17,7 @@ Hachibu 是 macOS 菜单栏电池监控应用，定位为 AlDente 的平替，�
 版本规划：
 
 - v1：只做数据展示（本文件描述的范围）。
-- v2：充电控制。以控制系统原生充电上限（80%–100%）为主；低于 80%、航行模式等需要 SMC CHIE 和特权 helper，作为可选高级功能。本机传统限充 SMC key 已不可用，见 `docs/v1技术设计.md` 第 18 节和 `docs/v2充电控制技术调研.md`，届时单独设计。
+- v2：充电控制。以控制系统原生充电上限（80%–100%）为主，经 PowerUI 写入；开关和档位已在面板和设置页实现（设计文档第 6 节），临时充满一次暂不做。低于 80%、航行模式等需要 SMC CHIE 和特权 helper，不进 v2。本机传统限充 SMC key 已不可用，见 `docs/v1技术设计.md` 第 18 节和 `docs/v2充电控制技术调研.md`。
 - v3：导入 AlDente 的历史数据。只导入每日指标，不提供解密 AlDente 数据库的方法或指引，数据来源待定，见设计文档第 18 节。
 
 视觉设计稿（菜单栏面板 + 主窗口历史曲线，Liquid Glass 风格的 HTML 近似稿）暂未放入仓库。设计稿只用来参考布局和视觉，部分内容已过时：侧栏的“概览”页、“耗电量（系统负载）”标题、应用名“电池监控”、面板状态文字、流向图说明句和温度“正常 / 偏高”标签。这些以设计文档为准，视觉以设计文档第 19 节为准。
@@ -54,7 +54,7 @@ Hachibu 是 macOS 菜单栏电池监控应用，定位为 AlDente 的平替，�
 - 温度在 `AppleSmartBatteryPack` 节点的 `BatteryData.Temperature`，除以 100 得 °C。`AppleSmartBattery` 主节点没有温度。v1 不读 SMC、不读 IOHID。
 - 最大容量两个口径分开命名、分开存储：系统最大容量（`system_profiler`，本机 95%）和容量比 `FullChargeCapacity / DesignCapacity`（本机 91.4%）。
 - 设计循环次数用 IORegistry 的 `DesignCycleCount9C`，不用 IOPS 的 `DesignCycleCount`（两者不一致）。
-- 系统充电上限优先用私有框架 PowerUI 的只读方法读取（校验方法类型编码，只读不写），不可用时退回读私有文件 `/Library/Preferences/com.apple.powerd.charging.plist`，格式不符就视为未知。规则见设计文档第 6 节。`NotChargingReason` 不参与状态判断。
+- 系统充电上限优先用私有框架 PowerUI 读取（校验方法类型编码），不可用时退回读私有文件 `/Library/Preferences/com.apple.powerd.charging.plist`，格式不符就视为未知。写入只用 PowerUI 的 `setMCLLimit:error:`、`enableMCL:`、`disableMCL:`，同样校验类型编码，以 PowerUI 读回为准；不直接改 powerd 文件。规则见设计文档第 6 节。`NotChargingReason` 不参与状态判断。
 - 缺失的指标显示“—”，数据库存 `NULL`，不存 0；休眠期间保留数据缺口，不补数据。
 - AlDente 等充电控制工具会改变充电行为，影响充电状态读数；测试充电相关逻辑前先退出这类工具。
 

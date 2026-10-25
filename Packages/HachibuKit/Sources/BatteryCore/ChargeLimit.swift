@@ -20,6 +20,50 @@ public enum ChargeLimitSetting: Sendable, Equatable {
     }
 }
 
+/// 对系统充电上限的一次修改。规则见 docs/v1技术设计.md 第 6 节。
+public enum ChargeLimitChange: Sendable, Equatable {
+    /// 开启充电上限，系统恢复关闭前的上限值。
+    case enable
+    case disable
+    /// 修改上限（%），只在已开启时使用。
+    case limit(Int)
+
+    /// 读回的设置是否已符合这次修改。
+    public func isApplied(to setting: ChargeLimitSetting?) -> Bool {
+        switch (self, setting) {
+        case (.enable, .on?), (.disable, .off?): true
+        case (.limit(let target), .on(let percent)?): target == percent
+        default: false
+        }
+    }
+}
+
+/// 写入失败。`message` 只用于日志，不显示在界面上。
+public struct ChargeLimitWriteError: Error, Sendable {
+    public var message: String
+
+    public init(message: String) {
+        self.message = message
+    }
+}
+
+/// 系统充电上限的写入方。
+public protocol ChargeLimitWriter: Sendable {
+    func write(_ change: ChargeLimitChange) throws
+}
+
+/// 通过 PowerUI 写入，与“系统设置 → 电池”修改的是同一项设置。
+public struct PowerUIChargeLimitWriter: ChargeLimitWriter {
+    /// PowerUI 读取或写入方法不可用时为 nil。
+    public init?() {
+        guard PowerUIClient.canWrite else { return nil }
+    }
+
+    public func write(_ change: ChargeLimitChange) throws {
+        try PowerUIClient.write(change)
+    }
+}
+
 /// 系统充电上限的私有文件。
 enum ChargeLimitFile {
     static let url = URL(fileURLWithPath: "/Library/Preferences/com.apple.powerd.charging.plist")

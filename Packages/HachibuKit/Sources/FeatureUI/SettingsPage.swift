@@ -81,11 +81,17 @@ struct SettingsPage: View {
             case .noBattery:
                 Text("No Battery Detected", bundle: .module)
             case .battery(let snapshot):
-                LabeledContent {
-                    ChargeLimitValue(setting: snapshot.chargeLimit)
-                        .monospacedDigit()
-                } label: {
-                    Text("System Charge Limit", bundle: .module)
+                if let control = chargeLimitControl {
+                    ChargeLimitControlRows(control: control) { change in
+                        Task { await monitor.setChargeLimit(change) }
+                    }
+                } else {
+                    LabeledContent {
+                        ChargeLimitValue(setting: snapshot.chargeLimit)
+                            .monospacedDigit()
+                    } label: {
+                        Text("System Charge Limit", bundle: .module)
+                    }
                 }
                 LabeledContent {
                     StatusLabel(status: ChargeStatus(snapshot))
@@ -107,10 +113,20 @@ struct SettingsPage: View {
         } header: {
             Text("Battery Charging", bundle: .module)
         } footer: {
-            Text("Change the charge limit in System Settings → Battery. Requires macOS 26.4 or later.", bundle: .module)
-                .font(.callout)
-                .foregroundStyle(.secondary)
+            Group {
+                if chargeLimitControl != nil {
+                    Text("Changes the same setting as System Settings → Battery.", bundle: .module)
+                } else {
+                    Text("Change the charge limit in System Settings → Battery. Requires macOS 26.4 or later.", bundle: .module)
+                }
+            }
+            .font(.callout)
+            .foregroundStyle(.secondary)
         }
+    }
+
+    private var chargeLimitControl: ChargeLimitControl? {
+        ChargeLimitControl(monitor: monitor)
     }
 
     private var diagnosticsSection: some View {
@@ -173,6 +189,33 @@ struct SettingsPage: View {
             }
         } header: {
             Text("About", bundle: .module)
+        }
+    }
+}
+
+/// 系统充电上限的开关和档位。开启时才显示档位。
+private struct ChargeLimitControlRows: View {
+    let control: ChargeLimitControl
+    let onChange: @MainActor (ChargeLimitChange) -> Void
+
+    var body: some View {
+        Toggle(isOn: Binding(get: { control.isEnabled }, set: { onChange($0 ? .enable : .disable) })) {
+            Text("System Charge Limit", bundle: .module)
+        }
+        .disabled(!control.isInteractive)
+        if control.isEnabled {
+            Picker(selection: Binding(get: { control.percent ?? 0 }, set: { onChange(.limit($0)) })) {
+                ForEach(control.options, id: \.self) { percent in
+                    Text(verbatim: DisplayFormat.percent(percent)).tag(percent)
+                }
+            } label: {
+                Text("Limit", bundle: .module)
+            }
+            .disabled(!control.isInteractive)
+        }
+        if control.isBlocked || control.writeFailed {
+            ChargeLimitNote(control: control)
+                .font(.callout)
         }
     }
 }

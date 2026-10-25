@@ -11,16 +11,25 @@ public actor BatterySampler {
     private let systemProfiler: any SystemProfilerSource
     /// 数据库打不开时为 nil：照常读取，不写库。
     private let store: HistoryStore?
+    /// PowerUI 写入方法不可用时为 nil：只读显示系统充电上限。
+    private let chargeLimitWriter: (any ChargeLimitWriter)?
     /// 最近一次完整读取的结果。分钟数据和每日数据都用它。
     private var latest: BatteryReading?
+
+    /// 能否修改系统充电上限。
+    public nonisolated var canWriteChargeLimit: Bool {
+        chargeLimitWriter != nil
+    }
 
     public init(
         dataSource: any BatteryDataSource = IOKitBatteryDataSource(),
         systemProfiler: any SystemProfilerSource = SystemProfilerReader(),
+        chargeLimitWriter: (any ChargeLimitWriter)? = PowerUIChargeLimitWriter(),
         store: HistoryStore?
     ) {
         self.dataSource = dataSource
         self.systemProfiler = systemProfiler
+        self.chargeLimitWriter = chargeLimitWriter
         self.store = store
     }
 
@@ -29,6 +38,30 @@ public actor BatterySampler {
         let reading = BatteryReading(dataSource.read())
         latest = reading
         return (reading, Date())
+    }
+
+    /// 修改系统充电上限，再完整读取一次。`applied` 表示写入成功且读回的设置已符合这次修改。
+    func writeChargeLimit(_ change: ChargeLimitChange) -> (reading: BatteryReading, date: Date, applied: Bool) {
+        var written = false
+        if let chargeLimitWriter {
+            do {
+                try chargeLimitWriter.write(change)
+                written = true
+            } catch let error as ChargeLimitWriteError {
+                logger.error("Failed to write charge limit: \(error.message, privacy: .public)")
+            } catch {
+                logger.error("Failed to write charge limit: \(String(describing: error), privacy: .public)")
+            }
+        }
+        let result = read()
+        guard case .battery(let snapshot) = result.reading, written else {
+            return (result.reading, result.date, false)
+        }
+        let applied = change.isApplied(to: snapshot.chargeLimit)
+        if !applied {
+            logger.error("Charge limit read back does not match \(String(describing: change), privacy: .public)")
+        }
+        return (result.reading, result.date, applied)
     }
 
     /// 用最近一次读取的值写一行分钟数据。没有电池或还没有读取时不写。

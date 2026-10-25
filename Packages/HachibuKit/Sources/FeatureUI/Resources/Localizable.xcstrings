@@ -269,6 +269,16 @@
         }
       }
     },
+    "Changes the same setting as System Settings → Battery." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "修改的是“系统设置 → 电池”中的同一项设置。"
+          }
+        }
+      }
+    },
     "Charge Limit Reached (%lld%%)" : {
       "localizations" : {
         "zh-Hans" : {
@@ -365,6 +375,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "电脑由电池供电 %@。"
+          }
+        }
+      }
+    },
+    "Could not change the charge limit." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未能修改充电上限。"
           }
         }
       }
@@ -596,6 +616,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "许可证"
+          }
+        }
+      }
+    },
+    "Limit" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上限"
           }
         }
       }
@@ -866,6 +896,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "退出"
+          }
+        }
+      }
+    },
+    "Quit AlDente to change the charge limit here." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "退出 AlDente 后才能在这里修改充电上限。"
           }
         }
       }

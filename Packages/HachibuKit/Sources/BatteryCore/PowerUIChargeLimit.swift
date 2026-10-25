@@ -21,8 +21,8 @@ public struct PowerUIChargeLimit: Sendable, Equatable, Codable {
     }
 }
 
-/// 只调用读取方法，不调用任何 set / disable 方法。
-/// 框架、类或方法缺失，或方法类型编码与本机实测（macOS 27.0.1）不一致时返回 nil，由调用方退回读取充电上限文件。
+/// 读取：框架、类或方法缺失，或方法类型编码与本机实测（macOS 27.0.1）不一致时返回 nil，由调用方退回读取充电上限文件。
+/// 写入：只调用 `setMCLLimit:error:`、`enableMCL:`、`disableMCL:`，类型编码不一致时不提供写入，读取不受影响。
 enum PowerUIClient {
     private static let frameworkPath = "/System/Library/PrivateFrameworks/PowerUI.framework/Versions/A/PowerUI"
 
@@ -34,13 +34,56 @@ enum PowerUIClient {
         "availableChargeLimitsWithError:": "@24@0:8^@16",
     ]
 
+    /// 写入方法，类型编码为 2026-10-24 本机实验时的值，见 docs/v2充电控制技术调研.md。
+    private static let writeEncodings = [
+        "setMCLLimit:error:": "B28@0:8C16^@20",
+        "enableMCL:": "B24@0:8^@16",
+        "disableMCL:": "B24@0:8^@16",
+    ]
+
     private typealias BoolMethod = @convention(c) (AnyObject, Selector) -> Bool
     private typealias UInt8ErrorMethod = @convention(c) (AnyObject, Selector, AutoreleasingUnsafeMutablePointer<NSError?>?) -> UInt8
     private typealias UInt64ErrorMethod = @convention(c) (AnyObject, Selector, AutoreleasingUnsafeMutablePointer<NSError?>?) -> UInt64
     private typealias ObjectErrorMethod = @convention(c) (AnyObject, Selector, AutoreleasingUnsafeMutablePointer<NSError?>?) -> Unmanaged<AnyObject>?
+    private typealias BoolErrorMethod = @convention(c) (AnyObject, Selector, AutoreleasingUnsafeMutablePointer<NSError?>?) -> Bool
+    private typealias SetLimitMethod = @convention(c) (AnyObject, Selector, UInt8, AutoreleasingUnsafeMutablePointer<NSError?>?) -> Bool
 
-    /// 进程内只创建一次，之后只在采样 actor 和诊断导出中读取。
+    /// 进程内只创建一次，之后在采样 actor 中读写、在诊断导出中读取。
     nonisolated(unsafe) private static let client: NSObject? = makeClient()
+
+    /// 读取可用，且写入方法的类型编码与实测一致。
+    static let canWrite: Bool = client.map { client in
+        writeEncodings.allSatisfy { name, encoding in
+            class_getInstanceMethod(type(of: client), NSSelectorFromString(name))
+                .flatMap(method_getTypeEncoding)
+                .map { String(cString: $0) } == encoding
+        }
+    } ?? false
+
+    /// 写入一次。方法返回 false 或给出错误时抛出 `ChargeLimitWriteError`。
+    static func write(_ change: ChargeLimitChange) throws {
+        guard canWrite, let client else { throw ChargeLimitWriteError(message: "PowerUI write methods unavailable") }
+        var error: NSError?
+        let succeeded: Bool
+        switch change {
+        case .enable, .disable:
+            let name = change == .enable ? "enableMCL:" : "disableMCL:"
+            succeeded = unsafeBitCast(
+                client.method(for: NSSelectorFromString(name)), to: BoolErrorMethod.self
+            )(client, NSSelectorFromString(name), &error)
+        case .limit(let percent):
+            guard let value = UInt8(exactly: percent), (50...100).contains(percent) else {
+                throw ChargeLimitWriteError(message: "Limit out of range: \(percent)")
+            }
+            succeeded = unsafeBitCast(
+                client.method(for: NSSelectorFromString("setMCLLimit:error:")), to: SetLimitMethod.self
+            )(client, NSSelectorFromString("setMCLLimit:error:"), value, &error)
+        }
+        if let error {
+            throw ChargeLimitWriteError(message: "\(error.domain) \(error.code): \(error.localizedDescription)")
+        }
+        guard succeeded else { throw ChargeLimitWriteError(message: "PowerUI returned false") }
+    }
 
     static func read() -> PowerUIChargeLimit? {
         guard let client else { return nil }

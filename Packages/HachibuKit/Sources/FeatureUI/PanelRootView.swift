@@ -26,6 +26,10 @@ public struct PanelRootView: View {
             reading: monitor.reading,
             health: monitor.health,
             highTemperatureCelsius: settings.temperatureAlertThreshold,
+            chargeLimitControl: ChargeLimitControl(monitor: monitor),
+            onChangeChargeLimit: { [monitor] change in
+                Task { await monitor.setChargeLimit(change) }
+            },
             onOpenMainWindow: onOpenMainWindow,
             onQuit: onQuit
         )
@@ -37,6 +41,8 @@ private struct PanelContent: View {
     let reading: BatteryReading?
     let health: BatteryHealthInfo?
     let highTemperatureCelsius: Int
+    let chargeLimitControl: ChargeLimitControl?
+    let onChangeChargeLimit: @MainActor (ChargeLimitChange) -> Void
     let onOpenMainWindow: @MainActor () -> Void
     let onQuit: @MainActor () -> Void
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -55,7 +61,9 @@ private struct PanelContent: View {
                 BatteryPanelContent(
                     snapshot: snapshot,
                     health: health,
-                    highTemperatureCelsius: highTemperatureCelsius
+                    highTemperatureCelsius: highTemperatureCelsius,
+                    chargeLimitControl: chargeLimitControl,
+                    onChangeChargeLimit: onChangeChargeLimit
                 )
             }
 
@@ -69,6 +77,7 @@ private struct PanelContent: View {
         .frame(width: 340, alignment: .leading)
         .animation(PanelMotion.animation(reduceMotion: reduceMotion), value: reading)
         .animation(PanelMotion.animation(reduceMotion: reduceMotion), value: health)
+        .animation(PanelMotion.animation(reduceMotion: reduceMotion), value: chargeLimitControl)
     }
 
     private var snapshot: BatterySnapshot? {
@@ -80,6 +89,8 @@ private struct BatteryPanelContent: View {
     let snapshot: BatterySnapshot
     let health: BatteryHealthInfo?
     let highTemperatureCelsius: Int
+    let chargeLimitControl: ChargeLimitControl?
+    let onChangeChargeLimit: @MainActor (ChargeLimitChange) -> Void
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
@@ -89,6 +100,9 @@ private struct BatteryPanelContent: View {
         }
         LiveSection(snapshot: snapshot, highTemperatureCelsius: highTemperatureCelsius)
         HealthSection(snapshot: snapshot, health: health)
+        if let chargeLimitControl {
+            ChargeLimitSection(control: chargeLimitControl, onChange: onChangeChargeLimit)
+        }
         if snapshot.isExternalPower == true {
             ChargerRow(snapshot: snapshot)
                 .transition(PanelMotion.transition(reduceMotion: reduceMotion))
@@ -348,6 +362,60 @@ private struct HealthSection: View {
     }
 }
 
+// MARK: - 充电上限
+
+/// 系统充电上限：标题行右侧为开关，开启时下方为档位。AlDente 运行时禁用并说明原因。
+private struct ChargeLimitSection: View {
+    let control: ChargeLimitControl
+    let onChange: @MainActor (ChargeLimitChange) -> Void
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        PanelSection(Text("System Charge Limit", bundle: .module)) {
+            Toggle(isOn: Binding(get: { control.isEnabled }, set: { onChange($0 ? .enable : .disable) })) {
+                Text("System Charge Limit", bundle: .module)
+            }
+            .toggleStyle(.switch)
+            .controlSize(.mini)
+            .labelsHidden()
+            .disabled(!control.isInteractive)
+        } content: {
+            if control.isEnabled {
+                Picker(selection: Binding(get: { control.percent ?? 0 }, set: { onChange(.limit($0)) })) {
+                    ForEach(control.options, id: \.self) { percent in
+                        Text(verbatim: DisplayFormat.percent(percent)).tag(percent)
+                    }
+                } label: {
+                    Text("Limit", bundle: .module)
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .disabled(!control.isInteractive)
+                .transition(PanelMotion.transition(reduceMotion: reduceMotion))
+            }
+            ChargeLimitNote(control: control)
+                .font(.caption)
+        }
+    }
+}
+
+/// AlDente 运行或修改失败时的说明，面板和设置页共用。
+struct ChargeLimitNote: View {
+    let control: ChargeLimitControl
+
+    var body: some View {
+        if control.isBlocked {
+            Text("Quit AlDente to change the charge limit here.", bundle: .module)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        } else if control.writeFailed {
+            Text("Could not change the charge limit.", bundle: .module)
+                .foregroundStyle(.red)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+}
+
 // MARK: - 充电器
 
 /// 只在接电时显示：额定功率（读不到时用名称）· 输入电压 · 输入电流。名称和厂商放在悬停提示里。
@@ -592,7 +660,8 @@ private enum PanelPreviewData {
             cycleCount: 68,
             designCycleCount: 1000,
             adapter: isExternalPower == true ? adapter : nil,
-            chargeLimit: chargeLimit
+            chargeLimit: chargeLimit,
+            chargeLimitOptions: [80, 85, 90, 95, 100]
         )
     }
 }
@@ -601,12 +670,21 @@ private enum PanelPreviewData {
 private struct PanelPreview: View {
     let reading: BatteryReading?
     var health: BatteryHealthInfo? = PanelPreviewData.health
+    var isChargeControlAppRunning = false
+
+    /// 预览按可以写入处理，显示充电上限控制。
+    private var chargeLimitControl: ChargeLimitControl? {
+        guard case .battery(let snapshot)? = reading else { return nil }
+        return ChargeLimitControl(snapshot: snapshot, canWrite: true, isBlocked: isChargeControlAppRunning)
+    }
 
     var body: some View {
         PanelContent(
             reading: reading,
             health: health,
             highTemperatureCelsius: 40,
+            chargeLimitControl: chargeLimitControl,
+            onChangeChargeLimit: { _ in },
             onOpenMainWindow: {},
             onQuit: {}
         )
@@ -651,6 +729,13 @@ private struct PanelPreview: View {
 
 #Preview("Plugged In, Not Charging") {
     PanelPreview(reading: .battery(PanelPreviewData.snapshot()))
+}
+
+#Preview("Charge Limit Off, AlDente Running") {
+    PanelPreview(
+        reading: .battery(PanelPreviewData.snapshot(isCharging: true, batteryPowerMW: 30000, chargeLimit: .off)),
+        isChargeControlAppRunning: true
+    )
 }
 
 #Preview("No Battery") {

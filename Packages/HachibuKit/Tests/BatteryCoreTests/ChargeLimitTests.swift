@@ -72,6 +72,33 @@ import Testing
         #expect(ChargeLimitSetting.resolve(powerUI: nil, archive: nil) == nil)
     }
 
+    @Test func optionsComeFromPowerUI() {
+        func options(_ powerUI: PowerUIChargeLimit?) -> [Int]? {
+            var raw = RawBatteryReadings.battery([:])
+            raw.powerUIChargeLimit = powerUI
+            return BatteryReading(raw).snapshot?.chargeLimitOptions
+        }
+        #expect(options(PowerUIChargeLimit(isSupported: true, isEnabled: true, limit: 80, availableLimits: [100, 80, 90, 85, 95]))
+            == [80, 85, 90, 95, 100])
+        #expect(options(PowerUIChargeLimit(isSupported: true, isEnabled: true, limit: 80, availableLimits: [0, 80, 120])) == [80])
+        #expect(options(PowerUIChargeLimit(isSupported: true, isEnabled: true, limit: 80, availableLimits: [])) == nil)
+        #expect(options(PowerUIChargeLimit(isSupported: true, isEnabled: true, limit: 80)) == nil)
+        #expect(options(PowerUIChargeLimit(isSupported: false, availableLimits: [80, 100])) == nil)
+        #expect(options(nil) == nil)
+    }
+
+    @Test func changeIsAppliedOnlyWhenReadBackMatches() {
+        #expect(ChargeLimitChange.enable.isApplied(to: .on(percent: 80)))
+        #expect(!ChargeLimitChange.enable.isApplied(to: .off))
+        #expect(ChargeLimitChange.disable.isApplied(to: .off))
+        #expect(!ChargeLimitChange.disable.isApplied(to: .on(percent: 80)))
+        #expect(ChargeLimitChange.limit(85).isApplied(to: .on(percent: 85)))
+        #expect(!ChargeLimitChange.limit(85).isApplied(to: .on(percent: 80)))
+        #expect(!ChargeLimitChange.limit(85).isApplied(to: .off))
+        #expect(!ChargeLimitChange.enable.isApplied(to: nil))
+        #expect(!ChargeLimitChange.disable.isApplied(to: .unsupported))
+    }
+
     @Test func missingFileReadsAsNil() {
         let url = URL(fileURLWithPath: "/nonexistent/com.apple.powerd.charging.plist")
         #expect(ChargeLimitFile.readArchive(at: url) == nil)
