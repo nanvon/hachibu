@@ -12,6 +12,9 @@ public final class AppSettings {
     public var menuBarContent: MenuBarContent {
         didSet { defaults.set(menuBarContent.rawValue, forKey: Key.menuBarContent) }
     }
+    public var menuBarIconStyle: MenuBarIconStyle {
+        didSet { defaults.set(menuBarIconStyle.rawValue, forKey: Key.menuBarIconStyle) }
+    }
     public var temperatureAlertEnabled: Bool {
         didSet { defaults.set(temperatureAlertEnabled, forKey: Key.temperatureAlertEnabled) }
     }
@@ -32,6 +35,7 @@ public final class AppSettings {
     public init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         menuBarContent = defaults.string(forKey: Key.menuBarContent).flatMap(MenuBarContent.init(rawValue:)) ?? .batteryLevel
+        menuBarIconStyle = defaults.string(forKey: Key.menuBarIconStyle).flatMap(MenuBarIconStyle.init(rawValue:)) ?? .battery
         temperatureAlertEnabled = defaults.object(forKey: Key.temperatureAlertEnabled) as? Bool ?? true
         temperatureAlertThreshold = Self.integer(defaults, Key.temperatureAlertThreshold, default: 40, in: Self.temperatureThresholdRange)
         healthAlertEnabled = defaults.object(forKey: Key.healthAlertEnabled) as? Bool ?? true
@@ -46,11 +50,19 @@ public final class AppSettings {
 
     private enum Key {
         static let menuBarContent = "menuBarContent"
+        static let menuBarIconStyle = "menuBarIconStyle"
         static let temperatureAlertEnabled = "temperatureAlertEnabled"
         static let temperatureAlertThreshold = "temperatureAlertThreshold"
         static let healthAlertEnabled = "healthAlertEnabled"
         static let healthAlertThreshold = "healthAlertThreshold"
     }
+}
+
+/// 菜单栏电池外观；旧样式和未知存储值回退到 macOS。
+public enum MenuBarIconStyle: String, CaseIterable, Sendable {
+    /// 保留第一批实现的持久化值 `battery`。
+    case battery
+    case ios
 }
 
 /// 菜单栏显示的读数。

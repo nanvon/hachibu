@@ -669,6 +669,16 @@
         }
       }
     },
+    "Icons turn yellow in Low Power Mode. The iOS style shows the percentage inside the battery." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "低电量模式下图标变为黄色。iOS 样式在电池内显示百分比。"
+          }
+        }
+      }
+    },
     "Input" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -817,6 +827,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "菜单栏"
+          }
+        }
+      }
+    },
+    "Menu Bar Icon" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "菜单栏图标"
           }
         }
       }
@@ -1357,6 +1377,26 @@
     },
     "Zero" : {
 
+    },
+    "iOS" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iOS"
+          }
+        }
+      }
+    },
+    "macOS" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "macOS"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

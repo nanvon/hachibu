@@ -35,6 +35,13 @@ struct SettingsPage: View {
 
     private var menuBarSection: some View {
         Section {
+            Picker(selection: $settings.menuBarIconStyle) {
+                ForEach(MenuBarIconStyle.allCases, id: \.self) { style in
+                    style.title.tag(style)
+                }
+            } label: {
+                Text("Menu Bar Icon", bundle: .module)
+            }
             Picker(selection: $settings.menuBarContent) {
                 ForEach(MenuBarContent.allCases, id: \.self) { content in
                     content.title.tag(content)
@@ -44,6 +51,8 @@ struct SettingsPage: View {
             }
         } header: {
             Text("Menu Bar", bundle: .module)
+        } footer: {
+            Text("Icons turn yellow in Low Power Mode. The iOS style shows the percentage inside the battery.", bundle: .module)
         }
     }
 
@@ -253,6 +262,15 @@ private enum AboutInfo {
             return shortVersion
         }
         return "\(shortVersion) (\(build))"
+    }
+}
+
+extension MenuBarIconStyle {
+    var title: Text {
+        switch self {
+        case .battery: Text("macOS", bundle: .module)
+        case .ios: Text("iOS", bundle: .module)
+        }
     }
 }
 
