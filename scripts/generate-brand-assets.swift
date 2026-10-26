@@ -214,8 +214,9 @@ try write(png(symbol), to: "docs/assets/brand/mark.png")
 // 传统 macOS 图标：透明外缘、浅暖白底板。小尺寸仍从同一轮廓导出。
 // 底板按 Apple 图标网格：1024 画布内 824 × 824，四周各留 100，与系统图标同大。
 let tile = path("M271 100 L753 100 C869.7 100 924 154.3 924 271 L924 753 C924 869.7 869.7 924 753 924 L271 924 C154.3 924 100 869.7 100 753 L100 271 C100 154.3 154.3 100 271 100 Z")
+// 碗形在原位置下移 28px，按确认过的渲染图作视觉居中补偿。
 let appIcon = Artwork(width: 1024, height: 1024,
-                      shapes: [Shape(path: tile, ink: ivory)] + mark().map { transformed($0, scale: 0.8645, x: 166.2, y: 222.3) })
+                      shapes: [Shape(path: tile, ink: ivory)] + mark().map { transformed($0, scale: 0.8645, x: 166.2, y: 250.3) })
 try svg(appIcon, title: "Hachibu app icon", to: "design/brand/app-icon-master.svg")
 try write(png(appIcon), to: "docs/assets/brand/app-icon.png")
 var iconImages: [[String: Any]] = []
