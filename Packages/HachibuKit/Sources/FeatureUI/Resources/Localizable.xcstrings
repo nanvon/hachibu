@@ -302,17 +302,6 @@
         }
       }
     },
-    "Capacity Ratio" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "容量比"
-          }
-        }
-      }
-    },
     "Capacity Ratio (Full Charge / Design)" : {
       "localizations" : {
         "zh-Hans" : {
@@ -363,45 +352,12 @@
         }
       }
     },
-    "Charger input %@, battery supplying %@, computer using %@." : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "充电器输入 %1$@，电池补充 %2$@，电脑使用 %3$@。"
-          }
-        }
-      }
-    },
-    "Charger input %@: computer using %@, charging battery %@." : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "充电器输入 %1$@：电脑使用 %2$@，充入电池 %3$@。"
-          }
-        }
-      }
-    },
     "Charger Input Power" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "充电器输入功率"
-          }
-        }
-      }
-    },
-    "Charger supplies %@ to the computer; battery not charging." : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "充电器为电脑供电 %@，电池未充电。"
           }
         }
       }
@@ -446,17 +402,6 @@
         }
       }
     },
-    "Computer running on battery: %@." : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "电脑由电池供电 %@。"
-          }
-        }
-      }
-    },
     "Could not change the charge limit." : {
       "localizations" : {
         "zh-Hans" : {
@@ -473,17 +418,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "无法打开电池设置，请手动前往“系统设置 → 电池”。"
-          }
-        }
-      }
-    },
-    "Current" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "电流"
           }
         }
       }
@@ -578,17 +512,6 @@
         }
       }
     },
-    "Full Charge / Design" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "满充 / 设计容量"
-          }
-        }
-      }
-    },
     "Full Charge Capacity" : {
       "localizations" : {
         "zh-Hans" : {
@@ -679,17 +602,6 @@
         }
       }
     },
-    "Input" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "输入"
-          }
-        }
-      }
-    },
     "Input Voltage · Current" : {
       "localizations" : {
         "zh-Hans" : {
@@ -736,17 +648,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "上限"
-          }
-        }
-      }
-    },
-    "Live" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "实时"
           }
         }
       }
@@ -1073,17 +974,6 @@
         }
       }
     },
-    "Rated Power" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "额定功率"
-          }
-        }
-      }
-    },
     "Recent" : {
       "localizations" : {
         "zh-Hans" : {
@@ -1330,17 +1220,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "版本"
-          }
-        }
-      }
-    },
-    "Voltage" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "电压"
           }
         }
       }
