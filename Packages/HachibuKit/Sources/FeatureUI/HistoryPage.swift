@@ -1,3 +1,4 @@
+import BatteryCore
 import Charts
 import HistoryStore
 import SwiftUI
@@ -302,14 +303,15 @@ private enum HistoryPreviewData {
 
         for day in 0..<120 {
             let date = now.addingTimeInterval(TimeInterval(day - 119) * 86400)
-            try await store.write(DailySample(
-                day: DailySample.day(for: date),
-                systemMaxCapacityPercent: day < 70 ? 96 : 95,
-                fullChargeCapacityMAh: 8090 - day + (day % 7) * 4,
-                designCapacityMAh: 8694,
-                cycleCount: 28 + day / 3,
-                updatedAt: date
-            ))
+            try await store.record(
+                BatteryHealthInfo(systemMaximumCapacityPercent: day < 70 ? 96 : 95, condition: .good),
+                snapshot: BatterySnapshot(
+                    fullChargeCapacityMAh: 8090 - day + (day % 7) * 4,
+                    designCapacityMAh: 8694,
+                    cycleCount: 28 + day / 3
+                ),
+                at: date
+            )
         }
     }
 }

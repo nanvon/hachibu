@@ -35,6 +35,9 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
             onExportDiagnostics: { [weak self] in
                 await self?.exportDiagnostics()
             },
+            onChooseImportFile: { [weak self] in
+                await self?.chooseImportFile()
+            },
             onCheckForUpdates: updates.isAvailable ? { @MainActor in updates.checkForUpdates() } : nil
         ).environment(monitor))
         hostingView.sceneBridgingOptions = [.toolbars, .title]
@@ -69,6 +72,17 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         } catch {
             await NSAlert(error: error).beginSheetModal(for: window)
         }
+    }
+
+    /// 选择要导入的历史数据文件（JSON）。取消时返回 nil。见 docs/v1技术设计.md 20.6。
+    private func chooseImportFile() async -> URL? {
+        guard let window else { return nil }
+        let openPanel = NSOpenPanel()
+        openPanel.allowedContentTypes = [.json]
+        openPanel.allowsMultipleSelection = false
+        openPanel.canChooseDirectories = false
+        guard await openPanel.beginSheetModal(for: window) == .OK else { return nil }
+        return openPanel.url
     }
 
     private static func fileTimestamp(_ date: Date) -> String {

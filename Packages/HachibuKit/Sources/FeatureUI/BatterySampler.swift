@@ -66,18 +66,18 @@ public actor BatterySampler {
         return (result.reading, result.date, applied)
     }
 
-    /// 用最近一次读取的值写一行分钟数据。没有电池或还没有读取时不写。
+    /// 用最近一次读取的值写一行分钟数据，同时更新电池、当天的满充容量和循环次数、事件。没有电池或还没有读取时不写。
     func writeMinuteSample(at date: Date) async {
         guard let store, case .battery(let snapshot)? = latest else { return }
         do {
-            try await store.write(MinuteSample(timestamp: date, snapshot: snapshot))
+            try await store.record(snapshot, at: date)
         } catch {
             logger.error("Failed to write minute sample: \(String(describing: error), privacy: .public)")
         }
     }
 
-    /// 运行 `system_profiler` 读取健康信息，再按当天日期写入 `daily_samples`。
-    /// 没有电池时不运行；`system_profiler` 失败时返回 nil，不写库，避免覆盖当天已有的值。
+    /// 运行 `system_profiler` 读取健康信息，再把系统最大容量和健康状态写进当天的每日数据。
+    /// 没有电池时不运行；`system_profiler` 失败时返回 nil，不写库。满充容量、循环次数由每分钟的写入负责。
     func refreshHealth(at date: Date) async -> BatteryHealthInfo? {
         guard case .battery = latest else { return nil }
 
@@ -92,7 +92,7 @@ public actor BatterySampler {
         // 等待 system_profiler 期间可能有新的读取，用最新的 IORegistry 读数。
         if let store, case .battery(let snapshot)? = latest {
             do {
-                try await store.write(DailySample(date: date, health: health, snapshot: snapshot))
+                try await store.record(health, snapshot: snapshot, at: date)
             } catch {
                 logger.error("Failed to write daily sample: \(String(describing: error), privacy: .public)")
             }

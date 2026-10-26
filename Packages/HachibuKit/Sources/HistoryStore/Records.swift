@@ -59,43 +59,60 @@ public struct MinuteSample: Sendable, Equatable {
 }
 
 /// 一小时的汇总，`hourly_samples` 的一行。近期 7 天曲线用的是 `HourlyAverage`。
-/// 平均值、最大值只统计非 NULL 的样本，全部为 NULL 时为 nil。
+/// 平均值、最小值、最大值只统计非 NULL 的样本，全部为 NULL 时为 nil。迁移 v2 之前生成的行，v2 新增的字段为 nil。
 public struct HourlySample: Sendable, Equatable {
     /// 小时起点。
     public var hour: Date
     public var sampleCount: Int
     /// 该小时内接电的分钟数。
     public var externalMinutes: Int
-    public var percentAverage: Double?
-    public var percentMin: Int?
-    public var percentMax: Int?
-    public var systemLoadAverageMW: Double?
-    public var systemLoadMaxMW: Int?
-    public var temperatureAverageCelsius: Double?
-    public var temperatureMaxCelsius: Double?
+    /// 该小时内充电的分钟数。
+    public var chargingMinutes: Int?
+    public var percent: Summary<Int>
+    public var systemLoadMW: Summary<Int>
+    public var batteryPowerMW: Summary<Int>
+    public var powerInMW: Summary<Int>
+    public var temperatureCelsius: Summary<Double>
+    public var voltageMV: Summary<Int>
+    public var amperageMA: Summary<Int>
+
+    /// 一个指标在一小时内的平均值、最小值、最大值。
+    public struct Summary<Value: Sendable & Equatable>: Sendable, Equatable {
+        public var average: Double?
+        public var min: Value?
+        public var max: Value?
+
+        public init(average: Double? = nil, min: Value? = nil, max: Value? = nil) {
+            self.average = average
+            self.min = min
+            self.max = max
+        }
+    }
 
     public init(
         hour: Date,
         sampleCount: Int,
         externalMinutes: Int,
-        percentAverage: Double? = nil,
-        percentMin: Int? = nil,
-        percentMax: Int? = nil,
-        systemLoadAverageMW: Double? = nil,
-        systemLoadMaxMW: Int? = nil,
-        temperatureAverageCelsius: Double? = nil,
-        temperatureMaxCelsius: Double? = nil
+        chargingMinutes: Int? = nil,
+        percent: Summary<Int> = Summary(),
+        systemLoadMW: Summary<Int> = Summary(),
+        batteryPowerMW: Summary<Int> = Summary(),
+        powerInMW: Summary<Int> = Summary(),
+        temperatureCelsius: Summary<Double> = Summary(),
+        voltageMV: Summary<Int> = Summary(),
+        amperageMA: Summary<Int> = Summary()
     ) {
         self.hour = hour
         self.sampleCount = sampleCount
         self.externalMinutes = externalMinutes
-        self.percentAverage = percentAverage
-        self.percentMin = percentMin
-        self.percentMax = percentMax
-        self.systemLoadAverageMW = systemLoadAverageMW
-        self.systemLoadMaxMW = systemLoadMaxMW
-        self.temperatureAverageCelsius = temperatureAverageCelsius
-        self.temperatureMaxCelsius = temperatureMaxCelsius
+        self.chargingMinutes = chargingMinutes
+        self.percent = percent
+        self.systemLoadMW = systemLoadMW
+        self.batteryPowerMW = batteryPowerMW
+        self.powerInMW = powerInMW
+        self.temperatureCelsius = temperatureCelsius
+        self.voltageMV = voltageMV
+        self.amperageMA = amperageMA
     }
 }
 
@@ -137,16 +154,21 @@ public struct HourlyAverage: Sendable, Equatable {
     }
 }
 
-/// `daily_samples` 的一行，按本地日期 upsert，一天保留最后的值。
-public struct DailySample: Sendable, Equatable {
+/// 一天的电池健康数据，由 `daily_health` 按字段合并各来源得到：本机的值优先，其次是最近一次导入的来源。
+/// 规则见 docs/v1技术设计.md 第 10 节。
+public struct DailyHealth: Sendable, Equatable {
     /// 本地日期 `YYYY-MM-DD`。
     public var day: String
     /// 系统最大容量（%），来自 `system_profiler`。
     public var systemMaxCapacityPercent: Int?
     public var fullChargeCapacityMAh: Int?
+    /// 与满充容量同一行的设计容量；这一行没有时取它所属电池的设计容量。用于计算容量比。
     public var designCapacityMAh: Int?
     public var cycleCount: Int?
-    public var updatedAt: Date
+    /// `system_profiler` 的健康状态原文，如 `Good`。
+    public var healthCondition: String?
+    /// 至少有一个字段来自导入的数据。
+    public var includesImportedData: Bool
 
     public init(
         day: String,
@@ -154,32 +176,66 @@ public struct DailySample: Sendable, Equatable {
         fullChargeCapacityMAh: Int? = nil,
         designCapacityMAh: Int? = nil,
         cycleCount: Int? = nil,
-        updatedAt: Date
+        healthCondition: String? = nil,
+        includesImportedData: Bool = false
     ) {
         self.day = day
         self.systemMaxCapacityPercent = systemMaxCapacityPercent
         self.fullChargeCapacityMAh = fullChargeCapacityMAh
         self.designCapacityMAh = designCapacityMAh
         self.cycleCount = cycleCount
-        self.updatedAt = updatedAt
-    }
-
-    /// 系统最大容量来自 `system_profiler`，满充容量、设计容量、循环次数来自当时的 IORegistry 读数。
-    public init(date: Date, health: BatteryHealthInfo, snapshot: BatterySnapshot, calendar: Calendar = .current) {
-        self.init(
-            day: Self.day(for: date, calendar: calendar),
-            systemMaxCapacityPercent: health.systemMaximumCapacityPercent,
-            fullChargeCapacityMAh: snapshot.fullChargeCapacityMAh,
-            designCapacityMAh: snapshot.designCapacityMAh,
-            cycleCount: snapshot.cycleCount,
-            updatedAt: date
-        )
+        self.healthCondition = healthCondition
+        self.includesImportedData = includesImportedData
     }
 
     /// 按 `calendar` 的时区取本地日期，格式 `YYYY-MM-DD`。
     public static func day(for date: Date, calendar: Calendar = .current) -> String {
         let components = calendar.dateComponents([.year, .month, .day], from: date)
         return String(format: "%04d-%02d-%02d", components.year ?? 0, components.month ?? 0, components.day ?? 0)
+    }
+}
+
+/// `battery_events` 的一行。
+public struct BatteryEvent: Sendable, Equatable {
+    public enum Kind: String, Sendable {
+        /// 本机电池与上一次见到的电池不同。`batteryID` 为新电池。
+        case batteryChanged = "battery_changed"
+        /// 系统充电上限变化。`value` 为开启时的上限百分比，关闭时为 100。
+        case chargeLimit = "charge_limit"
+    }
+
+    public var date: Date
+    public var kind: Kind
+    public var batteryID: Int64?
+    public var value: Int?
+
+    public init(date: Date, kind: Kind, batteryID: Int64? = nil, value: Int? = nil) {
+        self.date = date
+        self.kind = kind
+        self.batteryID = batteryID
+        self.value = value
+    }
+}
+
+/// 一次导入，`sources` 中 `kind = import` 的一行，附带它的每日数据范围。
+public struct ImportedSource: Sendable, Equatable, Identifiable {
+    public var id: Int64
+    public var app: String
+    public var appVersion: String?
+    public var importedAt: Date
+    /// 最早、最晚的一天，`YYYY-MM-DD`。没有每日数据时为 nil。
+    public var firstDay: String?
+    public var lastDay: String?
+    public var dayCount: Int
+
+    public init(id: Int64, app: String, appVersion: String?, importedAt: Date, firstDay: String?, lastDay: String?, dayCount: Int) {
+        self.id = id
+        self.app = app
+        self.appVersion = appVersion
+        self.importedAt = importedAt
+        self.firstDay = firstDay
+        self.lastDay = lastDay
+        self.dayCount = dayCount
     }
 }
 
@@ -235,35 +291,24 @@ extension MinuteSample: FetchableRecord, PersistableRecord {
     }
 }
 
-extension HourlySample: FetchableRecord, PersistableRecord {
-    public static let databaseTableName = "hourly_samples"
-
+extension HourlySample: FetchableRecord {
     public init(row: Row) throws {
+        func summary<Value: DatabaseValueConvertible & Sendable & Equatable>(_ prefix: String, _ unit: String) -> Summary<Value> {
+            Summary(average: row["\(prefix)_avg\(unit)"], min: row["\(prefix)_min\(unit)"], max: row["\(prefix)_max\(unit)"])
+        }
         self.init(
             hour: UnixTime.date(row["hour_ts"]),
             sampleCount: row["sample_count"],
             externalMinutes: row["external_minutes"],
-            percentAverage: row["percent_avg"],
-            percentMin: row["percent_min"],
-            percentMax: row["percent_max"],
-            systemLoadAverageMW: row["system_load_avg_mw"],
-            systemLoadMaxMW: row["system_load_max_mw"],
-            temperatureAverageCelsius: row["temperature_avg_c"],
-            temperatureMaxCelsius: row["temperature_max_c"]
+            chargingMinutes: row["charging_minutes"],
+            percent: summary("percent", ""),
+            systemLoadMW: summary("system_load", "_mw"),
+            batteryPowerMW: summary("battery_power", "_mw"),
+            powerInMW: summary("power_in", "_mw"),
+            temperatureCelsius: summary("temperature", "_c"),
+            voltageMV: summary("voltage", "_mv"),
+            amperageMA: summary("amperage", "_ma")
         )
-    }
-
-    public func encode(to container: inout PersistenceContainer) throws {
-        container["hour_ts"] = UnixTime.seconds(hour)
-        container["sample_count"] = sampleCount
-        container["external_minutes"] = externalMinutes
-        container["percent_avg"] = percentAverage
-        container["percent_min"] = percentMin
-        container["percent_max"] = percentMax
-        container["system_load_avg_mw"] = systemLoadAverageMW
-        container["system_load_max_mw"] = systemLoadMaxMW
-        container["temperature_avg_c"] = temperatureAverageCelsius
-        container["temperature_max_c"] = temperatureMaxCelsius
     }
 }
 
@@ -280,29 +325,5 @@ extension HourlyAverage: FetchableRecord {
             temperatureCelsius: row["temperature_avg_c"],
             voltageMV: row["voltage_avg_mv"]
         )
-    }
-}
-
-extension DailySample: FetchableRecord, PersistableRecord {
-    public static let databaseTableName = "daily_samples"
-
-    public init(row: Row) throws {
-        self.init(
-            day: row["day"],
-            systemMaxCapacityPercent: row["system_max_capacity_pct"],
-            fullChargeCapacityMAh: row["full_charge_mah"],
-            designCapacityMAh: row["design_mah"],
-            cycleCount: row["cycle_count"],
-            updatedAt: UnixTime.date(row["updated_at"])
-        )
-    }
-
-    public func encode(to container: inout PersistenceContainer) throws {
-        container["day"] = day
-        container["system_max_capacity_pct"] = systemMaxCapacityPercent
-        container["full_charge_mah"] = fullChargeCapacityMAh
-        container["design_mah"] = designCapacityMAh
-        container["cycle_count"] = cycleCount
-        container["updated_at"] = UnixTime.seconds(updatedAt)
     }
 }

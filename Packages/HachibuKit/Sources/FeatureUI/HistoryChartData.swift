@@ -157,16 +157,16 @@ enum HistoryChartBuilder {
 
     // MARK: - 长期
 
-    /// 查询 `daily_samples` 的起始日期。`all` 返回 nil，查询全部。
+    /// 查询每日数据的起始日期。`all` 返回 nil，查询全部。
     static func longTermFirstDay(range: LongTermRange, now: Date, calendar: Calendar = .current) -> String? {
         guard let dayCount = range.dayCount else { return nil }
-        return DailySample.day(for: firstDay(dayCount: dayCount, now: now, calendar: calendar), calendar: calendar)
+        return DailyHealth.day(for: firstDay(dayCount: dayCount, now: now, calendar: calendar), calendar: calendar)
     }
 
     /// 每天一个点，画在当天正午。横轴从范围第一天的 0 点到明天 0 点；
     /// `firstRecordedDay` 晚于范围起点时，之前的区间标“未记录”，横轴不缩短。
     static func longTerm(
-        dailySamples: [DailySample],
+        dailySamples: [DailyHealth],
         range: LongTermRange,
         now: Date,
         firstRecordedDay: String?,
@@ -182,7 +182,7 @@ enum HistoryChartBuilder {
         }
         let domain = start...end
 
-        let days: [(date: Date, sample: DailySample)] = dailySamples.compactMap { sample in
+        let days: [(date: Date, sample: DailyHealth)] = dailySamples.compactMap { sample in
             guard let dayStart = startOfDay(sample.day, calendar: calendar) else { return nil }
             return (dayStart.addingTimeInterval(12 * 3600), sample)
         }
@@ -201,7 +201,7 @@ enum HistoryChartBuilder {
         )
     }
 
-    private static func capacityRatioPercent(_ sample: DailySample) -> Double? {
+    private static func capacityRatioPercent(_ sample: DailyHealth) -> Double? {
         guard let fullCharge = sample.fullChargeCapacityMAh, let design = sample.designCapacityMAh, design > 0 else { return nil }
         return Double(fullCharge) / Double(design) * 100
     }

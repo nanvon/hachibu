@@ -116,4 +116,12 @@ public enum BatteryHealthCondition: Sendable, Equatable {
     init(_ rawValue: String) {
         self = rawValue == "Good" ? .good : .other(rawValue)
     }
+
+    /// `system_profiler` 的原文，存入数据库。
+    public var rawValue: String {
+        switch self {
+        case .good: "Good"
+        case .other(let rawValue): rawValue
+        }
+    }
 }

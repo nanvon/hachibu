@@ -1,5 +1,6 @@
 import AppKit
 import BatteryCore
+import HistoryStore
 import os
 import ServiceManagement
 import SwiftUI
@@ -10,6 +11,10 @@ private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Hachibu"
 struct SettingsPage: View {
     @Environment(BatteryMonitor.self) private var monitor
     @Bindable var settings: AppSettings
+    /// 数据库打不开时为 nil，不显示“历史数据”分区。
+    var importer: HistoryImportModel?
+    /// 由 App 层选择要导入的文件，取消时返回 nil。
+    var onChooseImportFile: @MainActor () async -> URL? = { nil }
     let onExportDiagnostics: @MainActor () async -> Void
     /// 为 nil 时不显示“检查更新”。
     let onCheckForUpdates: (@MainActor () -> Void)?
@@ -22,6 +27,9 @@ struct SettingsPage: View {
             menuBarSection
             generalSection
             chargingSection
+            if let importer {
+                HistoryDataSection(importer: importer, onChooseFile: onChooseImportFile)
+            }
             diagnosticsSection
             aboutSection
         }
@@ -198,6 +206,133 @@ struct SettingsPage: View {
             }
         } header: {
             Text("About", bundle: .module)
+        }
+    }
+}
+
+/// 导入历史数据，列出和删除已导入的来源。见 docs/v1技术设计.md 20.6。
+private struct HistoryDataSection: View {
+    let importer: HistoryImportModel
+    let onChooseFile: @MainActor () async -> URL?
+    @State private var pendingDeletion: ImportedSource?
+
+    var body: some View {
+        Section {
+            ForEach(importer.sources) { source in
+                LabeledContent {
+                    Button(role: .destructive) {
+                        pendingDeletion = source
+                    } label: {
+                        Text("Delete…", bundle: .module)
+                    }
+                    .disabled(importer.isWorking)
+                } label: {
+                    Text(verbatim: Self.name(source))
+                    Text("\(Self.dayRange(first: source.firstDay, last: source.lastDay)) · \(source.dayCount) days · Imported \(source.importedAt.formatted(date: .abbreviated, time: .omitted))", bundle: .module)
+                }
+            }
+            Button {
+                Task {
+                    if let url = await onChooseFile() {
+                        await importer.prepare(fileURL: url)
+                    }
+                }
+            } label: {
+                Text("Import History…", bundle: .module)
+            }
+            .disabled(importer.isWorking)
+            if let failure = importer.failure {
+                Self.message(failure)
+                    .font(.callout)
+                    .foregroundStyle(.red)
+            }
+        } header: {
+            Text("History Data", bundle: .module)
+        } footer: {
+            Text("Imports daily full charge capacity, cycle count and maximum capacity from a file in the Hachibu import format. Imported data stays on this Mac and is not included in diagnostic data.", bundle: .module)
+                .font(.callout)
+                .foregroundStyle(.secondary)
+        }
+        .task { await importer.loadSources() }
+        .alert(
+            Text("Import History?", bundle: .module),
+            isPresented: Binding(get: { importer.pending != nil }, set: { if !$0 { importer.cancelImport() } }),
+            presenting: importer.pending
+        ) { _ in
+            Button {
+                Task { await importer.confirmImport() }
+            } label: {
+                Text("Import", bundle: .module)
+            }
+            Button(role: .cancel) {
+                importer.cancelImport()
+            } label: {
+                Text("Cancel", bundle: .module)
+            }
+        } message: { preview in
+            Text(verbatim: Self.summary(preview))
+        }
+        .alert(
+            Text("Delete Imported Data?", bundle: .module),
+            isPresented: Binding(get: { pendingDeletion != nil }, set: { if !$0 { pendingDeletion = nil } }),
+            presenting: pendingDeletion
+        ) { source in
+            Button(role: .destructive) {
+                Task { await importer.delete(source) }
+            } label: {
+                Text("Delete", bundle: .module)
+            }
+            Button(role: .cancel) {} label: {
+                Text("Cancel", bundle: .module)
+            }
+        } message: { source in
+            Text("The \(source.dayCount) days imported from \(Self.name(source)) will be removed from the history charts.", bundle: .module)
+        }
+    }
+
+    /// 如 “AlDente 1.39.3”。
+    private static func name(_ source: ImportedSource) -> String {
+        [source.app, source.appVersion].compactMap { $0 }.joined(separator: " ")
+    }
+
+    private static func dayRange(first: String?, last: String?) -> String {
+        let dates = [first, last].compactMap { $0.flatMap { HistoryChartBuilder.startOfDay($0) } }
+            .map { $0.formatted(date: .abbreviated, time: .omitted) }
+        return dates.count == 2 ? "\(dates[0]) – \(dates[1])" : DisplayFormat.missing
+    }
+
+    /// 确认对话框的说明，每项一行。
+    private static func summary(_ preview: HistoryImportPreview) -> String {
+        let file = preview.file
+        let name = [file.sourceApp, file.sourceVersion].compactMap { $0 }.joined(separator: " ")
+        var lines = [
+            String(localized: "\(name): \(file.dayCount) days, \(dayRange(first: file.firstDay, last: file.lastDay)).", bundle: .module),
+        ]
+        if preview.overlappingNativeDays > 0 {
+            lines.append(String(localized: "\(preview.overlappingNativeDays) days were also recorded on this Mac. Those days keep this Mac's data and only fill in missing values.", bundle: .module))
+        }
+        if file.excludedCount > 0 || file.skippedCount > 0 {
+            lines.append(String(localized: "Invalid records excluded: \(file.excludedCount). Unrecognized records skipped: \(file.skippedCount).", bundle: .module))
+        }
+        if !file.hasBatterySerial {
+            lines.append(String(localized: "The file has no battery serial number, so the capacity ratio can't be calculated for imported days unless they include the design capacity.", bundle: .module))
+        } else if preview.isDifferentBattery {
+            lines.append(String(localized: "The data is from a different battery than the one in this Mac.", bundle: .module))
+        }
+        return lines.joined(separator: "\n\n")
+    }
+
+    private static func message(_ failure: HistoryImportModel.Failure) -> Text {
+        switch failure {
+        case .invalidFile(.fileTooLarge): Text("The file is larger than 50 MB.", bundle: .module)
+        case .invalidFile(.notJSON), .invalidFile(.unsupportedFormat):
+            Text("The file is not in the Hachibu import format.", bundle: .module)
+        case .invalidFile(.unsupportedVersion): Text("This version of the import format is not supported.", bundle: .module)
+        case .invalidFile(.missingSourceApp): Text("The file does not name the app the data came from.", bundle: .module)
+        case .invalidFile(.noValidRecords): Text("The file contains no valid daily data.", bundle: .module)
+        case .invalidFile(.alreadyImported): Text("This file has already been imported.", bundle: .module)
+        case .unreadable: Text("Could not read the file.", bundle: .module)
+        case .writeFailed: Text("Could not save the imported data.", bundle: .module)
         }
     }
 }

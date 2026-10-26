@@ -21,6 +21,58 @@
         }
       }
     },
+    "%@ · %lld days · Imported %@" : {
+      "en" : {
+        "variations" : {
+          "plural" : {
+            "one" : {
+              "stringUnit" : {
+                "state" : "translated",
+                "value" : "%@ · %lld day · Imported %@"
+              }
+            },
+            "other" : {
+              "stringUnit" : {
+                "state" : "translated",
+                "value" : "%@ · %lld days · Imported %@"
+              }
+            }
+          }
+        }
+      },
+      "zh-Hans" : {
+        "stringUnit" : {
+          "state" : "translated",
+          "value" : "%1$@ · %2$lld 天 · 导入于 %3$@"
+        }
+      }
+    },
+    "%@: %lld days, %@." : {
+      "en" : {
+        "variations" : {
+          "plural" : {
+            "one" : {
+              "stringUnit" : {
+                "state" : "translated",
+                "value" : "%@: %lld day, %@."
+              }
+            },
+            "other" : {
+              "stringUnit" : {
+                "state" : "translated",
+                "value" : "%@: %lld days, %@."
+              }
+            }
+          }
+        }
+      },
+      "zh-Hans" : {
+        "stringUnit" : {
+          "state" : "translated",
+          "value" : "%1$@：%2$lld 天，%3$@。"
+        }
+      }
+    },
     "%lld days recorded" : {
       "localizations" : {
         "en" : {
@@ -96,6 +148,32 @@
             "state" : "translated",
             "value" : "30 天"
           }
+        }
+      }
+    },
+    "%lld days were also recorded on this Mac. Those days keep this Mac's data and only fill in missing values." : {
+      "en" : {
+        "variations" : {
+          "plural" : {
+            "one" : {
+              "stringUnit" : {
+                "state" : "translated",
+                "value" : "%lld day was also recorded on this Mac. That day keeps this Mac's data and only fills in missing values."
+              }
+            },
+            "other" : {
+              "stringUnit" : {
+                "state" : "translated",
+                "value" : "%lld days were also recorded on this Mac. Those days keep this Mac's data and only fill in missing values."
+              }
+            }
+          }
+        }
+      },
+      "zh-Hans" : {
+        "stringUnit" : {
+          "state" : "translated",
+          "value" : "其中 %lld 天本机也有记录，这些天以本机数据为准，只补充缺失的值。"
         }
       }
     },
@@ -302,6 +380,14 @@
         }
       }
     },
+    "Cancel" : {
+      "zh-Hans" : {
+        "stringUnit" : {
+          "state" : "translated",
+          "value" : "取消"
+        }
+      }
+    },
     "Capacity Ratio (Full Charge / Design)" : {
       "localizations" : {
         "zh-Hans" : {
@@ -422,6 +508,22 @@
         }
       }
     },
+    "Could not read the file." : {
+      "zh-Hans" : {
+        "stringUnit" : {
+          "state" : "translated",
+          "value" : "无法读取文件。"
+        }
+      }
+    },
+    "Could not save the imported data." : {
+      "zh-Hans" : {
+        "stringUnit" : {
+          "state" : "translated",
+          "value" : "未能保存导入的数据。"
+        }
+      }
+    },
     "Current Maximum Capacity" : {
       "localizations" : {
         "zh-Hans" : {
@@ -459,6 +561,30 @@
             "state" : "translated",
             "value" : "循环次数"
           }
+        }
+      }
+    },
+    "Delete" : {
+      "zh-Hans" : {
+        "stringUnit" : {
+          "state" : "translated",
+          "value" : "删除"
+        }
+      }
+    },
+    "Delete Imported Data?" : {
+      "zh-Hans" : {
+        "stringUnit" : {
+          "state" : "translated",
+          "value" : "删除导入的数据？"
+        }
+      }
+    },
+    "Delete…" : {
+      "zh-Hans" : {
+        "stringUnit" : {
+          "state" : "translated",
+          "value" : "删除…"
         }
       }
     },
@@ -582,6 +708,14 @@
         }
       }
     },
+    "History Data" : {
+      "zh-Hans" : {
+        "stringUnit" : {
+          "state" : "translated",
+          "value" : "历史数据"
+        }
+      }
+    },
     "History Unavailable" : {
       "localizations" : {
         "zh-Hans" : {
@@ -602,6 +736,38 @@
         }
       }
     },
+    "Import" : {
+      "zh-Hans" : {
+        "stringUnit" : {
+          "state" : "translated",
+          "value" : "导入"
+        }
+      }
+    },
+    "Import History?" : {
+      "zh-Hans" : {
+        "stringUnit" : {
+          "state" : "translated",
+          "value" : "导入历史数据？"
+        }
+      }
+    },
+    "Import History…" : {
+      "zh-Hans" : {
+        "stringUnit" : {
+          "state" : "translated",
+          "value" : "导入历史数据…"
+        }
+      }
+    },
+    "Imports daily full charge capacity, cycle count and maximum capacity from a file in the Hachibu import format. Imported data stays on this Mac and is not included in diagnostic data." : {
+      "zh-Hans" : {
+        "stringUnit" : {
+          "state" : "translated",
+          "value" : "从 Hachibu 导入格式的文件导入每日的满充容量、循环次数和最大容量。导入的数据只保存在本机，不包含在诊断数据中。"
+        }
+      }
+    },
     "Input Voltage · Current" : {
       "localizations" : {
         "zh-Hans" : {
@@ -609,6 +775,14 @@
             "state" : "translated",
             "value" : "输入电压 · 电流"
           }
+        }
+      }
+    },
+    "Invalid records excluded: %lld. Unrecognized records skipped: %lld." : {
+      "zh-Hans" : {
+        "stringUnit" : {
+          "state" : "translated",
+          "value" : "排除的无效记录：%1$lld 条。跳过的无法识别的记录：%2$lld 条。"
         }
       }
     },
@@ -1134,6 +1308,32 @@
         }
       }
     },
+    "The %lld days imported from %@ will be removed from the history charts." : {
+      "en" : {
+        "variations" : {
+          "plural" : {
+            "one" : {
+              "stringUnit" : {
+                "state" : "translated",
+                "value" : "The %lld day imported from %@ will be removed from the history charts."
+              }
+            },
+            "other" : {
+              "stringUnit" : {
+                "state" : "translated",
+                "value" : "The %lld days imported from %@ will be removed from the history charts."
+              }
+            }
+          }
+        }
+      },
+      "zh-Hans" : {
+        "stringUnit" : {
+          "state" : "translated",
+          "value" : "从 %2$@ 导入的 %1$lld 天数据将从历史曲线中移除。"
+        }
+      }
+    },
     "The battery has stayed above %lld °C for 3 minutes. Current temperature: %@." : {
       "localizations" : {
         "zh-Hans" : {
@@ -1141,6 +1341,54 @@
             "state" : "translated",
             "value" : "电池温度已连续 3 分钟高于 %lld °C，当前 %@。"
           }
+        }
+      }
+    },
+    "The data is from a different battery than the one in this Mac." : {
+      "zh-Hans" : {
+        "stringUnit" : {
+          "state" : "translated",
+          "value" : "这些数据来自另一块电池，不是本机当前的电池。"
+        }
+      }
+    },
+    "The file contains no valid daily data." : {
+      "zh-Hans" : {
+        "stringUnit" : {
+          "state" : "translated",
+          "value" : "文件中没有有效的每日数据。"
+        }
+      }
+    },
+    "The file does not name the app the data came from." : {
+      "zh-Hans" : {
+        "stringUnit" : {
+          "state" : "translated",
+          "value" : "文件没有注明数据来自哪个应用。"
+        }
+      }
+    },
+    "The file has no battery serial number, so the capacity ratio can't be calculated for imported days unless they include the design capacity." : {
+      "zh-Hans" : {
+        "stringUnit" : {
+          "state" : "translated",
+          "value" : "文件中没有电池序列号，导入的日子除非带有设计容量，否则无法计算容量比。"
+        }
+      }
+    },
+    "The file is larger than 50 MB." : {
+      "zh-Hans" : {
+        "stringUnit" : {
+          "state" : "translated",
+          "value" : "文件超过 50 MB。"
+        }
+      }
+    },
+    "The file is not in the Hachibu import format." : {
+      "zh-Hans" : {
+        "stringUnit" : {
+          "state" : "translated",
+          "value" : "文件不是 Hachibu 导入格式。"
         }
       }
     },
@@ -1171,6 +1419,22 @@
             "state" : "translated",
             "value" : "系统找不到此登录项。"
           }
+        }
+      }
+    },
+    "This file has already been imported." : {
+      "zh-Hans" : {
+        "stringUnit" : {
+          "state" : "translated",
+          "value" : "这个文件已经导入过。"
+        }
+      }
+    },
+    "This version of the import format is not supported." : {
+      "zh-Hans" : {
+        "stringUnit" : {
+          "state" : "translated",
+          "value" : "不支持这个版本的导入格式。"
         }
       }
     },

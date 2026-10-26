@@ -107,8 +107,8 @@ private let utc: Calendar = {
 @Suite struct LongTermTests {
     private let now = base.addingTimeInterval(15 * 3600) // 2026-10-20 15:00 UTC
 
-    private func daily(_ day: String, capacity: Int? = 95, cycles: Int? = 100) -> DailySample {
-        DailySample(day: day, systemMaxCapacityPercent: capacity, fullChargeCapacityMAh: 6000, cycleCount: cycles, updatedAt: base)
+    private func daily(_ day: String, capacity: Int? = 95, cycles: Int? = 100) -> DailyHealth {
+        DailyHealth(day: day, systemMaxCapacityPercent: capacity, fullChargeCapacityMAh: 6000, cycleCount: cycles)
     }
 
     @Test func monthDomainAndNotRecorded() {
@@ -156,8 +156,8 @@ private let utc: Calendar = {
     @Test func capacityRatioNeedsBothCapacities() {
         let data = HistoryChartBuilder.longTerm(
             dailySamples: [
-                DailySample(day: "2026-10-19", fullChargeCapacityMAh: 7942, designCapacityMAh: 8694, updatedAt: base),
-                DailySample(day: "2026-10-20", fullChargeCapacityMAh: 7900, updatedAt: base),
+                DailyHealth(day: "2026-10-19", fullChargeCapacityMAh: 7942, designCapacityMAh: 8694),
+                DailyHealth(day: "2026-10-20", fullChargeCapacityMAh: 7900),
             ],
             range: .month,
             now: now,

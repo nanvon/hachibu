@@ -38,7 +38,11 @@ let package = Package(
         ),
         .testTarget(
             name: "HistoryStoreTests",
-            dependencies: ["HistoryStore", "BatteryCore"]
+            dependencies: [
+                "HistoryStore",
+                "BatteryCore",
+                .product(name: "GRDB", package: "GRDB.swift"),
+            ]
         ),
         .testTarget(
             name: "FeatureUITests",

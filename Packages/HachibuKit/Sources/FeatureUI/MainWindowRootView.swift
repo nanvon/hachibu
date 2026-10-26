@@ -7,22 +7,26 @@ public struct MainWindowRootView: View {
     private let settings: AppSettings
     private let alerts: AlertMonitor
     private let onExportDiagnostics: @MainActor () async -> Void
+    private let onChooseImportFile: @MainActor () async -> URL?
     private let onCheckForUpdates: (@MainActor () -> Void)?
     @State private var selection: MainWindowPage? = .history
 
     /// `onExportDiagnostics` 由 App 层选择保存位置并写文件，完成后返回。
+    /// `onChooseImportFile` 由 App 层选择要导入的历史数据文件，取消时返回 nil。
     /// `onCheckForUpdates` 为 nil 时（更新器未启用）设置页不显示“检查更新”。
     public init(
         history: HistoryModel,
         settings: AppSettings,
         alerts: AlertMonitor,
         onExportDiagnostics: @escaping @MainActor () async -> Void,
+        onChooseImportFile: @escaping @MainActor () async -> URL?,
         onCheckForUpdates: (@MainActor () -> Void)?
     ) {
         self.history = history
         self.settings = settings
         self.alerts = alerts
         self.onExportDiagnostics = onExportDiagnostics
+        self.onChooseImportFile = onChooseImportFile
         self.onCheckForUpdates = onCheckForUpdates
     }
 
@@ -53,6 +57,8 @@ public struct MainWindowRootView: View {
                 case .settings:
                     SettingsPage(
                         settings: settings,
+                        importer: history.importer,
+                        onChooseImportFile: onChooseImportFile,
                         onExportDiagnostics: onExportDiagnostics,
                         onCheckForUpdates: onCheckForUpdates
                     )

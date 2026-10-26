@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 
 /// 一次读取的解析结果。
@@ -53,6 +54,8 @@ public struct BatterySnapshot: Sendable, Equatable {
     public var cycleCount: Int?
     /// 设计循环次数，`DesignCycleCount9C`。
     public var designCycleCount: Int?
+    /// 电池序列号的 SHA-256（小写十六进制），用于区分电池，不保留原文。
+    public var batterySerialHash: String?
 
     /// 充电器信息，`IOPSCopyExternalPowerAdapterDetails()`。未接电时为 nil。
     public var adapter: PowerAdapter?
@@ -93,6 +96,7 @@ public struct BatterySnapshot: Sendable, Equatable {
         designCapacityMAh: Int? = nil,
         cycleCount: Int? = nil,
         designCycleCount: Int? = nil,
+        batterySerialHash: String? = nil,
         adapter: PowerAdapter? = nil,
         lowPowerModeEnabled: Bool = false,
         chargeLimit: ChargeLimitSetting? = nil,
@@ -116,6 +120,7 @@ public struct BatterySnapshot: Sendable, Equatable {
         self.designCapacityMAh = designCapacityMAh
         self.cycleCount = cycleCount
         self.designCycleCount = designCycleCount
+        self.batterySerialHash = batterySerialHash
         self.adapter = adapter
         self.lowPowerModeEnabled = lowPowerModeEnabled
         self.chargeLimit = chargeLimit
@@ -170,6 +175,8 @@ extension BatterySnapshot {
             designCapacityMAh: batteryData?["DesignCapacity"]?.intValue,
             cycleCount: battery["CycleCount"]?.intValue,
             designCycleCount: battery["DesignCycleCount9C"]?.intValue,
+            batterySerialHash: (battery["Serial"]?.stringValue ?? batteryData?["Serial"]?.stringValue)
+                .flatMap(Self.serialHash),
             adapter: raw.adapterDetails.map {
                 PowerAdapter(
                     watts: $0["Watts"]?.intValue,
@@ -181,6 +188,13 @@ extension BatterySnapshot {
             chargeLimit: ChargeLimitSetting.resolve(powerUI: raw.powerUIChargeLimit, archive: raw.chargeLimitArchive),
             chargeLimitOptions: Self.chargeLimitOptions(raw.powerUIChargeLimit)
         )
+    }
+
+    /// 序列号的 SHA-256，小写十六进制。去掉首尾空白后为空时为 nil。导入历史数据时用同一规则。
+    public static func serialHash(_ serial: String) -> String? {
+        let trimmed = serial.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        return SHA256.hash(data: Data(trimmed.utf8)).map { String(format: "%02x", $0) }.joined()
     }
 
     /// 只保留 50–100 的值；不支持、出错或没有可用值时为 nil。

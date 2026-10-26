@@ -90,6 +90,28 @@ import Testing
         #expect(snapshot?.temperatureCelsius == 26.69)
     }
 
+    @Test func serialIsHashed() {
+        // SHA-256("ABC")
+        let expected = "b5d4045c3f466fa91fe2cc6abe79232a1a57cdf104f7a26e716e0a1e2789df78"
+        let topLevel = BatteryReading(.battery([:], smartBattery: ["Serial": .string(" ABC\n")])).snapshot
+        #expect(topLevel?.batterySerialHash == expected)
+
+        let fromBatteryData = BatteryReading(.battery(
+            [:],
+            smartBattery: ["BatteryData": .dictionary(["Serial": .string("ABC")])]
+        )).snapshot
+        #expect(fromBatteryData?.batterySerialHash == expected)
+
+        let empty = BatteryReading(.battery([:], smartBattery: ["Serial": .string("  ")])).snapshot
+        #expect(empty?.batterySerialHash == nil)
+        #expect(BatterySnapshot.serialHash("ABC") == expected)
+    }
+
+    @Test func healthConditionRawValue() {
+        #expect(BatteryHealthCondition.good.rawValue == "Good")
+        #expect(BatteryHealthCondition.other("Service Recommended").rawValue == "Service Recommended")
+    }
+
     @Test func healthInfo() {
         func profiler(_ maximumCapacity: RawValue, _ condition: String) -> RawValue {
             .dictionary(["SPPowerDataType": .array([

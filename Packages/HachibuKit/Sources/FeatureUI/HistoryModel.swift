@@ -21,8 +21,12 @@ public final class HistoryModel {
     /// 最近一次分钟采样的时间。
     private(set) var lastUpdated: Date?
     private(set) var summary: RecordingSummary?
+    /// 导入历史数据。数据库打不开时为 nil。
+    let importer: HistoryImportModel?
     /// 最早一条分钟或小时数据的时间，用于近期曲线的“未记录”区间。
     @ObservationIgnored private var firstRecordedAt: Date?
+    /// 所有来源中最早的一天，用于长期曲线的“未记录”区间。
+    @ObservationIgnored private var firstDailyDay: String?
 
     @ObservationIgnored private let store: HistoryStore?
     @ObservationIgnored private var refreshTask: Task<Void, Never>?
@@ -33,6 +37,10 @@ public final class HistoryModel {
     public init(store: HistoryStore?) {
         self.store = store
         isAvailable = store != nil
+        importer = store.map { HistoryImportModel(store: $0) }
+        importer?.onChange = { [weak self] in
+            await self?.reloadAll()
+        }
     }
 
     /// 立即查询一次，之后每分钟刷新。重复调用无效果。
@@ -65,7 +73,7 @@ public final class HistoryModel {
 
     // MARK: - 查询
 
-    private func reloadAll() async {
+    func reloadAll() async {
         // 两组的“未记录”区间要用最早记录时间和记录概况，先查。
         await loadSummary()
         await loadRecent()
@@ -78,6 +86,7 @@ public final class HistoryModel {
             let summary = try await store.recordingSummary()
             let lastUpdated = try await store.latestMinuteSampleTime()
             firstRecordedAt = try await store.firstSampleTime()
+            firstDailyDay = try await store.firstDailyHealthDay()
             if summary != self.summary {
                 self.summary = summary
             }
@@ -120,12 +129,12 @@ public final class HistoryModel {
         let range = longTermRange
         let now = Date()
         do {
-            let samples = try await store.dailySamples(from: HistoryChartBuilder.longTermFirstDay(range: range, now: now))
+            let samples = try await store.dailyHealth(from: HistoryChartBuilder.longTermFirstDay(range: range, now: now))
             let data = HistoryChartBuilder.longTerm(
                 dailySamples: samples,
                 range: range,
                 now: now,
-                firstRecordedDay: summary?.firstDay
+                firstRecordedDay: firstDailyDay
             )
             guard generation == longTermGeneration else { return }
             longTerm = data

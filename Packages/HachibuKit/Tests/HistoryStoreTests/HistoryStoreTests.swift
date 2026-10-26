@@ -1,5 +1,6 @@
 import BatteryCore
 import Foundation
+import GRDB
 import Testing
 @testable import HistoryStore
 
@@ -99,10 +100,10 @@ private func minute(_ offset: Int) -> Date {
 }
 
 @Suite struct AggregationTests {
-    /// 第 0 小时：3 个样本，2 个接电，温度一个 NULL；第 1 小时：1 个样本，全部指标 NULL。
+    /// 第 0 小时：3 个样本，2 个接电、1 个充电，温度一个 NULL；第 1 小时：1 个样本，全部指标 NULL。
     private func seed(_ store: HistoryStore) async throws {
-        try await store.write(MinuteSample(timestamp: minute(0), percent: 60, isExternalPower: true, systemLoadMW: 10000, batteryPowerMW: 2000, powerInMW: 12000, temperatureCelsius: 30))
-        try await store.write(MinuteSample(timestamp: minute(1), percent: 62, isExternalPower: true, systemLoadMW: 20000, batteryPowerMW: -1000))
+        try await store.write(MinuteSample(timestamp: minute(0), percent: 60, isExternalPower: true, isCharging: true, systemLoadMW: 10000, batteryPowerMW: 2000, powerInMW: 12000, temperatureCelsius: 30, amperageMA: 160))
+        try await store.write(MinuteSample(timestamp: minute(1), percent: 62, isExternalPower: true, isCharging: false, systemLoadMW: 20000, batteryPowerMW: -1000))
         try await store.write(MinuteSample(timestamp: minute(59), percent: 64, isExternalPower: false, systemLoadMW: 15000, temperatureCelsius: 32, voltageMV: 12000))
         try await store.write(MinuteSample(timestamp: minute(60)))
     }
@@ -111,16 +112,17 @@ private func minute(_ offset: Int) -> Date {
         hour: base,
         sampleCount: 3,
         externalMinutes: 2,
-        percentAverage: 62,
-        percentMin: 60,
-        percentMax: 64,
-        systemLoadAverageMW: 15000,
-        systemLoadMaxMW: 20000,
-        temperatureAverageCelsius: 31,
-        temperatureMaxCelsius: 32
+        chargingMinutes: 1,
+        percent: .init(average: 62, min: 60, max: 64),
+        systemLoadMW: .init(average: 15000, min: 10000, max: 20000),
+        batteryPowerMW: .init(average: 500, min: -1000, max: 2000),
+        powerInMW: .init(average: 12000, min: 12000, max: 12000),
+        temperatureCelsius: .init(average: 31, min: 30, max: 32),
+        voltageMV: .init(average: 12000, min: 12000, max: 12000),
+        amperageMA: .init(average: 160, min: 160, max: 160)
     )
 
-    private let secondHour = HourlySample(hour: base.addingTimeInterval(3600), sampleCount: 1, externalMinutes: 0)
+    private let secondHour = HourlySample(hour: base.addingTimeInterval(3600), sampleCount: 1, externalMinutes: 0, chargingMinutes: 0)
 
     @Test func groupByHour() async throws {
         let store = try HistoryStore.inMemory()
@@ -177,13 +179,40 @@ private func minute(_ offset: Int) -> Date {
     }
 }
 
-@Suite struct DailySampleTests {
-    private let utc: Calendar = {
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = TimeZone(identifier: "UTC")!
-        return calendar
-    }()
+let utc: Calendar = {
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = TimeZone(identifier: "UTC")!
+    return calendar
+}()
 
+/// 2026-10-20 的第 `hours` 小时（UTC）。
+private func hour(_ hours: Int) -> Date {
+    base.addingTimeInterval(TimeInterval(hours * 3600))
+}
+
+private func snapshot(
+    serial: String? = "SERIAL-A",
+    fullCharge: Int? = 7942,
+    design: Int? = 8694,
+    cycles: Int? = 68,
+    chargeLimit: ChargeLimitSetting? = nil
+) -> BatterySnapshot {
+    BatterySnapshot(
+        percent: 80,
+        fullChargeCapacityMAh: fullCharge,
+        designCapacityMAh: design,
+        cycleCount: cycles,
+        designCycleCount: 1000,
+        batterySerialHash: serial.flatMap(BatterySnapshot.serialHash),
+        chargeLimit: chargeLimit
+    )
+}
+
+private func batteryCount(_ store: HistoryStore) throws -> Int {
+    try store.dbQueue.read { db in try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM batteries") ?? 0 }
+}
+
+@Suite struct DailyHealthTests {
     private let shanghai: Calendar = {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(identifier: "Asia/Shanghai")!
@@ -192,45 +221,129 @@ private func minute(_ offset: Int) -> Date {
 
     @Test func localDay() {
         let lateEvening = base.addingTimeInterval(-3600)
-        #expect(DailySample.day(for: lateEvening, calendar: utc) == "2026-10-19")
-        #expect(DailySample.day(for: lateEvening, calendar: shanghai) == "2026-10-20")
+        #expect(DailyHealth.day(for: lateEvening, calendar: utc) == "2026-10-19")
+        #expect(DailyHealth.day(for: lateEvening, calendar: shanghai) == "2026-10-20")
     }
 
-    @Test func fromHealthAndSnapshot() {
-        let sample = DailySample(
-            date: base,
-            health: BatteryHealthInfo(systemMaximumCapacityPercent: 95, condition: .good),
-            snapshot: BatterySnapshot(fullChargeCapacityMAh: 7942, designCapacityMAh: 8694, cycleCount: 68),
+    @Test func minuteRecordWritesSampleAndDailyCapacity() async throws {
+        let store = try HistoryStore.inMemory()
+        try await store.record(snapshot(), at: minute(3).addingTimeInterval(20), calendar: utc)
+
+        #expect(try await store.minuteSamples(from: base, to: minute(10)).map(\.timestamp) == [minute(3)])
+        #expect(try await store.dailyHealth() == [
+            DailyHealth(day: "2026-10-20", fullChargeCapacityMAh: 7942, designCapacityMAh: 8694, cycleCount: 68),
+        ])
+    }
+
+    @Test func healthRecordAddsSystemFields() async throws {
+        let store = try HistoryStore.inMemory()
+        try await store.record(snapshot(), at: hour(1), calendar: utc)
+        try await store.record(
+            BatteryHealthInfo(systemMaximumCapacityPercent: 95, condition: .good),
+            snapshot: snapshot(),
+            at: hour(2),
             calendar: utc
         )
-        #expect(sample == DailySample(
-            day: "2026-10-20",
-            systemMaxCapacityPercent: 95,
-            fullChargeCapacityMAh: 7942,
-            designCapacityMAh: 8694,
-            cycleCount: 68,
-            updatedAt: base
-        ))
+        #expect(try await store.dailyHealth() == [
+            DailyHealth(
+                day: "2026-10-20",
+                systemMaxCapacityPercent: 95,
+                fullChargeCapacityMAh: 7942,
+                designCapacityMAh: 8694,
+                cycleCount: 68,
+                healthCondition: "Good"
+            ),
+        ])
     }
 
-    @Test func upsertKeepsLastValuePerDay() async throws {
+    @Test func missingFieldsKeepEarlierValues() async throws {
         let store = try HistoryStore.inMemory()
-        try await store.write(DailySample(day: "2026-10-20", systemMaxCapacityPercent: 96, cycleCount: 67, updatedAt: base))
-        try await store.write(DailySample(day: "2026-10-20", systemMaxCapacityPercent: 95, updatedAt: base.addingTimeInterval(3600)))
+        try await store.record(
+            BatteryHealthInfo(systemMaximumCapacityPercent: 95, condition: .good),
+            snapshot: snapshot(cycles: 67),
+            at: hour(1),
+            calendar: utc
+        )
+        // 稍后满充容量读不到、循环次数变了、system_profiler 没有值：只更新循环次数。
+        try await store.record(snapshot(fullCharge: nil, cycles: 68), at: hour(2), calendar: utc)
+        try await store.record(
+            BatteryHealthInfo(systemMaximumCapacityPercent: nil, condition: nil),
+            snapshot: snapshot(fullCharge: nil, design: nil, cycles: nil),
+            at: hour(3),
+            calendar: utc
+        )
 
-        let samples = try await store.dailySamples()
-        #expect(samples == [DailySample(day: "2026-10-20", systemMaxCapacityPercent: 95, updatedAt: base.addingTimeInterval(3600))])
+        let day = try #require(try await store.dailyHealth().first)
+        #expect(day.fullChargeCapacityMAh == 7942)
+        #expect(day.cycleCount == 68)
+        #expect(day.systemMaxCapacityPercent == 95)
+        #expect(day.healthCondition == "Good")
+    }
+
+    @Test func nothingWrittenWithoutValues() async throws {
+        let store = try HistoryStore.inMemory()
+        try await store.record(snapshot(fullCharge: nil, design: nil, cycles: nil), at: hour(1), calendar: utc)
+        #expect(try await store.dailyHealth().isEmpty)
+        #expect(try await store.recordingSummary() == nil)
+        // 分钟数据照常写。
+        #expect(try await store.latestMinuteSampleTime() == hour(1))
     }
 
     @Test func rangeAndSummary() async throws {
         let store = try HistoryStore.inMemory()
-        for day in ["2026-10-21", "2026-09-30", "2026-10-01"] {
-            try await store.write(DailySample(day: day, updatedAt: base))
+        for offset in [1, -20, -19] {
+            try await store.record(snapshot(), at: base.addingTimeInterval(TimeInterval(offset * 86400)), calendar: utc)
         }
-
-        #expect(try await store.dailySamples().map(\.day) == ["2026-09-30", "2026-10-01", "2026-10-21"])
-        #expect(try await store.dailySamples(from: "2026-10-01").map(\.day) == ["2026-10-01", "2026-10-21"])
+        #expect(try await store.dailyHealth().map(\.day) == ["2026-09-30", "2026-10-01", "2026-10-21"])
+        #expect(try await store.dailyHealth(from: "2026-10-01").map(\.day) == ["2026-10-01", "2026-10-21"])
         #expect(try await store.recordingSummary() == RecordingSummary(firstDay: "2026-09-30", dayCount: 3))
+        #expect(try await store.firstDailyHealthDay() == "2026-09-30")
+    }
+}
+
+@Suite struct BatteryTests {
+    @Test func sameSerialIsOneBattery() async throws {
+        let store = try HistoryStore.inMemory()
+        try await store.record(snapshot(), at: hour(1), calendar: utc)
+        try await store.record(snapshot(design: 8700), at: hour(2), calendar: utc)
+        #expect(try batteryCount(store) == 1)
+        let design = try await store.dbQueue.read { db in try Int.fetchOne(db, sql: "SELECT design_mah FROM batteries") }
+        #expect(design == 8700)
+        #expect(try await store.events(.batteryChanged).isEmpty)
+    }
+
+    @Test func missingSerialUsesLastBattery() async throws {
+        let store = try HistoryStore.inMemory()
+        try await store.record(snapshot(), at: hour(1), calendar: utc)
+        try await store.record(snapshot(serial: nil), at: base.addingTimeInterval(86400), calendar: utc)
+        #expect(try batteryCount(store) == 1)
+        let unassigned = try await store.dbQueue.read { db in
+            try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM daily_health WHERE battery_id IS NULL")
+        }
+        #expect(unassigned == 0)
+    }
+
+    @Test func newSerialRecordsBatteryChange() async throws {
+        let store = try HistoryStore.inMemory()
+        try await store.record(snapshot(serial: "SERIAL-A"), at: hour(1), calendar: utc)
+        try await store.record(snapshot(serial: "SERIAL-B"), at: hour(2), calendar: utc)
+        try await store.record(snapshot(serial: "SERIAL-B"), at: hour(3), calendar: utc)
+
+        #expect(try batteryCount(store) == 2)
+        let events = try await store.events(.batteryChanged)
+        #expect(events.map(\.date) == [hour(2)])
+        #expect(events.first?.batteryID == 2)
+    }
+
+    @Test func chargeLimitChangesAreRecorded() async throws {
+        let store = try HistoryStore.inMemory()
+        let settings: [ChargeLimitSetting?] = [.on(percent: 80), .on(percent: 80), nil, .unsupported, .off, .on(percent: 85)]
+        for (offset, setting) in settings.enumerated() {
+            try await store.record(snapshot(chargeLimit: setting), at: minute(offset), calendar: utc)
+        }
+        let events = try await store.events(.chargeLimit)
+        #expect(events.map(\.value) == [80, 100, 85])
+        #expect(events.map(\.date) == [minute(0), minute(4), minute(5)])
     }
 }
 
@@ -248,6 +361,46 @@ private func minute(_ offset: Int) -> Date {
         let migrations = try await reopened.dbQueue.read { db in
             try HistoryStore.migrator.appliedIdentifiers(db)
         }
-        #expect(migrations == ["v1"])
+        #expect(migrations == ["v1", "v2"])
+    }
+
+    /// v1 的每日数据转入 `daily_health`，没有电池；第一次确定电池时归给它。旧的小时行新增列为 NULL。
+    @Test func v1DataMovesToV2() async throws {
+        let queue = try DatabaseQueue()
+        try HistoryStore.migrator.migrate(queue, upTo: "v1")
+        try await queue.write { db in
+            try db.execute(sql: """
+                INSERT INTO daily_samples (day, system_max_capacity_pct, full_charge_mah, design_mah, cycle_count, updated_at)
+                VALUES ('2026-10-01', 96, 8000, 8694, 60, 100), ('2026-10-02', NULL, 7990, 8694, NULL, 200)
+                """)
+            try db.execute(sql: """
+                INSERT INTO hourly_samples (hour_ts, sample_count, external_minutes, percent_avg, temperature_max_c)
+                VALUES (0, 60, 30, 70.5, 31)
+                """)
+        }
+
+        let store = try HistoryStore(dbQueue: queue)
+        #expect(try await store.dailyHealth() == [
+            DailyHealth(day: "2026-10-01", systemMaxCapacityPercent: 96, fullChargeCapacityMAh: 8000, designCapacityMAh: 8694, cycleCount: 60),
+            DailyHealth(day: "2026-10-02", fullChargeCapacityMAh: 7990, designCapacityMAh: 8694),
+        ])
+        #expect(try store.hourlySamples() == [
+            HourlySample(
+                hour: Date(timeIntervalSince1970: 0),
+                sampleCount: 60,
+                externalMinutes: 30,
+                percent: .init(average: 70.5),
+                temperatureCelsius: .init(max: 31)
+            ),
+        ])
+        let tableExists = try await queue.read { db in try db.tableExists("daily_samples") }
+        #expect(!tableExists)
+
+        try await store.record(snapshot(), at: base, calendar: utc)
+        let unassigned = try await queue.read { db in
+            try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM daily_health WHERE battery_id IS NULL")
+        }
+        #expect(unassigned == 0)
+        #expect(try await store.events(.batteryChanged).isEmpty)
     }
 }
