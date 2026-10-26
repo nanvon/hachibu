@@ -1,6 +1,7 @@
 import AppKit
 import FeatureUI
 import HistoryStore
+import Observation
 import os
 
 private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Hachibu", category: "App")
@@ -42,6 +43,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             await alertMonitor.handleHealth(health)
         }
         alertMonitor.start()
+        syncChargeAboveLimitAction()
         batteryMonitor.start()
 
         let panelController = PanelController(
@@ -67,6 +69,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self.pendingSettings = nil
             showMainWindow(settings: pendingSettings)
         }
+    }
+
+    /// 把设置页的“电量高于上限时”同步给 BatteryMonitor，设置变化时重新同步。
+    private func syncChargeAboveLimitAction() {
+        batteryMonitor?.holdsChargeAboveLimit = withObservationTracking {
+            settings.chargeAboveLimitAction == .holdCurrentCharge
+        } onChange: { [weak self] in
+            Task { @MainActor in self?.syncChargeAboveLimitAction() }
+        }
+    }
+
+    /// 正在“保持当前电量”时写回用户设置的上限，见 docs/v1技术设计.md 第 6 节。
+    func applicationWillTerminate(_ notification: Notification) {
+        batteryMonitor?.restoreChargeLimitBeforeExit()
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {

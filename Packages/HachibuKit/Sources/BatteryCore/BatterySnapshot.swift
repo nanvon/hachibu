@@ -66,6 +66,8 @@ public struct BatterySnapshot: Sendable, Equatable {
     public var chargeLimitOptions: [Int]?
     /// 本次插电期间电量已在未充电时到达当前充电上限。不是读数，由 `ChargeLimitHoldTracker` 根据连续读数推导，解析结果为 false。
     public var hasReachedChargeLimit: Bool
+    /// 正在“保持当前电量”时为保存的上限，此时 `chargeLimit` 是系统实际的临时值。不是读数，由 BatteryMonitor 写入，解析结果为 nil。
+    public var chargeLimitHold: ChargeLimitHold?
 
     /// 已开启的系统充电上限（%）。未开启、不支持或未知时为 nil。
     public var chargeLimitPercent: Int? {
@@ -103,7 +105,8 @@ public struct BatterySnapshot: Sendable, Equatable {
         lowPowerModeEnabled: Bool = false,
         chargeLimit: ChargeLimitSetting? = nil,
         chargeLimitOptions: [Int]? = nil,
-        hasReachedChargeLimit: Bool = false
+        hasReachedChargeLimit: Bool = false,
+        chargeLimitHold: ChargeLimitHold? = nil
     ) {
         self.percent = percent
         self.isExternalPower = isExternalPower
@@ -129,6 +132,7 @@ public struct BatterySnapshot: Sendable, Equatable {
         self.chargeLimit = chargeLimit
         self.chargeLimitOptions = chargeLimitOptions
         self.hasReachedChargeLimit = hasReachedChargeLimit
+        self.chargeLimitHold = chargeLimitHold
     }
 }
 

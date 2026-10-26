@@ -209,14 +209,14 @@ struct StatusLabel: View {
         switch status {
         case .onBattery: "battery.75percent"
         case .charging: "bolt.fill"
-        case .aboveChargeLimit, .pluggedInDraining, .fullyCharged, .chargeLimitReached, .pluggedInNotCharging:
+        case .aboveChargeLimit, .pluggedInDraining, .holdingCharge, .fullyCharged, .chargeLimitReached, .pluggedInNotCharging:
             "powerplug.fill"
         }
     }
 
     static func tint(_ status: ChargeStatus) -> Color {
         switch status {
-        case .charging, .fullyCharged, .chargeLimitReached: .green
+        case .charging, .holdingCharge, .fullyCharged, .chargeLimitReached: .green
         case .aboveChargeLimit, .pluggedInDraining: .orange
         case .onBattery, .pluggedInNotCharging: .secondary
         }
@@ -228,6 +228,7 @@ struct StatusLabel: View {
         case .charging: Text("Charging", bundle: .module)
         case .aboveChargeLimit(let limit): Text("Above Charge Limit, Using Battery to \(limit)%", bundle: .module)
         case .pluggedInDraining: Text("Plugged In, Draining", bundle: .module)
+        case .holdingCharge(let percent): Text("Holding at \(percent)%", bundle: .module)
         case .fullyCharged: Text("Fully Charged", bundle: .module)
         case .chargeLimitReached(let limit): Text("Charge Limit Reached (\(limit)%)", bundle: .module)
         case .pluggedInNotCharging: Text("Plugged In, Not Charging", bundle: .module)
@@ -1065,6 +1066,13 @@ enum PanelPreviewData {
     static let health = BatteryHealthInfo(systemMaximumCapacityPercent: 95, condition: .good)
     static let adapter = PowerAdapter(watts: 140, name: "140W USB-C Power Adapter", manufacturer: "Apple Inc.")
 
+    /// 正在“保持当前电量”：用户上限 80%，系统临时上限 87%。
+    static var holdingSnapshot: BatterySnapshot {
+        var snapshot = snapshot(percent: 87, chargeLimit: .on(percent: 87))
+        snapshot.chargeLimitHold = ChargeLimitHold(userLimit: 80, heldLimit: 87)
+        return snapshot
+    }
+
     static func snapshot(
         percent: Int? = 80,
         isExternalPower: Bool? = true,
@@ -1192,6 +1200,10 @@ private struct PanelPreview: View {
 
 #Preview("Plugged In, Not Charging") {
     PanelPreview(reading: .battery(PanelPreviewData.snapshot()))
+}
+
+#Preview("Holding Current Charge") {
+    PanelPreview(reading: .battery(PanelPreviewData.holdingSnapshot))
 }
 
 #Preview("Charge Limit Off, AlDente Running") {

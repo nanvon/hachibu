@@ -103,6 +103,17 @@ struct SettingsPage: View {
                     ChargeLimitControlRows(control: control) { change in
                         Task { await monitor.setChargeLimit(change) }
                     }
+                    if control.isEnabled {
+                        Picker(selection: $settings.chargeAboveLimitAction) {
+                            ForEach(ChargeAboveLimitAction.allCases, id: \.self) { action in
+                                action.title.tag(action)
+                            }
+                        } label: {
+                            Text("When Above Limit", bundle: .module)
+                            Text("Hold Current Charge temporarily sets the system limit to the current level (up to 99%) so the charger powers your Mac. Your limit is restored when you unplug, switch back, or quit Hachibu.", bundle: .module)
+                        }
+                        .disabled(control.isBlocked)
+                    }
                 } else {
                     LabeledContent {
                         ChargeLimitValue(setting: snapshot.chargeLimit)
@@ -406,6 +417,15 @@ extension MenuBarIconStyle {
         switch self {
         case .battery: Text("macOS", bundle: .module)
         case .ios: Text("iOS", bundle: .module)
+        }
+    }
+}
+
+extension ChargeAboveLimitAction {
+    var title: Text {
+        switch self {
+        case .dischargeToLimit: Text("Discharge to Limit", bundle: .module)
+        case .holdCurrentCharge: Text("Hold Current Charge", bundle: .module)
         }
     }
 }

@@ -75,6 +75,18 @@ public actor BatterySampler {
         return (result.reading, result.date, applied)
     }
 
+    /// 在当前线程同步写入，不读回快照。只用于应用退出时恢复用户的上限，写入方法内部仍按 PowerUI 读回判断成功。
+    nonisolated func writeChargeLimitImmediately(_ change: ChargeLimitChange) -> Bool {
+        guard let chargeLimitWriter else { return false }
+        do {
+            try chargeLimitWriter.write(change)
+            return true
+        } catch {
+            logger.error("Failed to write charge limit before exit: \(String(describing: error), privacy: .public)")
+            return false
+        }
+    }
+
     /// 用最近一次读取的值写一行分钟数据，同时更新电池、当天的满充容量和循环次数、事件。没有电池或还没有读取时不写。
     func writeMinuteSample(at date: Date) async {
         guard let store, case .battery(let snapshot)? = latest else { return }

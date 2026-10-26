@@ -24,7 +24,8 @@ struct ChargeLimitControl: Equatable {
         switch snapshot.chargeLimit {
         case .on(let percent):
             isEnabled = true
-            self.percent = percent
+            // 保持当前电量期间显示用户设置的上限，不显示临时值。
+            self.percent = snapshot.chargeLimitHold?.userLimit ?? percent
         case .off:
             isEnabled = false
             percent = nil

@@ -5,6 +5,8 @@ public enum ChargeStatus: Sendable, Equatable {
     /// 电量高于系统充电上限，系统不用充电器、由电池供电，放到上限后恢复。
     case aboveChargeLimit(limit: Int)
     case pluggedInDraining
+    /// 正在“保持当前电量”：系统上限临时为当前电量，由充电器供电。
+    case holdingCharge(percent: Int)
     case fullyCharged
     case chargeLimitReached(limit: Int)
     case pluggedInNotCharging
@@ -30,6 +32,8 @@ public enum ChargeStatus: Sendable, Equatable {
             } else {
                 self = .pluggedInDraining
             }
+        } else if let hold = snapshot.chargeLimitHold {
+            self = .holdingCharge(percent: hold.heldLimit)
         } else if snapshot.percent == 100 {
             self = .fullyCharged
         } else if let limit = snapshot.chargeLimitPercent, let percent = snapshot.percent,

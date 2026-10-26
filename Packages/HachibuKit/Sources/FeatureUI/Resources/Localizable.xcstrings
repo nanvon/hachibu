@@ -635,6 +635,16 @@
         }
       }
     },
+    "Discharge to Limit" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "放电到上限"
+          }
+        }
+      }
+    },
     "End" : {
       "localizations" : {
         "zh-Hans" : {
@@ -761,6 +771,36 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "历史数据不可用"
+          }
+        }
+      }
+    },
+    "Hold Current Charge" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保持当前电量"
+          }
+        }
+      }
+    },
+    "Hold Current Charge temporarily sets the system limit to the current level (up to 99%) so the charger powers your Mac. Your limit is restored when you unplug, switch back, or quit Hachibu." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择“保持当前电量”时，插电且电量高于上限会把系统上限临时改成当前电量（最高 99%），由充电器给电脑供电；拔电、改回“放电到上限”或退出 Hachibu 时恢复你设置的上限。"
+          }
+        }
+      }
+    },
+    "Holding at %lld%%" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保持在 %lld%%"
           }
         }
       }
@@ -1616,6 +1656,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "等待中"
+          }
+        }
+      }
+    },
+    "When Above Limit" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "电量高于上限时"
           }
         }
       }

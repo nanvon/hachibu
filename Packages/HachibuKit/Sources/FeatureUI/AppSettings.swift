@@ -29,6 +29,10 @@ public final class AppSettings {
     public var healthAlertThreshold: Int {
         didSet { defaults.set(healthAlertThreshold, forKey: Key.healthAlertThreshold) }
     }
+    /// 插电且电量高于系统充电上限时的处理，见 docs/v1技术设计.md 第 6 节。
+    public var chargeAboveLimitAction: ChargeAboveLimitAction {
+        didSet { defaults.set(chargeAboveLimitAction.rawValue, forKey: Key.chargeAboveLimitAction) }
+    }
 
     @ObservationIgnored private let defaults: UserDefaults
 
@@ -40,6 +44,8 @@ public final class AppSettings {
         temperatureAlertThreshold = Self.integer(defaults, Key.temperatureAlertThreshold, default: 40, in: Self.temperatureThresholdRange)
         healthAlertEnabled = defaults.object(forKey: Key.healthAlertEnabled) as? Bool ?? true
         healthAlertThreshold = Self.integer(defaults, Key.healthAlertThreshold, default: 80, in: Self.healthThresholdRange)
+        chargeAboveLimitAction = defaults.string(forKey: Key.chargeAboveLimitAction)
+            .flatMap(ChargeAboveLimitAction.init(rawValue:)) ?? .dischargeToLimit
     }
 
     /// 没有保存过时用默认值；超出范围时取范围内最近的值。
@@ -55,7 +61,16 @@ public final class AppSettings {
         static let temperatureAlertThreshold = "temperatureAlertThreshold"
         static let healthAlertEnabled = "healthAlertEnabled"
         static let healthAlertThreshold = "healthAlertThreshold"
+        static let chargeAboveLimitAction = "chargeAboveLimitAction"
     }
+}
+
+/// 插电且电量高于系统充电上限时的处理。
+public enum ChargeAboveLimitAction: String, CaseIterable, Sendable {
+    /// 系统默认行为：用电池放到上限，Hachibu 不写入。
+    case dischargeToLimit
+    /// 把系统上限临时写成当前电量，由充电器供电。
+    case holdCurrentCharge
 }
 
 /// 菜单栏电池外观；旧样式和未知存储值回退到 macOS。
