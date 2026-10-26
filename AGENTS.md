@@ -8,7 +8,7 @@ Hachibu 是 macOS 菜单栏电池监控应用，定位为 AlDente 的平替，�
 
 文档：
 
-- `docs/v1技术设计.md`：v1 写代码的依据，包括已定决策、数据来源、状态规则、存储结构。与其他文档冲突时以它为准。其中第 19 节是界面改版计划：菜单栏面板、主窗口和颜色已实现，剩余与现有代码不一致的地方见 19.8，改完一项要更新 19.8。
+- `docs/v1技术设计.md`：v1 写代码的依据，包括已定决策、数据来源、状态规则、存储结构。与其他文档冲突时以它为准。其中第 19 节是界面视觉：原则、颜色含义、平台约束和改视觉的流程，不写像素值；实现状态和待办见 19.8，改完一项要更新 19.8。
 - `design/brand/README.md`：品牌素材（应用图标、菜单栏图标、logo、宣传图、DMG 背景）的来源和导出方式，素材由 `scripts/generate-brand-assets.swift` 生成。
 - `docs/打包发布.md`：`scripts/build.sh` 打包、GitHub Actions 发布、Sparkle 密钥配置。
 - `release-notes/README.md`：每个版本更新说明的写法。
@@ -20,7 +20,7 @@ Hachibu 是 macOS 菜单栏电池监控应用，定位为 AlDente 的平替，�
 - v2：充电控制。以控制系统原生充电上限（80%–100%）为主，经 PowerUI 写入；开关和档位已在面板和设置页实现（设计文档第 6 节），临时充满一次暂不做。低于 80%、航行模式等需要 SMC CHIE 和特权 helper，不进 v2。本机传统限充 SMC key 已不可用，见 `docs/v1技术设计.md` 第 18 节和 `docs/v2充电控制技术调研.md`。
 - v3：导入 AlDente 的历史数据。只导入每日指标，不提供解密 AlDente 数据库的方法或指引，数据来源待定，见设计文档第 18 节。
 
-视觉设计稿（菜单栏面板 + 主窗口历史曲线，Liquid Glass 风格的 HTML 近似稿）暂未放入仓库。设计稿只用来参考布局和视觉，部分内容已过时：侧栏的“概览”页、“耗电量（系统负载）”标题、应用名“电池监控”、面板状态文字、流向图说明句和温度“正常 / 偏高”标签。这些以设计文档为准，视觉以设计文档第 19 节为准。
+旧的视觉设计稿（Liquid Glass 风格的 HTML 近似稿）已废弃，不作参考，按它定的像素规格也已从设计文档删除。现有面板和主窗口的样式不是定稿，正在重做。改界面样式按设计文档 19.1 的流程：先写渲染测试出图，自己看过再发给用户，用户确认后定稿；以确认过的渲染图和代码为准。
 
 ## v1 功能范围
 
@@ -115,6 +115,8 @@ SPARKLE_PUBLIC_ED_KEY="公钥" ./scripts/build.sh     # 产物：dist/Hachibu.dm
 - 改了 `App/`、`project.yml`、`Config/`，增删了文件，或改了 HachibuKit 的公共接口：
   `xcodegen generate`
   `xcodebuild -project Hachibu.xcodeproj -scheme Hachibu -configuration Debug build`
+- 改了界面样式：另外运行对应的渲染测试出图并查看，例如
+  `HACHIBU_RENDER_DIR=<临时目录> swift test --package-path Packages/HachibuKit --filter PowerFlowRenderTests`
 - 只改文档时不运行。
 
 项目代码出现编译警告也要处理，或者说明为什么不处理。GRDB 等依赖自身的警告不用管。校验失败要原样报告，不能跳过；修复如果超出原指令范围，先说明再改。只运行编译和测试，不启动 App，不做界面测试。
