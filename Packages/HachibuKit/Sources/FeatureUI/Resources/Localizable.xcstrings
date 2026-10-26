@@ -128,6 +128,7 @@
       }
     },
     "1 Hour" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -138,6 +139,7 @@
       }
     },
     "1 Year" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -147,17 +149,8 @@
         }
       }
     },
-    "48 Hours" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "最近 48 小时"
-          }
-        }
-      }
-    },
     "7 Days" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -168,6 +161,7 @@
       }
     },
     "24 Hours" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -178,11 +172,22 @@
       }
     },
     "30 Days" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "30 天"
+          }
+        }
+      }
+    },
+    "48 Hours" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最近 48 小时"
           }
         }
       }
@@ -1494,6 +1499,7 @@
       }
     },
     "Time Range" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
