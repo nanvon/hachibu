@@ -27,11 +27,12 @@ struct SettingsPage: View {
             menuBarSection
             generalSection
             chargingSection
+            diagnosticsSection
+            aboutSection
+            // 历史数据导入用得少，放在最后。
             if let importer {
                 HistoryDataSection(importer: importer, onChooseFile: onChooseImportFile)
             }
-            diagnosticsSection
-            aboutSection
         }
         .formStyle(.grouped)
         .onAppear { loginItem.refresh() }

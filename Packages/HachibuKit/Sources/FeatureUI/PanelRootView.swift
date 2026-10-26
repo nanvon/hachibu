@@ -704,13 +704,13 @@ private struct SegmentThumb: View {
     }
 }
 
-/// AlDente 运行或修改失败时的说明，面板和设置页共用。
+/// 其他充电控制应用运行或修改失败时的说明，面板和设置页共用。界面不点名具体应用。
 struct ChargeLimitNote: View {
     let control: ChargeLimitControl
 
     var body: some View {
         if control.isBlocked {
-            Text("Quit AlDente to change the charge limit here.", bundle: .module)
+            Text("Another charge control app is running. Quit it to change the charge limit here.", bundle: .module)
                 .foregroundStyle(.secondary)
                 .lineLimit(nil)
                 .fixedSize(horizontal: false, vertical: true)
@@ -757,7 +757,7 @@ private struct HealthTile: View {
                 design: snapshot.designCapacityMAh,
                 ratio: snapshot.capacityRatio
             )
-            .help(Text("Full charge capacity estimated by the battery, and its percentage of the design capacity. AlDente shows this percentage as Health.", bundle: .module))
+            .help(Text("Full charge capacity estimated by the battery, and its percentage of the design capacity.", bundle: .module))
             .padding(.top, 14)
             HairlineDivider()
                 .padding(.top, 12)
