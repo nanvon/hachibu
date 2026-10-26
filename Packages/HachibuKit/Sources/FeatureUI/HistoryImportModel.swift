@@ -59,8 +59,8 @@ public final class HistoryImportModel {
         }
     }
 
-    func confirmImport() async {
-        guard let preview = pending else { return }
+    /// 使用确认框捕获的预览，避免关闭确认框清空 pending 后丢失导入内容。
+    func confirmImport(_ preview: HistoryImportPreview) async {
         pending = nil
         isWorking = true
         defer { isWorking = false }

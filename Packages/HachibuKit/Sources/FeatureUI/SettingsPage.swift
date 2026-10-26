@@ -258,9 +258,9 @@ private struct HistoryDataSection: View {
             Text("Import History?", bundle: .module),
             isPresented: Binding(get: { importer.pending != nil }, set: { if !$0 { importer.cancelImport() } }),
             presenting: importer.pending
-        ) { _ in
+        ) { preview in
             Button {
-                Task { await importer.confirmImport() }
+                Task { await importer.confirmImport(preview) }
             } label: {
                 Text("Import", bundle: .module)
             }
