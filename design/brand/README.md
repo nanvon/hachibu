@@ -20,7 +20,7 @@
 | --- | --- | --- |
 | 独立饭碗 | `design/brand/bowl-mark.svg`、`docs/assets/brand/mark.svg` / `.png` | 品牌展示 |
 | 应用图标 | `design/brand/app-icon-master.svg`、`docs/assets/brand/app-icon.png` | `App/Resources/Assets.xcassets/AppIcon.appiconset` |
-| 菜单栏 | `design/brand/menubar-template.svg` | `App/Resources/Assets.xcassets/MenuBarIcon.imageset` → `StatusItemController` |
+| 菜单栏模板 | `design/brand/menubar-template.svg` | `App/Resources/Assets.xcassets/MenuBarIcon.imageset`，代码已不使用 |
 | 浅背景 Logo | `design/brand/logo-light.svg`、`docs/assets/brand/logo-light.svg` / `.png` | README；FeatureUI 的 BrandLogo 默认外观 |
 | 深背景 Logo | `design/brand/logo-dark.svg`、`docs/assets/brand/logo-dark.svg` / `.png` | README；FeatureUI 的 BrandLogo 深色外观 |
 | GitHub 分享图 / 英文横幅 | `docs/assets/promo/github-social-preview.svg` / `.png` | GitHub Social preview、README_EN.md |
@@ -42,7 +42,7 @@ swift scripts/generate-brand-assets.swift
 
 应用图标提供 macOS 16、32、128、256、512 pt 的 1× / 2× PNG。底板按 Apple 图标网格放在 1024 画布中央的 824 × 824 区域，四周各留 100，在 Finder 里和系统图标一样大。AppIcon 是 Finder、通知等位置共用的应用图标；`LSUIElement` 下默认不显示 Dock 图标，不需要另一份 Dock 专用图标。
 
-菜单栏是 22 × 18 pt 的矢量 PDF 模板，自动适配系统深浅色。它只标识应用；旁边的读数来自当前电量、功率或温度，不把品牌饭碗当作电量刻度。
+菜单栏模板是 22 × 18 pt 的矢量 PDF，脚本仍会导出，但菜单栏现在显示 `App/BatteryIconDrawing.swift` 自绘的 macOS / iOS 电池图标（`docs/v1技术设计.md` 第 9 节），不使用这份模板，也不把品牌饭碗当作电量刻度。
 
 FeatureUI 的 BrandLogo 放在包自己的资源集中，通过 `Bundle.module` 使用；AppIcon 和菜单栏资源属于 App 主包。宣传素材不打进应用。
 
