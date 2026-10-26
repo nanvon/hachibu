@@ -161,11 +161,13 @@ private final class ReorderedPowerSource: @unchecked Sendable {
 @Suite struct BatteryMonitorTests {
     private func monitor(
         source: any BatteryDataSource,
-        power: @escaping @Sendable () -> BatteryReading?
+        power: @escaping @Sendable () -> BatteryReading?,
+        smc: @escaping @Sendable (SMCReadScope) -> SMCReadings? = { _ in nil }
     ) -> BatteryMonitor {
         BatteryMonitor(
             sampler: BatterySampler(dataSource: source, systemProfiler: UnusedProfiler(), chargeLimitWriter: nil, store: nil),
-            powerSourceReader: power
+            powerSourceReader: power,
+            smcReader: smc
         )
     }
 
@@ -294,7 +296,7 @@ private final class ReorderedPowerSource: @unchecked Sendable {
         let sampler = BatterySampler(dataSource: source, systemProfiler: UnusedProfiler(), chargeLimitWriter: nil, store: store)
         let monitor = BatteryMonitor(sampler: sampler, powerSourceReader: {
             .battery(BatterySnapshot(percent: 79, isExternalPower: false, isCharging: false))
-        })
+        }, smcReader: { _ in nil })
         var failures = 0
         monitor.onRead = { reading, _ in if reading == nil { failures += 1 } }
         await monitor.read()
@@ -325,4 +327,114 @@ private final class ReorderedPowerSource: @unchecked Sendable {
         await monitor.read()
         #expect(monitor.reading == .noBattery)
     }
+
+    // MARK: - SMC（docs/v1技术设计.md 5.1）
+
+    @Test func smcOverlaysEachReadableKeyAndKeepsOthers() async {
+        let smc = SMCBox(SMCReadings(isCharging: true, batteryPowerMW: 30000, powerInMW: 45000))
+        let monitor = monitor(
+            source: FixedBatterySource(raw: rawPower(external: true)),
+            power: { nil }, smc: { smc.read($0) }
+        )
+        await monitor.read()
+        await monitor.refreshSMC(.display)
+        guard case .battery(let snapshot) = monitor.reading else { Issue.record("Battery missing"); return }
+        #expect(snapshot.isCharging == true)
+        #expect(snapshot.batteryPowerMW == 30000)
+        #expect(snapshot.powerInMW == 45000)
+        // PSTR、TB0T 读不到时退回 IORegistry。
+        #expect(snapshot.systemLoadMW == 12000)
+        #expect(snapshot.temperatureCelsius == 32)
+        #expect(ChargeStatus(snapshot) == .charging)
+    }
+
+    @Test func smcFailureFallsBackToRegistry() async {
+        let smc = SMCBox(SMCReadings(isCharging: true, systemPowerMW: 20000))
+        let monitor = monitor(
+            source: FixedBatterySource(raw: rawPower(external: true)),
+            power: { nil }, smc: { smc.read($0) }
+        )
+        await monitor.read()
+        await monitor.refreshSMC(.display)
+        smc.set(nil)
+        await monitor.refreshSMC(.display)
+        guard case .battery(let snapshot) = monitor.reading else { Issue.record("Battery missing"); return }
+        #expect(snapshot.isCharging == false)
+        #expect(snapshot.systemLoadMW == 12000)
+    }
+
+    @Test func newerChargingReadOverridesOlderDisplayRead() async {
+        let smc = SMCBox(SMCReadings(isCharging: false, batteryPowerMW: 0))
+        let monitor = monitor(
+            source: FixedBatterySource(raw: rawPower(external: true)),
+            power: { nil }, smc: { smc.read($0) }
+        )
+        await monitor.read()
+        await monitor.refreshSMC(.display)
+        smc.set(SMCReadings(isCharging: true))
+        await monitor.refreshSMC(.charging)
+        guard case .battery(let charging) = monitor.reading else { Issue.record("Battery missing"); return }
+        #expect(charging.isCharging == true)
+        // 功率仍取较早的全部 key 读数，等待下一次读取。
+        #expect(charging.batteryPowerMW == 0)
+
+        smc.set(SMCReadings(isCharging: false, batteryPowerMW: -100))
+        await monitor.refreshSMC(.display)
+        guard case .battery(let stopped) = monitor.reading else { Issue.record("Battery missing"); return }
+        #expect(stopped.isCharging == false)
+    }
+
+    @Test func smcUpdatesWhileFullReadIsBlocked() async {
+        let source = BlockedBatterySource(raw: rawPower(external: true))
+        defer { source.release() }
+        let smc = SMCBox(SMCReadings(isCharging: true))
+        let monitor = monitor(
+            source: source,
+            power: { .battery(BatterySnapshot(percent: 80, isExternalPower: true, isCharging: false)) },
+            smc: { smc.read($0) }
+        )
+        await monitor.refreshPowerSource()
+        let fullRead = Task { await monitor.read() }
+        var started = source.started.makeAsyncIterator()
+        _ = await started.next()
+
+        await monitor.refreshSMC(.charging)
+        #expect(source.isBlocked)
+        guard case .battery(let snapshot) = monitor.reading else { Issue.record("Battery missing"); return }
+        #expect(snapshot.isCharging == true)
+        source.release()
+        await fullRead.value
+    }
+
+    @Test func minuteSamplesKeepRegistryValues() async throws {
+        let store = try HistoryStore.inMemory()
+        let sampler = BatterySampler(
+            dataSource: FixedBatterySource(raw: rawPower(external: true)),
+            systemProfiler: UnusedProfiler(), chargeLimitWriter: nil, store: store
+        )
+        let monitor = BatteryMonitor(
+            sampler: sampler, powerSourceReader: { nil },
+            smcReader: { _ in SMCReadings(isCharging: true, systemPowerMW: 20000) }
+        )
+        await monitor.read()
+        await monitor.refreshSMC(.display)
+        let now = Date()
+        await sampler.writeMinuteSample(at: now)
+        let samples = try await store.minuteSamples(from: now.addingTimeInterval(-60), to: now.addingTimeInterval(60))
+        #expect(samples.first?.systemLoadMW == 12000)
+        #expect(samples.first?.isCharging == false)
+    }
+}
+
+private final class SMCBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var value: SMCReadings?
+    init(_ value: SMCReadings?) { self.value = value }
+    func read(_ scope: SMCReadScope) -> SMCReadings? {
+        lock.withLock {
+            guard let value else { return nil }
+            return scope == .charging ? SMCReadings(isCharging: value.isCharging) : value
+        }
+    }
+    func set(_ value: SMCReadings?) { lock.withLock { self.value = value } }
 }

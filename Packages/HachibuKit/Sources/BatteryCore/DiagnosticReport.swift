@@ -36,22 +36,27 @@ public struct DiagnosticReport: Sendable, Equatable, Codable {
     public var readings: RawBatteryReadings
     /// `system_profiler SPPowerDataType -json` 的输出，已脱敏；运行失败时为 nil。
     public var systemProfilerPower: RawValue?
+    /// 5.1 节各 SMC key 的原始读数，键为 key 名。打不开 SMC 连接时为 nil，读不到的 key 不写。
+    public var smc: [String: SMCRawValue]?
 
     public static let currentFormatVersion = 1
 
     /// 读取当前数据并脱敏。
     public static func collect(
         dataSource: any BatteryDataSource = IOKitBatteryDataSource(),
-        systemProfiler: any SystemProfilerSource = SystemProfilerReader()
+        systemProfiler: any SystemProfilerSource = SystemProfilerReader(),
+        smcReader: @Sendable () -> [SMCKey: SMCRawValue]? = { SMCReader.shared.readRaw(SMCKey.allCases) }
     ) async throws -> DiagnosticReport {
         let readings = try dataSource.read()
+        let smc = smcReader()
         let profilerOutput = try? await systemProfiler.readPowerData()
         return DiagnosticReport(
             formatVersion: currentFormatVersion,
             exportedAt: Date(),
             system: .current(),
             readings: readings.redacted(),
-            systemProfilerPower: profilerOutput?.redacted()
+            systemProfilerPower: profilerOutput?.redacted(),
+            smc: smc.map { Dictionary(uniqueKeysWithValues: $0.map { ($0.key.rawValue, $0.value) }) }
         )
     }
 
@@ -73,18 +78,27 @@ public struct DiagnosticReport: Sendable, Equatable, Codable {
         exportedAt: Date,
         system: SystemInfo,
         readings: RawBatteryReadings,
-        systemProfilerPower: RawValue?
+        systemProfilerPower: RawValue?,
+        smc: [String: SMCRawValue]? = nil
     ) {
         self.formatVersion = formatVersion
         self.exportedAt = exportedAt
         self.system = system
         self.readings = readings
         self.systemProfilerPower = systemProfilerPower
+        self.smc = smc
+    }
+
+    /// `smc` 中能识别的 key 的原始读数。
+    public var smcValues: [SMCKey: SMCRawValue] {
+        Dictionary(uniqueKeysWithValues: (smc ?? [:]).compactMap { name, value in
+            SMCKey(rawValue: name).map { ($0, value) }
+        })
     }
 
     // `readings` 的字段平铺在顶层，导出文件少一层嵌套。
     private enum CodingKeys: String, CodingKey {
-        case formatVersion, exportedAt, system, systemProfilerPower
+        case formatVersion, exportedAt, system, systemProfilerPower, smc
     }
 
     public init(from decoder: any Decoder) throws {
@@ -93,6 +107,7 @@ public struct DiagnosticReport: Sendable, Equatable, Codable {
         exportedAt = try container.decode(Date.self, forKey: .exportedAt)
         system = try container.decode(SystemInfo.self, forKey: .system)
         systemProfilerPower = try container.decodeIfPresent(RawValue.self, forKey: .systemProfilerPower)
+        smc = try container.decodeIfPresent([String: SMCRawValue].self, forKey: .smc)
         readings = try RawBatteryReadings(from: decoder)
     }
 
@@ -102,6 +117,7 @@ public struct DiagnosticReport: Sendable, Equatable, Codable {
         try container.encode(exportedAt, forKey: .exportedAt)
         try container.encode(system, forKey: .system)
         try container.encodeIfPresent(systemProfilerPower, forKey: .systemProfilerPower)
+        try container.encodeIfPresent(smc, forKey: .smc)
         try readings.encode(to: encoder)
     }
 }
