@@ -29,6 +29,8 @@ public final class HistoryModel {
 
     @ObservationIgnored private let store: HistoryStore?
     @ObservationIgnored private var refreshTask: Task<Void, Never>?
+    @ObservationIgnored private var isWindowVisible = false
+    @ObservationIgnored private var isHistoryPageVisible = true
     /// 定时刷新与导入可能重叠，只保留最后一次发起的结果。
     @ObservationIgnored private var recentGeneration = 0
     @ObservationIgnored private var longTermGeneration = 0
@@ -38,12 +40,27 @@ public final class HistoryModel {
         isAvailable = store != nil
         importer = store.map { HistoryImportModel(store: $0) }
         importer?.onChange = { [weak self] in
+            guard self?.refreshTask != nil else { return }
             await self?.reloadAll()
         }
     }
 
     /// 立即查询一次，之后每分钟刷新。重复调用无效果。
     public func start() {
+        isWindowVisible = true
+        updateRefreshActivity()
+    }
+
+    func setHistoryPageVisible(_ visible: Bool) {
+        isHistoryPageVisible = visible
+        updateRefreshActivity()
+    }
+
+    private func updateRefreshActivity() {
+        guard isWindowVisible, isHistoryPageVisible else {
+            stopRefreshing()
+            return
+        }
         guard store != nil, refreshTask == nil else { return }
         refreshTask = Task { [weak self] in
             while !Task.isCancelled {
@@ -54,6 +71,11 @@ public final class HistoryModel {
     }
 
     public func stop() {
+        isWindowVisible = false
+        stopRefreshing()
+    }
+
+    private func stopRefreshing() {
         refreshTask?.cancel()
         refreshTask = nil
         recentGeneration += 1

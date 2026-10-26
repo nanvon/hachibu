@@ -5,12 +5,12 @@ import SwiftUI
 /// 读数平时显示最新点；悬停时换成悬停处最近一个点的值和时间。同组的几张图共享 `hoverDate`，一起显示同一时刻的竖线和读数。
 /// 样式见 docs/v1技术设计.md 19.3。
 struct MetricChart: View {
-    enum YScale {
+    enum YScale: Equatable {
         case fixed(ClosedRange<Double>)
         case automatic(includesZero: Bool)
     }
 
-    enum Style {
+    enum Style: Equatable {
         /// 单色曲线加同色渐变面积。
         case line(Color)
         /// 正值绿色、负值橙色，面积以 0 为基线。用于电池功率。
@@ -19,6 +19,7 @@ struct MetricChart: View {
 
     let title: Text
     let series: ChartSeries
+    var hoverPoints: [ChartPoint] = []
     private var points: [ChartPoint] { series.points }
     let domain: ClosedRange<Date>
     /// 悬停时只取这个距离内的点。
@@ -26,24 +27,25 @@ struct MetricChart: View {
     var bands: [Range<Date>] = []
     var notRecorded: Range<Date>?
     var yScale: YScale = .automatic(includesZero: false)
-    /// 单调三次插值使曲线平滑，避免在相邻读数之间超调；读数仍取真实采样点。
-    private let interpolation: InterpolationMethod = .monotone
     let style: Style
     let formatValue: (Double) -> String
     let formatDate: (Date) -> String
     @Binding var hoverDate: Date?
 
-    private static let bandColor = Color.green.opacity(0.09)
-    private static let lineWidth: CGFloat = 2
     private static let chartHeight: CGFloat = 200
-    /// “未记录”区间窄于横轴的这个比例时不显示文字，只画底色。
-    private static let notRecordedLabelMinFraction = 0.12
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             header
                 .padding(.horizontal, 4)
-            scaledChart
+            MetricPlot(series: series, domain: domain, bands: bands, notRecorded: notRecorded, yScale: yScale, style: style)
+                .equatable()
+                .chartOverlay { proxy in
+                    MetricChartInteraction(
+                        proxy: proxy, points: points, hoverPoints: hoverPoints.isEmpty ? points : hoverPoints,
+                        maxGap: maxGap, style: style, hoverDate: $hoverDate
+                    )
+                }
                 .frame(height: Self.chartHeight)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 12)
@@ -111,8 +113,28 @@ struct MetricChart: View {
                 .frame(width: 8, height: 8)
         }
     }
+}
 
-    // MARK: - 曲线
+/// 曲线不读取悬停状态，只在数据、刻度或样式变化时重新构造 Charts 内容。
+private struct MetricPlot: View, Equatable {
+    let series: ChartSeries
+    let domain: ClosedRange<Date>
+    let bands: [Range<Date>]
+    let notRecorded: Range<Date>?
+    let yScale: MetricChart.YScale
+    let style: MetricChart.Style
+    private let interpolation: InterpolationMethod = .monotone
+    private static let bandColor = Color.green.opacity(0.09)
+    private static let lineWidth: CGFloat = 2
+    private static let notRecordedLabelMinFraction = 0.12
+
+    nonisolated static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.series.plotID == rhs.series.plotID && lhs.domain == rhs.domain
+            && lhs.bands == rhs.bands && lhs.notRecorded == rhs.notRecorded
+            && lhs.yScale == rhs.yScale && lhs.style == rhs.style
+    }
+
+    var body: some View { scaledChart }
 
     /// 面积填充的下边界：固定刻度取下限，自动刻度取数据最小值（包含 0 时取 0）。
     /// 不用 AreaMark 默认的 0 基线，以免把不含 0 的纵轴撑到 0。
@@ -168,37 +190,14 @@ struct MetricChart: View {
                     lineMarks(run.points, series: { _ in "\(run.id)" }, baseline: 0, color: run.isPositive ? .green : .orange)
                 }
             }
-            if let point = hoveredPoint {
-                RuleMark(x: .value("Time", point.date))
-                    .foregroundStyle(Color.primary.opacity(0.3))
-                PointMark(x: .value("Time", point.date), y: .value("Value", point.value))
-                    .foregroundStyle(pointColor(point))
-                    .symbolSize(50)
-            }
+
         }
         .chartXScale(domain: domain)
         .overlay {
-            if points.isEmpty {
+            if series.points.isEmpty {
                 Text("No Data", bundle: .module)
                     .font(.callout)
                     .foregroundStyle(.secondary)
-            }
-        }
-        .chartOverlay { proxy in
-            GeometryReader { geometry in
-                Rectangle()
-                    .fill(.clear)
-                    .contentShape(Rectangle())
-                    .onContinuousHover { phase in
-                        switch phase {
-                        case .active(let location):
-                            guard let plotFrame = proxy.plotFrame else { return }
-                            let x = location.x - geometry[plotFrame].origin.x
-                            hoverDate = proxy.value(atX: x, as: Date.self)
-                        case .ended:
-                            hoverDate = nil
-                        }
-                    }
             }
         }
     }
@@ -232,16 +231,71 @@ struct MetricChart: View {
         }
     }
 
+    private func showsNotRecordedLabel(_ range: Range<Date>) -> Bool {
+        let total = domain.upperBound.timeIntervalSince(domain.lowerBound)
+        guard total > 0 else { return false }
+        return range.upperBound.timeIntervalSince(range.lowerBound) / total >= Self.notRecordedLabelMinFraction
+    }
+}
+
+/// 悬停标记作为独立叠层绘制，不把高频鼠标事件传进曲线的 ChartContent。
+private struct MetricChartInteraction: View {
+    let proxy: ChartProxy
+    let points: [ChartPoint]
+    let hoverPoints: [ChartPoint]
+    let maxGap: TimeInterval
+    let style: MetricChart.Style
+    @Binding var hoverDate: Date?
+
+    var body: some View {
+        GeometryReader { geometry in
+            ZStack(alignment: .topLeading) {
+                if let hoverDate,
+                   let point = HistoryChartBuilder.nearest(in: points, to: hoverDate, within: maxGap),
+                   let plotAnchor = proxy.plotFrame,
+                   let x = proxy.position(forX: point.date),
+                   let y = proxy.position(forY: point.value) {
+                    let frame = geometry[plotAnchor]
+                    Path { path in
+                        path.move(to: CGPoint(x: frame.minX + x, y: frame.minY))
+                        path.addLine(to: CGPoint(x: frame.minX + x, y: frame.maxY))
+                    }
+                    .stroke(Color.primary.opacity(0.3), lineWidth: 1)
+                    Circle()
+                        .fill(pointColor(point))
+                        .frame(width: 8, height: 8)
+                        .position(x: frame.minX + x, y: frame.minY + y)
+                }
+                Rectangle()
+                    .fill(.clear)
+                    .contentShape(Rectangle())
+                    .onContinuousHover { phase in
+                        let selection: Date?
+                        switch phase {
+                        case .active(let location):
+                            guard let plotAnchor = proxy.plotFrame else { return }
+                            let frame = geometry[plotAnchor]
+                            guard frame.contains(location) else {
+                                if hoverDate != nil { hoverDate = nil }
+                                return
+                            }
+                            let date: Date? = proxy.value(atX: location.x - frame.minX)
+                            selection = date.flatMap {
+                                HistoryChartBuilder.nearest(in: hoverPoints, to: $0, within: maxGap)?.date
+                            }
+                        case .ended:
+                            selection = nil
+                        }
+                        if selection != hoverDate { hoverDate = selection }
+                    }
+            }
+        }
+    }
+
     private func pointColor(_ point: ChartPoint) -> Color {
         switch style {
         case .line(let color): color
         case .signed: point.value >= 0 ? .green : .orange
         }
-    }
-
-    private func showsNotRecordedLabel(_ range: Range<Date>) -> Bool {
-        let total = domain.upperBound.timeIntervalSince(domain.lowerBound)
-        guard total > 0 else { return false }
-        return range.upperBound.timeIntervalSince(range.lowerBound) / total >= Self.notRecordedLabelMinFraction
     }
 }

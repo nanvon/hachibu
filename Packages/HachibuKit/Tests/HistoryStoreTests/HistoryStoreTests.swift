@@ -404,3 +404,75 @@ private func batteryCount(_ store: HistoryStore) throws -> Int {
         #expect(try await store.events(.batteryChanged).isEmpty)
     }
 }
+
+private final class DailyQueryCounter: @unchecked Sendable {
+    private let lock = NSLock()
+    private var value = 0
+    var count: Int { lock.withLock { value } }
+    func increment() { lock.withLock { value += 1 } }
+}
+
+@Suite struct DailyHealthCacheTests {
+    private func tracedStore() throws -> (HistoryStore, DailyQueryCounter) {
+        let counter = DailyQueryCounter()
+        var configuration = Configuration()
+        configuration.prepareDatabase { db in
+            db.trace { event in
+                if case .statement(let statement) = event, statement.sql.contains("SELECT d.*") {
+                    counter.increment()
+                }
+            }
+        }
+        return (try HistoryStore(dbQueue: DatabaseQueue(configuration: configuration)), counter)
+    }
+
+    @Test func unchangedMinuteWritesDoNotReloadAllDailyRows() async throws {
+        let (store, queries) = try tracedStore()
+        let snapshot = BatterySnapshot(
+            fullChargeCapacityMAh: 8000, designCapacityMAh: 8694, cycleCount: 10,
+            batterySerialHash: BatterySnapshot.serialHash("cache-test")
+        )
+        try await store.record(snapshot, at: base)
+        let original = try await store.dailyHealth()
+        for offset in 1...5 {
+            try await store.record(snapshot, at: minute(offset))
+            #expect(try await store.dailyHealth() == original)
+        }
+        #expect(queries.count == 1)
+        try await store.record(BatteryHealthInfo(systemMaximumCapacityPercent: 95, condition: .good), snapshot: snapshot, at: minute(6))
+        #expect(try await store.dailyHealth().first?.systemMaxCapacityPercent == 95)
+        #expect(queries.count == 2)
+        // 带起始日期的查询不覆盖完整历史缓存。
+        #expect(try await store.dailyHealth(from: "2099-01-01").isEmpty)
+        #expect(try await store.dailyHealth().count == 1)
+        #expect(queries.count == 3)
+    }
+
+    @Test func anotherConnectionInvalidatesCachedHistory() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let path = directory.appendingPathComponent("history.sqlite")
+        let store = try HistoryStore(fileURL: path)
+        try await store.record(BatterySnapshot(cycleCount: 10), at: base)
+        #expect(try await store.dailyHealth().first?.cycleCount == 10)
+        let other = try DatabaseQueue(path: path.path)
+        try await other.write { db in
+            try db.execute(sql: "UPDATE daily_health SET cycle_count = 11")
+        }
+        #expect(try await store.dailyHealth().first?.cycleCount == 11)
+    }
+
+    @Test func rollbackKeepsCachedResultCorrect() async throws {
+        enum Rollback: Error { case requested }
+        let (store, _) = try tracedStore()
+        try await store.record(BatterySnapshot(cycleCount: 10), at: base)
+        let original = try await store.dailyHealth()
+        do {
+            try await store.dbQueue.write { db in
+                try db.execute(sql: "UPDATE daily_health SET cycle_count = 99")
+                throw Rollback.requested
+            }
+        } catch Rollback.requested {}
+        #expect(try await store.dailyHealth() == original)
+    }
+}

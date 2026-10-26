@@ -49,7 +49,6 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
 
     func showAndActivate() {
         NSApp.setActivationPolicy(.regular)
-        history?.start()
         showWindow(nil)
         if window?.isMiniaturized == true {
             window?.deminiaturize(nil)
@@ -58,6 +57,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         // 窗口留在其他应用后面。见 https://developer.apple.com/forums/thread/836619
         (NSApp as any LegacyActivation).activate(ignoringOtherApps: true)
         window?.makeKeyAndOrderFront(nil)
+        updateHistoryActivity()
     }
 
     func showSettings() {
@@ -68,6 +68,26 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     func windowWillClose(_ notification: Notification) {
         history?.stop()
         NSApp.setActivationPolicy(.accessory)
+    }
+
+    func windowDidMiniaturize(_ notification: Notification) {
+        history?.stop()
+    }
+
+    func windowDidDeminiaturize(_ notification: Notification) {
+        updateHistoryActivity()
+    }
+
+    func windowDidChangeOcclusionState(_ notification: Notification) {
+        updateHistoryActivity()
+    }
+
+    private func updateHistoryActivity() {
+        if let window, window.isVisible, !window.isMiniaturized, window.occlusionState.contains(.visible) {
+            history?.start()
+        } else {
+            history?.stop()
+        }
     }
 
     /// 选择保存位置后读取当前数据（已脱敏），写成 JSON。见 docs/v1技术设计.md 第 14 节。

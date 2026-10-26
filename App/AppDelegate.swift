@@ -7,28 +7,34 @@ private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Hachibu"
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    private let historyStore: HistoryStore?
-    private let batteryMonitor: BatteryMonitor
+    private var historyStore: HistoryStore?
+    private var batteryMonitor: BatteryMonitor?
     private let settings = AppSettings()
     private lazy var alertMonitor = AlertMonitor(settings: settings, notifier: SystemAlertNotifier())
     private let updateController = UpdateController()
     private var statusItemController: StatusItemController?
-    private lazy var mainWindowController = MainWindowController(
-        history: HistoryModel(store: historyStore),
-        monitor: batteryMonitor,
-        settings: settings,
-        alerts: alertMonitor,
-        updates: updateController
-    )
-
-    override init() {
-        historyStore = Self.openHistoryStore()
-        batteryMonitor = BatteryMonitor(sampler: BatterySampler(store: historyStore))
-        super.init()
-    }
+    private var mainWindowController: MainWindowController?
+    private var pendingSettings: Bool?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.mainMenu = MainMenu.make()
+        // 先显示入口；数据库打开、迁移和 PowerUI 能力检查不占用主线程。
+        let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        statusItem.button?.title = "…"
+        statusItem.button?.isEnabled = false
+        Task {
+            let (store, sampler) = await Task.detached(priority: .userInitiated) {
+                let store = Self.openHistoryStore()
+                return (store, BatterySampler(store: store))
+            }.value
+            configure(store: store, sampler: sampler, statusItem: statusItem)
+        }
+    }
+
+    private func configure(store: HistoryStore?, sampler: BatterySampler, statusItem: NSStatusItem) {
+        historyStore = store
+        let batteryMonitor = BatteryMonitor(sampler: sampler)
+        self.batteryMonitor = batteryMonitor
         batteryMonitor.onRead = { [alertMonitor] reading, date in
             alertMonitor.handleReading(reading, at: date)
         }
@@ -42,10 +48,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             monitor: batteryMonitor,
             settings: settings,
             onOpenMainWindow: { [weak self] in
-                self?.mainWindowController.showAndActivate()
+                self?.showMainWindow()
             },
             onOpenSettings: { [weak self] in
-                self?.mainWindowController.showSettings()
+                self?.showMainWindow(settings: true)
             },
             onVisibilityChange: { [batteryMonitor] visible in
                 batteryMonitor.setPanelVisible(visible)
@@ -54,17 +60,38 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItemController = StatusItemController(
             panelController: panelController,
             monitor: batteryMonitor,
-            settings: settings
+            settings: settings,
+            statusItem: statusItem
         )
+        if let pendingSettings {
+            self.pendingSettings = nil
+            showMainWindow(settings: pendingSettings)
+        }
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
-        mainWindowController.showAndActivate()
+        showMainWindow()
         return false
     }
 
+    private func showMainWindow(settings showSettings: Bool = false) {
+        guard let batteryMonitor else {
+            pendingSettings = showSettings
+            return
+        }
+        let controller = mainWindowController ?? MainWindowController(
+            history: HistoryModel(store: historyStore),
+            monitor: batteryMonitor,
+            settings: settings,
+            alerts: alertMonitor,
+            updates: updateController
+        )
+        mainWindowController = controller
+        if showSettings { controller.showSettings() } else { controller.showAndActivate() }
+    }
+
     /// 打开历史数据库。失败时只记录日志：照常显示实时读数，不写库。
-    private static func openHistoryStore() -> HistoryStore? {
+    private nonisolated static func openHistoryStore() -> HistoryStore? {
         guard let bundleIdentifier = Bundle.main.bundleIdentifier else {
             logger.error("Missing bundle identifier, history disabled")
             return nil

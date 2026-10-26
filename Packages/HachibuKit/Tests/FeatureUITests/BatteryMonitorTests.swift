@@ -1,5 +1,6 @@
 import BatteryCore
 import Foundation
+import HistoryStore
 import Observation
 import Testing
 @testable import FeatureUI
@@ -17,6 +18,54 @@ private func rawPower(external: Bool, charging: Bool = false) -> RawBatteryReadi
         adapterDetails: external ? ["Watts": .int(140)] : nil,
         chargeLimitArchive: nil, lowPowerModeEnabled: false
     )
+}
+
+private final class BlockedChargeLimitWriter: ChargeLimitWriter, @unchecked Sendable {
+    let started: AsyncStream<Void>
+    private let continuation: AsyncStream<Void>.Continuation
+    private let gate = DispatchSemaphore(value: 0)
+    private let lock = NSLock()
+    private var blocked = false
+    var isBlocked: Bool { lock.withLock { blocked } }
+
+    init() { (started, continuation) = AsyncStream.makeStream() }
+
+    func write(_ change: ChargeLimitChange) throws {
+        lock.withLock { blocked = true }
+        continuation.yield(())
+        _ = gate.wait(timeout: .now() + 5)
+        lock.withLock { blocked = false }
+    }
+
+    func release() { gate.signal() }
+}
+
+@Suite struct BatterySamplerConcurrencyTests {
+    @Test func samplingAndMinuteStorageContinueWhileChargeWriteWaits() async throws {
+        let writer = BlockedChargeLimitWriter()
+        defer { writer.release() }
+        let store = try HistoryStore.inMemory()
+        let sampler = BatterySampler(
+            dataSource: FixedBatterySource(raw: rawPower(external: true)),
+            systemProfiler: UnusedProfiler(), chargeLimitWriter: writer, store: store
+        )
+        let write = Task { await sampler.writeChargeLimit(.enable) }
+        var started = writer.started.makeAsyncIterator()
+        _ = await started.next()
+        let reading = await sampler.read()
+        let date = Date()
+        await sampler.writeMinuteSample(at: date)
+        let samples = try await store.minuteSamples(from: date.addingTimeInterval(-60), to: date.addingTimeInterval(60))
+        #expect(writer.isBlocked)
+        guard case .battery(let snapshot) = reading.reading else {
+            Issue.record("Battery missing")
+            return
+        }
+        #expect(snapshot.systemLoadMW == 12000)
+        #expect(samples.count == 1)
+        writer.release()
+        _ = await write.value
+    }
 }
 
 private struct FixedBatterySource: BatteryDataSource {

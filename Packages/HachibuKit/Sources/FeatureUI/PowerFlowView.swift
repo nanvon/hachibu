@@ -178,16 +178,24 @@ private struct AnimatedFlow: View, Animatable {
     }
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30, paused: motion != .live)) { context in
-            Canvas { graphics, size in
-                let layout = FlowLayout(metrics: metrics, labels: labels, size: size)
-                let time: TimeInterval? = switch motion {
-                case .off: nil
-                case .live: context.date.timeIntervalSinceReferenceDate
-                case .frozen(let time): time
+        GeometryReader { geometry in
+            let layout = FlowLayout(metrics: metrics, labels: labels, size: geometry.size)
+            let palette = FlowPalette(colorScheme: colorScheme)
+            ZStack {
+                // 文字、节点、流带和辉光只随读数或尺寸变化重绘。
+                Canvas { graphics, _ in
+                    FlowRenderer(layout: layout, palette: palette, time: nil).draw(in: &graphics)
                 }
-                FlowRenderer(layout: layout, palette: FlowPalette(colorScheme: colorScheme), time: time)
-                    .draw(in: &graphics)
+                TimelineView(.animation(minimumInterval: 1.0 / 30, paused: motion != .live)) { context in
+                    Canvas { graphics, _ in
+                        let time: TimeInterval? = switch motion {
+                        case .off: nil
+                        case .live: context.date.timeIntervalSinceReferenceDate
+                        case .frozen(let time): time
+                        }
+                        FlowRenderer(layout: layout, palette: palette, time: time).drawParticles(in: &graphics)
+                    }
+                }
             }
         }
     }
@@ -389,14 +397,18 @@ private struct FlowRenderer {
         for band in layout.bands {
             let path = band.path
             graphics.fill(path, with: gradient(for: band, opacity: palette.bandOpacity * band.opacity))
-            if let time {
-                drawParticles(band, path: path, time: time, in: graphics)
-            }
         }
         for node in layout.nodes {
             drawNode(node, in: &graphics)
         }
         drawHub(in: &graphics)
+    }
+
+    func drawParticles(in graphics: inout GraphicsContext) {
+        guard let time else { return }
+        for band in layout.bands {
+            drawParticles(band, path: band.path, time: time, in: graphics)
+        }
     }
 
     /// 节点颜色占流带的大部分，只在靠近 MacBook 的一段过渡到品牌蓝，避免橙、蓝在中段混成灰色。

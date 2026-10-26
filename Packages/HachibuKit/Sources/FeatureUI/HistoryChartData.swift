@@ -19,17 +19,23 @@ struct SignedRun: Identifiable, Equatable {
 
 /// 原始点用于读数和悬停；绘图点在加载时生成，避免鼠标移动时重复降采样。
 struct ChartSeries: Equatable, Sendable {
-    var points: [ChartPoint]
-    var plotPoints: [ChartPoint]
+    let points: [ChartPoint]
+    let plotPoints: [ChartPoint]
+    let plotID = UUID()
 
     init(_ points: [ChartPoint]) {
         self.points = points
         plotPoints = HistoryChartBuilder.downsample(points)
     }
+
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.points == rhs.points && lhs.plotPoints == rhs.plotPoints
+    }
 }
 
 /// 近期组六条曲线的数据。
 struct RecentChartData: Equatable, Sendable {
+    var hoverPoints: [ChartPoint]
     var domain: ClosedRange<Date>
     /// 超过该间隔的相邻两点不连线；悬停时也只取这个距离内的点。
     var maxGap: TimeInterval
@@ -48,6 +54,7 @@ struct RecentChartData: Equatable, Sendable {
 
 /// 长期组四条曲线的数据。
 struct LongTermChartData: Equatable, Sendable {
+    var hoverPoints: [ChartPoint]
     var domain: ClosedRange<Date>
     var maxGap: TimeInterval
     /// 早于第一条记录的区间，标“未记录”。
@@ -102,6 +109,7 @@ enum HistoryChartBuilder {
         let rows = rows.filter { domain.contains($0.date) }
         let maxGap = sampleInterval * maxGapIntervals
         return RecentChartData(
+            hoverPoints: rows.map { ChartPoint(date: $0.date, value: 0, segment: 0) },
             domain: domain,
             maxGap: maxGap,
             notRecorded: notRecordedRange(in: domain, recordStart: firstRecordedAt),
@@ -144,6 +152,7 @@ enum HistoryChartBuilder {
         // 夏令时切换的日子不是 24 小时，留 1 小时余量。
         let maxGap = 24 * 3600 * maxGapIntervals + 3600
         return LongTermChartData(
+            hoverPoints: days.map { ChartPoint(date: $0.date, value: 0, segment: 0) },
             domain: domain,
             maxGap: maxGap,
             notRecorded: notRecordedRange(in: domain, recordStart: firstRecordedStart),

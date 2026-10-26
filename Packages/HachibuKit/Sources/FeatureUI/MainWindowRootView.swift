@@ -84,6 +84,9 @@ public struct MainWindowRootView: View {
             .navigationTitle(page.title)
         }
         .frame(minWidth: 960, minHeight: 660)
+        .onChange(of: navigation.selection, initial: true) { _, selection in
+            history.setHistoryPageVisible((selection ?? .history) == .history)
+        }
         // 与菜单栏面板一致，不显示控件的焦点环。
         .focusEffectDisabled()
     }

@@ -80,6 +80,8 @@ private let utc: Calendar = {
         #expect(data.pluggedIn == [minute(1)..<minute(2)])
         #expect(data.maxGap == 180)
         #expect(data.notRecorded == nil)
+        // 各指标共用全部采样时间，温度缺失时也能悬停并联动电量图。
+        #expect(data.hoverPoints.map(\.date) == [minute(1), minute(2)])
     }
 
     @Test func notRecordedBeforeFirstSample() {

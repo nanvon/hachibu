@@ -1,5 +1,6 @@
 import Foundation
 import ObjectiveC
+import os
 
 /// 私有框架 PowerUI 中 `PowerUISmartChargeClient` 的只读结果，对应“系统设置 → 电池 → 充电上限”。
 /// 规则见 docs/v1技术设计.md 第 6 节。
@@ -48,13 +49,18 @@ enum PowerUIClient {
     private typealias BoolErrorMethod = @convention(c) (AnyObject, Selector, AutoreleasingUnsafeMutablePointer<NSError?>?) -> Bool
     private typealias SetLimitMethod = @convention(c) (AnyObject, Selector, UInt8, AutoreleasingUnsafeMutablePointer<NSError?>?) -> Bool
 
-    /// 进程内只创建一次，之后在采样 actor 中读写、在诊断导出中读取。
+    private static let operations = PowerUIOperationQueue()
+    private static let writeReadback = WriteReadback()
+    private static let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Hachibu", category: "PowerUI")
+
+    /// 初始化和所有方法调用均在 operations 的专用队列上执行。
     nonisolated(unsafe) private static let client: NSObject? = makeClient()
+    private static let clientClass: AnyClass? = loadClientClass()
 
     /// 读取可用，且写入方法的类型编码与实测一致。
-    static let canWrite: Bool = client.map { client in
+    static let canWrite: Bool = clientClass.map { cls in
         writeEncodings.allSatisfy { name, encoding in
-            class_getInstanceMethod(type(of: client), NSSelectorFromString(name))
+            class_getInstanceMethod(cls, NSSelectorFromString(name))
                 .flatMap(method_getTypeEncoding)
                 .map { String(cString: $0) } == encoding
         }
@@ -62,6 +68,18 @@ enum PowerUIClient {
 
     /// 写入一次。方法返回 false 或给出错误时抛出 `ChargeLimitWriteError`。
     static func write(_ change: ChargeLimitChange) throws {
+        try operations.run(timeout: .seconds(5)) {
+            try writeCurrent(change)
+            // 与写入在同一队列中读回，不用延迟更新的文件判断成功。
+            let value = readCurrent()
+            guard change.isApplied(to: ChargeLimitSetting.resolve(powerUI: value, archive: nil)), let value else {
+                throw ChargeLimitWriteError(message: "PowerUI read back does not match requested limit")
+            }
+            writeReadback.store(value)
+        }
+    }
+
+    private static func writeCurrent(_ change: ChargeLimitChange) throws {
         guard canWrite, let client else { throw ChargeLimitWriteError(message: "PowerUI write methods unavailable") }
         var error: NSError?
         let succeeded: Bool
@@ -86,6 +104,36 @@ enum PowerUIClient {
     }
 
     static func read() -> PowerUIChargeLimit? {
+        // 写入后的立即刷新复用同一次操作已验证的结果，避免与周期读取争用队列。
+        if let value = writeReadback.recentValue() { return value }
+        // 慢调用继续占用专用队列，超时后走文件回退；不累积后续请求。
+        do {
+            return try operations.run(timeout: .milliseconds(500)) { readCurrent() }
+        } catch {
+            if error as? PowerUIOperationQueue.Failure == .timedOut {
+                logger.error("PowerUI read timed out; using file fallback")
+            }
+            return nil
+        }
+    }
+
+    private final class WriteReadback: @unchecked Sendable {
+        private let lock = NSLock()
+        private var value: (reading: PowerUIChargeLimit, date: Date)?
+
+        func store(_ reading: PowerUIChargeLimit) {
+            lock.withLock { value = (reading, Date()) }
+        }
+
+        func recentValue() -> PowerUIChargeLimit? {
+            lock.withLock {
+                guard let value, Date().timeIntervalSince(value.date) < 1 else { return nil }
+                return value.reading
+            }
+        }
+    }
+
+    private static func readCurrent() -> PowerUIChargeLimit? {
         guard let client else { return nil }
         let isSupported = unsafeBitCast(
             client.method(for: NSSelectorFromString("isMCLSupported")), to: BoolMethod.self
@@ -115,14 +163,20 @@ enum PowerUIClient {
         )
     }
 
-    private static func makeClient() -> NSObject? {
+    private static func loadClientClass() -> AnyClass? {
         guard dlopen(frameworkPath, RTLD_NOW) != nil,
               let cls = NSClassFromString("PowerUISmartChargeClient"),
               expectedEncodings.allSatisfy({ name, encoding in
                   class_getInstanceMethod(cls, NSSelectorFromString(name))
                       .flatMap(method_getTypeEncoding)
                       .map { String(cString: $0) } == encoding
-              }),
+              })
+        else { return nil }
+        return cls
+    }
+
+    private static func makeClient() -> NSObject? {
+        guard let cls = clientClass,
               let instance = class_createInstance(cls, 0).map({ $0 as AnyObject })
         else { return nil }
         // init 方法会消耗接收者并返回 +1 的对象，先多保留一次，与 Swift 持有的引用相抵。
@@ -130,5 +184,49 @@ enum PowerUIClient {
         return instance
             .perform(NSSelectorFromString("initWithClientName:"), with: "Hachibu")?
             .takeRetainedValue() as? NSObject
+    }
+}
+
+/// 私有同步接口无法被 Task 取消。超时只结束等待，原调用结束前拒绝新请求，避免线程或请求堆积。
+final class PowerUIOperationQueue: @unchecked Sendable {
+    enum Failure: Error, Equatable { case busy, timedOut }
+
+    private let queue = DispatchQueue(label: "Hachibu.PowerUI", qos: .utility)
+    private let lock = NSLock()
+    private var isRunning = false
+
+    func run<Value: Sendable>(
+        timeout: DispatchTimeInterval,
+        _ operation: @escaping @Sendable () throws -> Value
+    ) throws -> Value {
+        let started = lock.withLock {
+            guard !isRunning else { return false }
+            isRunning = true
+            return true
+        }
+        guard started else { throw Failure.busy }
+        let result = OperationResult<Value>()
+        queue.async { [self] in
+            let value = autoreleasepool { Result(catching: operation) }
+            lock.withLock { isRunning = false }
+            result.complete(value)
+        }
+        guard result.finished.wait(timeout: .now() + timeout) == .success else { throw Failure.timedOut }
+        return try result.value().get()
+    }
+
+    private final class OperationResult<Value: Sendable>: @unchecked Sendable {
+        let finished = DispatchSemaphore(value: 0)
+        private let lock = NSLock()
+        private var result: Result<Value, any Error>?
+
+        func complete(_ value: Result<Value, any Error>) {
+            lock.withLock { result = value }
+            finished.signal()
+        }
+
+        func value() -> Result<Value, any Error> {
+            lock.withLock { result! }
+        }
     }
 }

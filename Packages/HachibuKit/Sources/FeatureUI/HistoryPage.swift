@@ -99,6 +99,7 @@ private struct RecentSection: View {
         MetricChart(
             title: title,
             series: series,
+            hoverPoints: data.hoverPoints,
             domain: data.domain,
             maxGap: data.maxGap,
             bands: data.pluggedIn,
@@ -157,6 +158,7 @@ private struct LongTermSection: View {
         MetricChart(
             title: title,
             series: series,
+            hoverPoints: data.hoverPoints,
             domain: data.domain,
             maxGap: data.maxGap,
             notRecorded: data.notRecorded,

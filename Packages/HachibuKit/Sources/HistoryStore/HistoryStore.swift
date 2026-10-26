@@ -10,6 +10,7 @@ public final class HistoryStore: Sendable {
     public static let minuteRetention: TimeInterval = 7 * 24 * 3600
 
     let dbQueue: DatabaseQueue
+    private let dailyCache = DailyHealthCache()
 
     /// 打开（必要时创建）数据库文件，并执行迁移。
     public convenience init(fileURL: URL) throws {
@@ -28,6 +29,7 @@ public final class HistoryStore: Sendable {
     init(dbQueue: DatabaseQueue) throws {
         self.dbQueue = dbQueue
         try Self.migrator.migrate(dbQueue)
+        dbQueue.add(transactionObserver: dailyCache)
     }
 
     /// `~/Library/Application Support/<Bundle ID>/history.sqlite`。
@@ -153,6 +155,11 @@ public final class HistoryStore: Sendable {
     /// 每天按字段合并各来源：本机的值优先，其次是最近一次导入的来源。
     public func dailyHealth(from firstDay: String? = nil) async throws -> [DailyHealth] {
         try await dbQueue.read { db in
+            // data_version 覆盖其他连接的写入；本连接的变化由事务观察者失效。
+            let version = try Int64.fetchOne(db, sql: "PRAGMA data_version")
+            if firstDay == nil, dailyCache.dataVersion == version, let samples = dailyCache.samples {
+                return samples
+            }
             let rows = try Row.fetchAll(
                 db,
                 sql: """
@@ -164,7 +171,12 @@ public final class HistoryStore: Sendable {
                     """,
                 arguments: [firstDay, firstDay, Self.nativeSourceID]
             )
-            return Self.mergeDaily(rows)
+            let samples = Self.mergeDaily(rows)
+            if firstDay == nil {
+                dailyCache.samples = samples
+                dailyCache.dataVersion = version
+            }
+            return samples
         }
     }
 
@@ -292,12 +304,16 @@ public final class HistoryStore: Sendable {
                 sql: """
                     UPDATE batteries SET
                         design_mah = COALESCE(?, design_mah),
-                        design_cycle_count = COALESCE(?, design_cycle_count),
-                        first_seen_at = MIN(first_seen_at, ?),
-                        last_seen_at = MAX(last_seen_at, ?)
+                        design_cycle_count = COALESCE(?, design_cycle_count)
                     WHERE id = ?
+                      AND (design_mah IS NOT COALESCE(?, design_mah)
+                           OR design_cycle_count IS NOT COALESCE(?, design_cycle_count))
                     """,
-                arguments: [snapshot.designCapacityMAh, snapshot.designCycleCount, ts, ts, batteryID]
+                arguments: [snapshot.designCapacityMAh, snapshot.designCycleCount, batteryID, snapshot.designCapacityMAh, snapshot.designCycleCount]
+            )
+            try db.execute(
+                sql: "UPDATE batteries SET first_seen_at = MIN(first_seen_at, ?), last_seen_at = MAX(last_seen_at, ?) WHERE id = ?",
+                arguments: [ts, ts, batteryID]
             )
         } else {
             try db.execute(
@@ -353,6 +369,12 @@ public final class HistoryStore: Sendable {
                     system_max_capacity_pct = COALESCE(excluded.system_max_capacity_pct, system_max_capacity_pct),
                     health_condition = COALESCE(excluded.health_condition, health_condition),
                     updated_at = excluded.updated_at
+                WHERE battery_id IS NOT COALESCE(excluded.battery_id, battery_id)
+                   OR full_charge_mah IS NOT COALESCE(excluded.full_charge_mah, full_charge_mah)
+                   OR design_mah IS NOT COALESCE(excluded.design_mah, design_mah)
+                   OR cycle_count IS NOT COALESCE(excluded.cycle_count, cycle_count)
+                   OR system_max_capacity_pct IS NOT COALESCE(excluded.system_max_capacity_pct, system_max_capacity_pct)
+                   OR health_condition IS NOT COALESCE(excluded.health_condition, health_condition)
                 """,
             arguments: [
                 day, nativeSourceID, batteryID, fullChargeCapacityMAh, designCapacityMAh, cycleCount,
@@ -411,6 +433,25 @@ public final class HistoryStore: Sendable {
             AVG(amperage_ma), MIN(amperage_ma), MAX(amperage_ma)
         FROM minute_samples
         """
+}
+
+/// 只在 DatabaseQueue 的串行队列上访问，包含查询闭包和事务观察回调。
+private final class DailyHealthCache: TransactionObserver, @unchecked Sendable {
+    var samples: [DailyHealth]?
+    var dataVersion: Int64?
+
+    func observes(eventsOfKind eventKind: DatabaseEventKind) -> Bool {
+        switch eventKind {
+        case .update(tableName: "batteries", columnNames: let columns):
+            return columns.contains("design_mah")
+        default:
+            return eventKind.tableName == "daily_health" || eventKind.tableName == "batteries"
+        }
+    }
+
+    func databaseDidChange(with event: DatabaseEvent) { samples = nil }
+    func databaseDidCommit(_ db: Database) {}
+    func databaseDidRollback(_ db: Database) { samples = nil }
 }
 
 public struct RecordingSummary: Sendable, Equatable {

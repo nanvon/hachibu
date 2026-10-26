@@ -43,11 +43,14 @@ public actor BatterySampler {
     }
 
     /// 修改系统充电上限，再完整读取一次。`applied` 表示写入成功且读回的设置已符合这次修改。
-    func writeChargeLimit(_ change: ChargeLimitChange) -> (reading: BatteryReading, date: Date, applied: Bool) {
+    func writeChargeLimit(_ change: ChargeLimitChange) async -> (reading: BatteryReading, date: Date, applied: Bool) {
         var written = false
         if let chargeLimitWriter {
             do {
-                try chargeLimitWriter.write(change)
+                // 写入等待系统服务时让出采样 actor，分钟记录和实时读取仍能继续。
+                try await Task.detached(priority: .userInitiated) {
+                    try chargeLimitWriter.write(change)
+                }.value
                 written = true
             } catch let error as ChargeLimitWriteError {
                 logger.error("Failed to write charge limit: \(error.message, privacy: .public)")

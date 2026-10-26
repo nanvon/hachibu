@@ -2,6 +2,33 @@ import Foundation
 import Testing
 @testable import BatteryCore
 
+@Suite struct PowerUIOperationQueueTests {
+    @Test func timeoutDoesNotQueueAnotherOperation() {
+        let operations = PowerUIOperationQueue()
+        let gate = DispatchSemaphore(value: 0)
+        defer { gate.signal() }
+        #expect(throws: PowerUIOperationQueue.Failure.timedOut) {
+            try operations.run(timeout: .milliseconds(20)) {
+                _ = gate.wait(timeout: .now() + 5)
+                return 1
+            }
+        }
+        #expect(throws: PowerUIOperationQueue.Failure.busy) {
+            try operations.run(timeout: .seconds(1)) { 2 }
+        }
+    }
+
+    @Test func failedOperationReleasesQueue() throws {
+        let operations = PowerUIOperationQueue()
+        #expect(throws: PowerUIOperationQueue.Failure.timedOut) {
+            try operations.run(timeout: .seconds(1)) { () -> Int in
+                throw PowerUIOperationQueue.Failure.timedOut
+            }
+        }
+        #expect(try operations.run(timeout: .seconds(1)) { 42 } == 42)
+    }
+}
+
 @Suite struct ChargeLimitTests {
     /// 与本机文件相同结构的归档：NSMutableArray 里放一个 ChargeCtrlPolicy。
     private func archive(reason: String = "manualChargeLimit", soclimit: RawValue = .int(80)) -> RawValue {

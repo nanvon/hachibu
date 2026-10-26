@@ -88,6 +88,26 @@ extension HistoryImportFile {
     /// 解析导入文件。整个文件不符合格式时抛出 `HistoryImportError`；单条记录有问题时跳过并计数。
     public static func parse(_ data: Data, calendar: Calendar = .current) throws -> HistoryImportFile {
         guard data.count <= maximumFileSize else { throw HistoryImportError.fileTooLarge }
+        // 释放完整 JSON 对象后再排序、归并，减少大文件解析期间同时存活的中间数据。
+        var decoded = try autoreleasepool { try decodeRecords(data) }
+        let excluded = excludeAnomalies(&decoded.records)
+        decoded.records.sort { $0.date < $1.date }
+        let days = normalize(decoded.records, calendar: calendar)
+        guard !days.isEmpty else { throw HistoryImportError.noValidRecords }
+
+        return HistoryImportFile(
+            sourceApp: decoded.app,
+            sourceVersion: decoded.version,
+            timeZone: calendar.timeZone.identifier,
+            fileSHA256: SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined(),
+            days: days,
+            recordCount: decoded.records.count,
+            excludedCount: excluded,
+            skippedCount: decoded.skipped
+        )
+    }
+
+    private static func decodeRecords(_ data: Data) throws -> (app: String, version: String?, records: [Record], skipped: Int) {
         guard let root = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else {
             throw HistoryImportError.notJSON
         }
@@ -109,20 +129,7 @@ extension HistoryImportFile {
             }
         }
 
-        let (valid, excluded) = excludeAnomalies(records)
-        let days = normalize(valid, calendar: calendar)
-        guard !days.isEmpty else { throw HistoryImportError.noValidRecords }
-
-        return HistoryImportFile(
-            sourceApp: app,
-            sourceVersion: source?["version"] as? String,
-            timeZone: calendar.timeZone.identifier,
-            fileSHA256: SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined(),
-            days: days,
-            recordCount: valid.count,
-            excludedCount: excluded,
-            skippedCount: skipped
-        )
+        return (app, source?["version"] as? String, records, skipped)
     }
 
     private static func record(_ item: Any, dateParser: DateParser) -> Record? {
@@ -167,28 +174,29 @@ extension HistoryImportFile {
         }
     }
 
-    /// 返回有效记录和被排除的记录数。
-    private static func excludeAnomalies(_ records: [Record]) -> (valid: [Record], excluded: Int) {
+    /// 原地排除异常，返回排除的记录数。
+    private static func excludeAnomalies(_ records: inout [Record]) -> Int {
         // AlDente 采集失效时，同一秒内满充容量和循环次数同为 0。
         let failedSeconds = Set(records.compactMap { record -> Int64? in
             guard record.metric == .fullChargeCapacity, case .int(let value) = record.value, value <= 0 else { return nil }
             return UnixTime.seconds(record.date)
         })
-        let valid = records.filter { record in
+        let count = records.count
+        records.removeAll { record in
             switch (record.metric, record.value) {
             case (.fullChargeCapacity, .int(let value)), (.designCapacity, .int(let value)):
-                return value > 0
+                return value <= 0
             case (.systemMaxCapacity, .int(let value)):
-                return (1...100).contains(value)
+                return !(1...100).contains(value)
             case (.cycleCount, .int(let value)):
-                return value > 0 || (value == 0 && !failedSeconds.contains(UnixTime.seconds(record.date)))
+                return value < 0 || (value == 0 && failedSeconds.contains(UnixTime.seconds(record.date)))
             case (.batterySerial, .serialHash(let hash)):
-                return !hash.isEmpty
+                return hash.isEmpty
             default:
-                return false
+                return true
             }
         }
-        return (valid, records.count - valid.count)
+        return count - records.count
     }
 
     /// 每天每个指标取时间最晚的值；每天归属当天或之前最近一条序列号对应的电池，早于第一条序列号的日子归属第一条。
@@ -196,10 +204,14 @@ extension HistoryImportFile {
         var byDay: [String: Day] = [:]
         var serials: [(day: String, hash: String)] = []
 
-        for record in records.sorted(by: { $0.date < $1.date }) {
+        for record in records {
             let day = DailyHealth.day(for: record.date, calendar: calendar)
             if case .serialHash(let hash) = record.value {
-                serials.append((day, hash))
+                if serials.last?.day == day {
+                    serials[serials.count - 1].hash = hash
+                } else {
+                    serials.append((day, hash))
+                }
                 continue
             }
             guard case .int(let value) = record.value else { continue }
@@ -215,9 +227,15 @@ extension HistoryImportFile {
         }
 
         // `YYYY-MM-DD` 按字符串比较即按日期比较。
+        var serialIndex = 0
+        var currentSerial = serials.first?.hash
         return byDay.values.sorted { $0.day < $1.day }.map { day in
             var day = day
-            day.serialHash = serials.last { $0.day <= day.day }?.hash ?? serials.first?.hash
+            while serialIndex < serials.count, serials[serialIndex].day <= day.day {
+                currentSerial = serials[serialIndex].hash
+                serialIndex += 1
+            }
+            day.serialHash = currentSerial
             return day
         }
     }

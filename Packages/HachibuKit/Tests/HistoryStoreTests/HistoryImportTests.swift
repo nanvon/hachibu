@@ -96,6 +96,20 @@ private func parse(_ records: [(String, String, Any)], calendar: Calendar = utc)
         #expect(file.hasBatterySerial)
     }
 
+    @Test func denseSerialRecordsUseLastSerialOfEachDay() throws {
+        var records: [(String, String, Any)] = []
+        for day in 1...28 {
+            let date = String(format: "2026-02-%02d", day)
+            records.append(("battery_serial", "\(date)T01:00:00Z", "old-\(day)"))
+            records.append(("cycle_count", "\(date)T08:00:00Z", day))
+            records.append(("battery_serial", "\(date)T23:00:00Z", "new-\(day)"))
+        }
+        let file = try parse(Array(records.reversed()))
+        #expect(file.days.count == 28)
+        #expect(file.days.map(\.serialHash) == (1...28).map { BatterySnapshot.serialHash("new-\($0)") })
+        #expect(file.days.map(\.cycleCount) == Array(1...28))
+    }
+
     @Test(arguments: [
         (#"[1, 2]"#, HistoryImportError.notJSON),
         ("not json", .notJSON),
@@ -171,6 +185,25 @@ private func parse(_ records: [(String, String, Any)], calendar: Calendar = utc)
         try await store.importHistory(parse([("cycle_count", "2026-10-01T08:00:00Z", 10)]))
         try await store.importHistory(parse([("cycle_count", "2026-10-01T09:00:00Z", 11)]))
         #expect(try await store.dailyHealth().map(\.cycleCount) == [11])
+    }
+
+    @Test func cachedHistoryRefreshesAfterImportAndDeletion() async throws {
+        let store = try await nativeStore()
+        let original = try await store.dailyHealth()
+        let sourceID = try await store.importHistory(parse(records))
+        #expect(try await store.dailyHealth().count == 2)
+        try await store.deleteImportedSource(id: sourceID)
+        #expect(try await store.dailyHealth() == original)
+    }
+
+    @Test func cachedHistoryRefreshesWhenBatteryDesignChanges() async throws {
+        let store = try await nativeStore()
+        try await store.importHistory(parse(records))
+        #expect(try await store.dailyHealth().first?.designCapacityMAh == 8694)
+        try await store.dbQueue.write { db in
+            try db.execute(sql: "UPDATE batteries SET design_mah = 9000")
+        }
+        #expect(try await store.dailyHealth().first?.designCapacityMAh == 9000)
     }
 
     @Test func differentBatteryIsReported() async throws {

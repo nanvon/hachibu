@@ -6,20 +6,22 @@ import Observation
 /// 菜单栏图标：显示设置里选择的读数，点击切换面板的显示。
 @MainActor
 final class StatusItemController: NSObject {
-    private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+    private let statusItem: NSStatusItem
     private let panelController: PanelController
     private let monitor: BatteryMonitor
     private let settings: AppSettings
     private var lastIcon: MenuBarIcon?
     private var appearanceObservation: NSKeyValueObservation?
 
-    init(panelController: PanelController, monitor: BatteryMonitor, settings: AppSettings) {
+    init(panelController: PanelController, monitor: BatteryMonitor, settings: AppSettings, statusItem: NSStatusItem) {
+        self.statusItem = statusItem
         self.panelController = panelController
         self.monitor = monitor
         self.settings = settings
         super.init()
 
         guard let button = statusItem.button else { return }
+        button.isEnabled = true
         // 等宽数字，数值变化时宽度不跳动。
         button.font = .monospacedDigitSystemFont(ofSize: NSFont.menuBarFont(ofSize: 0).pointSize, weight: .regular)
         button.target = self

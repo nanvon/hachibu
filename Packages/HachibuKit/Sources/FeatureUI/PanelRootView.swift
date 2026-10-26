@@ -273,13 +273,14 @@ private struct BatteryLevelCard: View {
 
     var body: some View {
         let isLive = frozenTime == nil && isAnimating && !reduceMotion
+        let content = labels
         TimelineView(.animation(minimumInterval: 1.0 / 30, paused: !isLive)) { context in
             let time = frozenTime ?? (isLive ? context.date.timeIntervalSinceReferenceDate : 0)
             let phase = time * (isCharging ? 2.2 : 0.8)
-            labels
+            content
                 .foregroundStyle(.primary)
                 .overlay {
-                    labels
+                    content
                         .foregroundStyle(underwaterText)
                         .mask(Wave(level: level, phase: phase, amplitude: 2.4))
                 }
