@@ -90,3 +90,114 @@ import Testing
         #expect(decoded == report)
     }
 }
+
+/// 本机录制的使用电池数据。
+@Suite struct OnBatteryFixtureTests {
+    let report: DiagnosticReport
+
+    init() throws {
+        report = try Fixtures.report(Fixtures.onBattery)
+    }
+
+    @Test func snapshot() throws {
+        let snapshot = try #require(BatteryReading(report.readings).snapshot)
+
+        #expect(snapshot.percent == 79)
+        #expect(snapshot.isExternalPower == false)
+        #expect(snapshot.isCharging == false)
+        #expect(snapshot.timeToEmptyMinutes == 301)
+        #expect(snapshot.timeToFullMinutes == nil)
+
+        #expect(snapshot.voltageMV == 11957)
+        #expect(snapshot.amperageMA == -1387)
+        // 使用电池时电池功率为负，绝对值等于系统功率；没有输入。
+        #expect(snapshot.batteryPowerMW == -16159)
+        #expect(snapshot.systemLoadMW == 16159)
+        #expect(snapshot.powerInMW == 0)
+        #expect(snapshot.inputVoltageMV == 0)
+        #expect(snapshot.inputCurrentMA == 0)
+        #expect(snapshot.telemetryUpdatedAt == Date(timeIntervalSince1970: 1_792_996_357))
+
+        #expect(snapshot.temperatureCelsius == 28.59)
+        #expect(snapshot.fullChargeCapacityMAh == 7882)
+        #expect(snapshot.designCapacityMAh == 8694)
+        #expect(snapshot.adapter == nil)
+        #expect(snapshot.chargeLimitPercent == 80)
+    }
+
+    @Test func derivedState() throws {
+        let snapshot = try #require(BatteryReading(report.readings).snapshot)
+
+        #expect(ChargeStatus(snapshot) == .onBattery)
+        #expect(snapshot.remainingTime == .untilEmpty(minutes: 301))
+
+        let flow = try #require(PowerFlow(snapshot))
+        #expect(flow.inputs == [PowerFlow.Stream(.battery, powerMW: 16159)])
+        #expect(flow.outputs == [PowerFlow.Stream(.system, powerMW: 16159)])
+        #expect(flow.computerMW == 16159)
+    }
+}
+
+/// 本机录制的充电中数据。
+@Suite struct ChargingFixtureTests {
+    let report: DiagnosticReport
+
+    init() throws {
+        report = try Fixtures.report(Fixtures.charging)
+    }
+
+    @Test func snapshot() throws {
+        let snapshot = try #require(BatteryReading(report.readings).snapshot)
+
+        #expect(snapshot.percent == 78)
+        #expect(snapshot.isExternalPower == true)
+        #expect(snapshot.isCharging == true)
+        #expect(snapshot.timeToEmptyMinutes == nil)
+        #expect(snapshot.timeToFullMinutes == 53)
+
+        #expect(snapshot.voltageMV == 12671)
+        #expect(snapshot.amperageMA == 4477)
+        // 充电时电池功率为正，输入功率等于系统功率加电池功率。
+        #expect(snapshot.batteryPowerMW == 56807)
+        #expect(snapshot.systemLoadMW == 26815)
+        #expect(snapshot.powerInMW == 83622)
+        #expect(snapshot.inputVoltageMV == 27518)
+        #expect(snapshot.inputCurrentMA == 3038)
+        #expect(snapshot.telemetryUpdatedAt == Date(timeIntervalSince1970: 1_792_996_734))
+
+        #expect(snapshot.temperatureCelsius == 29.29)
+        #expect(snapshot.fullChargeCapacityMAh == 7891)
+        #expect(snapshot.adapter == PowerAdapter(watts: 140, name: "140W USB-C Power Adapter", manufacturer: "Apple Inc."))
+        #expect(snapshot.chargeLimitPercent == 80)
+    }
+
+    @Test func derivedState() throws {
+        let snapshot = try #require(BatteryReading(report.readings).snapshot)
+
+        #expect(ChargeStatus(snapshot) == .charging)
+        #expect(snapshot.remainingTime == .untilFull(minutes: 53))
+
+        let flow = try #require(PowerFlow(snapshot))
+        #expect(flow.inputs == [PowerFlow.Stream(.charger, powerMW: 83622)])
+        #expect(flow.outputs == [PowerFlow.Stream(.system, powerMW: 26815), PowerFlow.Stream(.battery, powerMW: 56807)])
+        #expect(flow.computerMW == 83622)
+    }
+}
+
+/// 所有 fixture 都要已脱敏、能原样往返。
+@Suite struct AllFixturesTests {
+    @Test(arguments: Fixtures.all) func isRedacted(_ name: String) throws {
+        let report = try Fixtures.report(name)
+        let json = try #require(String(data: try report.jsonData(), encoding: .utf8))
+        #expect(!json.localizedCaseInsensitiveContains("\"serial"))
+        #expect(!json.localizedCaseInsensitiveContains("uuidbytes"))
+        #expect(!json.contains("\"token\""))
+        #expect(!json.contains("\"ManufacturerData\""))
+        #expect(!json.contains("\"MfgData\""))
+    }
+
+    @Test(arguments: Fixtures.all) func roundTrip(_ name: String) throws {
+        let report = try Fixtures.report(name)
+        #expect(try DiagnosticReport(jsonData: try report.jsonData()) == report)
+    }
+}
