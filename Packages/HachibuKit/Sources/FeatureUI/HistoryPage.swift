@@ -3,7 +3,7 @@ import Charts
 import HistoryStore
 import SwiftUI
 
-/// 历史曲线页：近期、长期两组，各自独立的时间范围，每组一行两张图。规则见 docs/v1技术设计.md 第 11 节。
+/// 历史曲线页：近期固定 48 小时、长期显示全部历史，每组一行两张图。规则见 docs/v1技术设计.md 第 11 节。
 struct HistoryPage: View {
     let model: HistoryModel
 
@@ -54,7 +54,6 @@ struct HistoryChartsContent: View {
 private struct RecentSection: View {
     let model: HistoryModel
     @State private var hoverDate: Date?
-    @Environment(\.rendersStaticControls) private var rendersStaticControls
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -67,24 +66,13 @@ private struct RecentSection: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
-                if rendersStaticControls {
-                    StaticHistoryRangePicker(options: RecentRange.allCases, selection: model.recentRange, title: Self.title)
-                } else {
-                    Picker(selection: Binding(get: { model.recentRange }, set: { model.setRecentRange($0) })) {
-                        ForEach(RecentRange.allCases, id: \.self) { range in
-                            Self.title(range).tag(range)
-                        }
-                    } label: {
-                        Text("Time Range", bundle: .module)
-                    }
-                    .pickerStyle(.segmented)
-                    .labelsHidden()
-                    .fixedSize()
-                }
+                Text("48 Hours", bundle: .module)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
             if let data = model.recent {
-                let formatDate = Self.dateFormatter(model.recentRange)
+                let formatDate: (Date) -> String = { $0.formatted(.dateTime.month(.abbreviated).day().hour().minute()) }
                 ChartGrid {
                     chart(Text("Battery Level", bundle: .module), data.percent, data: data, yScale: .fixed(0...100), style: .line(.brand), formatDate: formatDate) {
                         DisplayFormat.percent(Int($0.rounded()))
@@ -101,7 +89,7 @@ private struct RecentSection: View {
 
     private func chart(
         _ title: Text,
-        _ points: [ChartPoint],
+        _ series: ChartSeries,
         data: RecentChartData,
         yScale: MetricChart.YScale = .automatic(includesZero: false),
         style: MetricChart.Style,
@@ -110,7 +98,7 @@ private struct RecentSection: View {
     ) -> MetricChart {
         MetricChart(
             title: title,
-            points: points,
+            series: series,
             domain: data.domain,
             maxGap: data.maxGap,
             bands: data.pluggedIn,
@@ -122,22 +110,6 @@ private struct RecentSection: View {
             hoverDate: $hoverDate
         )
     }
-
-    private static func title(_ range: RecentRange) -> Text {
-        switch range {
-        case .hour: Text("1 Hour", bundle: .module)
-        case .day: Text("24 Hours", bundle: .module)
-        case .week: Text("7 Days", bundle: .module)
-        }
-    }
-
-    private static func dateFormatter(_ range: RecentRange) -> (Date) -> String {
-        switch range {
-        case .hour: { $0.formatted(.dateTime.hour().minute()) }
-        case .day: { $0.formatted(.dateTime.weekday(.abbreviated).hour().minute()) }
-        case .week: { $0.formatted(.dateTime.month(.abbreviated).day().hour()) }
-        }
-    }
 }
 
 // MARK: - 长期
@@ -146,25 +118,13 @@ private struct RecentSection: View {
 private struct LongTermSection: View {
     let model: HistoryModel
     @State private var hoverDate: Date?
-    @Environment(\.rendersStaticControls) private var rendersStaticControls
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             SectionHeader(title: Text("Long Term", bundle: .module)) {
-                if rendersStaticControls {
-                    StaticHistoryRangePicker(options: LongTermRange.allCases, selection: model.longTermRange, title: Self.title)
-                } else {
-                    Picker(selection: Binding(get: { model.longTermRange }, set: { model.setLongTermRange($0) })) {
-                        ForEach(LongTermRange.allCases, id: \.self) { range in
-                            Self.title(range).tag(range)
-                        }
-                    } label: {
-                        Text("Time Range", bundle: .module)
-                    }
-                    .pickerStyle(.segmented)
-                    .labelsHidden()
-                    .fixedSize()
-                }
+                Text("All", bundle: .module)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
             if let data = model.longTerm {
@@ -190,13 +150,13 @@ private struct LongTermSection: View {
 
     private func chart(
         _ title: Text,
-        _ points: [ChartPoint],
+        _ series: ChartSeries,
         data: LongTermChartData,
         formatValue: @escaping (Double) -> String
     ) -> MetricChart {
         MetricChart(
             title: title,
-            points: points,
+            series: series,
             domain: data.domain,
             maxGap: data.maxGap,
             notRecorded: data.notRecorded,
@@ -206,43 +166,9 @@ private struct LongTermSection: View {
             hoverDate: $hoverDate
         )
     }
-
-    private static func title(_ range: LongTermRange) -> Text {
-        switch range {
-        case .month: Text("30 Days", bundle: .module)
-        case .year: Text("1 Year", bundle: .module)
-        case .all: Text("All", bundle: .module)
-        }
-    }
 }
 
 // MARK: - 通用
-
-/// ImageRenderer 无法绘制 AppKit 分段控件，出图时使用静态近似。
-private struct StaticHistoryRangePicker<Range: Hashable>: View {
-    let options: [Range]
-    let selection: Range
-    let title: (Range) -> Text
-
-    var body: some View {
-        HStack(spacing: 0) {
-            ForEach(options, id: \.self) { range in
-                title(range)
-                    .font(.system(size: 11, weight: range == selection ? .semibold : .regular))
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 4)
-                    .background {
-                        if range == selection {
-                            RoundedRectangle(cornerRadius: 5).fill(.background)
-                        }
-                    }
-            }
-        }
-        .padding(2)
-        .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 7))
-        .fixedSize()
-    }
-}
 
 /// 一行两张图。
 private struct ChartGrid<Content: View>: View {
@@ -284,8 +210,8 @@ private struct LoadingPlaceholder: View {
 // MARK: - 预览
 
 #if DEBUG
-/// 历史页的示例数据，写入内存数据库：最近 24 小时的分钟数据（每 4 小时交替使用电池和接电，中间有一段休眠缺口），
-/// 以及 120 天的每日数据。7 天范围和长期组的“全部”会显示“未记录”区间。
+/// 历史页的示例数据，写入内存数据库：最近 48 小时的分钟数据（每 4 小时交替使用电池和接电，中间有一段休眠缺口），
+/// 以及 120 天的每日数据。
 @MainActor
 private enum HistoryPreviewData {
     static func model() -> HistoryModel {
@@ -302,8 +228,8 @@ private enum HistoryPreviewData {
 
     private static func fill(_ store: HistoryStore, now: Date) async throws {
         var level = 80.0
-        for minute in 0..<1440 {
-            let date = now.addingTimeInterval(TimeInterval(minute - 1439) * 60)
+        for minute in 0..<2880 {
+            let date = now.addingTimeInterval(TimeInterval(minute - 2879) * 60)
             let isExternal = (minute / 240) % 2 == 1
             let load = 7000 + 3000 * sin(Double(minute) / 25)
             let isCharging = isExternal && level < 80

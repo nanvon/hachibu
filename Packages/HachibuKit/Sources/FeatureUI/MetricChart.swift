@@ -18,7 +18,8 @@ struct MetricChart: View {
     }
 
     let title: Text
-    let points: [ChartPoint]
+    let series: ChartSeries
+    private var points: [ChartPoint] { series.points }
     let domain: ClosedRange<Date>
     /// 悬停时只取这个距离内的点。
     let maxGap: TimeInterval
@@ -120,7 +121,7 @@ struct MetricChart: View {
         case .fixed(let range):
             return range.lowerBound
         case .automatic(let includesZero):
-            let minValue = points.lazy.map(\.value).min() ?? 0
+            let minValue = series.plotPoints.lazy.map(\.value).min() ?? 0
             return includesZero ? min(0, minValue) : minValue
         }
     }
@@ -158,12 +159,12 @@ struct MetricChart: View {
             }
             switch style {
             case .line(let color):
-                lineMarks(points, series: { "\($0.segment)" }, baseline: areaBaseline, color: color)
+                lineMarks(series.plotPoints, series: { "\($0.segment)" }, baseline: areaBaseline, color: color)
             case .signed:
                 RuleMark(y: .value("Zero", 0.0))
                     .foregroundStyle(Color.primary.opacity(0.25))
                     .lineStyle(StrokeStyle(lineWidth: 1))
-                ForEach(HistoryChartBuilder.signedRuns(points)) { run in
+                ForEach(HistoryChartBuilder.signedRuns(series.plotPoints)) { run in
                     lineMarks(run.points, series: { _ in "\(run.id)" }, baseline: 0, color: run.isPositive ? .green : .orange)
                 }
             }

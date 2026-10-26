@@ -14,12 +14,12 @@ import Testing
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let store = try HistoryStore.inMemory()
         let now = Date()
-        for minute in 0..<1440 {
+        for minute in 0..<2880 {
             // 留出半小时缺口，确认平滑后仍然断开。
             guard !(900..<930).contains(minute) else { continue }
             let phase = Double(minute) / 90
             try await store.write(MinuteSample(
-                timestamp: now.addingTimeInterval(Double(minute - 1439) * 60),
+                timestamp: now.addingTimeInterval(Double(minute - 2879) * 60),
                 percent: Int(65 + 15 * sin(phase)),
                 isExternalPower: (minute / 240) % 2 == 1,
                 temperatureCelsius: 30 + 4 * sin(phase + 0.8)
@@ -45,7 +45,6 @@ import Testing
                 .frame(width: 1040, height: 1180)
                 .background(scheme == .dark ? Color(white: 0.12) : Color(white: 0.96))
                 .environment(\.colorScheme, scheme)
-                .environment(\.rendersStaticControls, true)
                 .environment(\.locale, Locale(identifier: "zh-Hans")))
             renderer.scale = 2
             let image = try #require(renderer.cgImage)

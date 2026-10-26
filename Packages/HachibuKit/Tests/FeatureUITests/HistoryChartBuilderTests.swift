@@ -1,3 +1,4 @@
+import BatteryCore
 import Foundation
 import HistoryStore
 import Testing
@@ -63,44 +64,31 @@ private let utc: Calendar = {
 
 @Suite struct RecentTests {
     @Test func minuteSamplesInsideDomain() {
-        let now = minute(60).addingTimeInterval(20)
+        let now = minute(48 * 60).addingTimeInterval(20)
         let samples = [
             MinuteSample(timestamp: minute(0), percent: 50, isExternalPower: true),
             MinuteSample(timestamp: minute(1), percent: 51, isExternalPower: true, systemLoadMW: 12_500),
             MinuteSample(timestamp: minute(2), percent: 52, isExternalPower: false, temperatureCelsius: 30.5),
         ]
-        let data = HistoryChartBuilder.recent(minuteSamples: samples, range: .hour, now: now, firstRecordedAt: minute(0))
+        let data = HistoryChartBuilder.recent(minuteSamples: samples, now: now, firstRecordedAt: minute(0))
 
-        #expect(data.domain == now.addingTimeInterval(-3600)...now)
+        #expect(data.domain == now.addingTimeInterval(-48 * 3600)...now)
         // minute(0) 早于范围起点。
-        #expect(data.percent.map(\.value) == [51, 52])
-        #expect(data.systemPowerWatts.map(\.value) == [12.5])
-        #expect(data.temperatureCelsius.map(\.value) == [30.5])
+        #expect(data.percent.points.map(\.value) == [51, 52])
+        #expect(data.systemPowerWatts.points.map(\.value) == [12.5])
+        #expect(data.temperatureCelsius.points.map(\.value) == [30.5])
         #expect(data.pluggedIn == [minute(1)..<minute(2)])
         #expect(data.maxGap == 180)
         #expect(data.notRecorded == nil)
     }
 
     @Test func notRecordedBeforeFirstSample() {
-        let now = minute(60)
-        let data = HistoryChartBuilder.recent(minuteSamples: [], range: .hour, now: now, firstRecordedAt: minute(45))
+        let now = minute(48 * 60)
+        let data = HistoryChartBuilder.recent(minuteSamples: [], now: now, firstRecordedAt: minute(45))
         #expect(data.notRecorded == minute(0)..<minute(45))
 
-        let noRecord = HistoryChartBuilder.recent(minuteSamples: [], range: .hour, now: now, firstRecordedAt: nil)
+        let noRecord = HistoryChartBuilder.recent(minuteSamples: [], now: now, firstRecordedAt: nil)
         #expect(noRecord.notRecorded == nil)
-    }
-
-    @Test func hourIsPluggedInWhenMostMinutesAre() {
-        let now = base.addingTimeInterval(3 * 3600)
-        let samples = [
-            HourlyAverage(hour: base, sampleCount: 60, externalMinutes: 30, percent: 80, batteryPowerMW: -2500),
-            HourlyAverage(hour: base.addingTimeInterval(3600), sampleCount: 60, externalMinutes: 29),
-        ]
-        let data = HistoryChartBuilder.recent(hourlyAverages: samples, range: .week, now: now, firstRecordedAt: base)
-        #expect(data.batteryPowerWatts.map(\.value) == [-2.5])
-        #expect(data.pluggedIn == [base..<base.addingTimeInterval(3600)])
-        #expect(data.percent.map(\.value) == [80])
-        #expect(data.maxGap == 3 * 3600)
     }
 }
 
@@ -111,29 +99,27 @@ private let utc: Calendar = {
         DailyHealth(day: day, systemMaxCapacityPercent: capacity, fullChargeCapacityMAh: 6000, cycleCount: cycles)
     }
 
-    @Test func monthDomainAndNotRecorded() {
+    @Test func allDailySamplesUseFullDomain() {
         let data = HistoryChartBuilder.longTerm(
             dailySamples: [daily("2026-10-18"), daily("2026-10-20", cycles: 101)],
-            range: .month,
             now: now,
             firstRecordedDay: "2026-10-18",
             calendar: utc
         )
-        let start = base.addingTimeInterval(-29 * 24 * 3600)
+        let start = base.addingTimeInterval(-2 * 24 * 3600)
         let end = base.addingTimeInterval(24 * 3600)
         let firstRecorded = base.addingTimeInterval(-2 * 24 * 3600)
 
         #expect(data.domain == start...end)
-        #expect(data.notRecorded == start..<firstRecorded)
+        #expect(data.notRecorded == nil)
         // 每天一个点，在当天正午。
-        #expect(data.cycleCount.map(\.date) == [firstRecorded.addingTimeInterval(12 * 3600), base.addingTimeInterval(12 * 3600)])
-        #expect(data.cycleCount.map(\.segment) == [0, 0])
+        #expect(data.cycleCount.points.map(\.date) == [firstRecorded.addingTimeInterval(12 * 3600), base.addingTimeInterval(12 * 3600)])
+        #expect(data.cycleCount.points.map(\.segment) == [0, 0])
     }
 
     @Test func allStartsAtFirstRecordWithoutNotRecorded() {
         let data = HistoryChartBuilder.longTerm(
             dailySamples: [daily("2026-10-18")],
-            range: .all,
             now: now,
             firstRecordedDay: "2026-10-18",
             calendar: utc
@@ -145,12 +131,11 @@ private let utc: Calendar = {
     @Test func gapLongerThanThreeDaysBreaksLine() {
         let data = HistoryChartBuilder.longTerm(
             dailySamples: [daily("2026-10-10"), daily("2026-10-13"), daily("2026-10-17"), daily("2026-10-18", capacity: nil)],
-            range: .month,
             now: now,
             firstRecordedDay: "2026-10-10",
             calendar: utc
         )
-        #expect(data.maximumCapacityPercent.map(\.segment) == [0, 0, 1])
+        #expect(data.maximumCapacityPercent.points.map(\.segment) == [0, 0, 1])
     }
 
     @Test func capacityRatioNeedsBothCapacities() {
@@ -159,19 +144,20 @@ private let utc: Calendar = {
                 DailyHealth(day: "2026-10-19", fullChargeCapacityMAh: 7942, designCapacityMAh: 8694),
                 DailyHealth(day: "2026-10-20", fullChargeCapacityMAh: 7900),
             ],
-            range: .month,
             now: now,
             firstRecordedDay: "2026-10-19",
             calendar: utc
         )
-        #expect(data.capacityRatioPercent.count == 1)
-        #expect(abs((data.capacityRatioPercent.first?.value ?? 0) - 7942.0 / 8694 * 100) < 1e-9)
+        #expect(data.capacityRatioPercent.points.count == 1)
+        #expect(abs((data.capacityRatioPercent.points.first?.value ?? 0) - 7942.0 / 8694 * 100) < 1e-9)
     }
 
-    @Test func firstDayForQuery() {
-        #expect(HistoryChartBuilder.longTermFirstDay(range: .month, now: now, calendar: utc) == "2026-09-21")
-        #expect(HistoryChartBuilder.longTermFirstDay(range: .all, now: now, calendar: utc) == nil)
+    @Test func emptyHistoryShowsToday() {
+        let data = HistoryChartBuilder.longTerm(dailySamples: [], now: now, firstRecordedDay: nil, calendar: utc)
+        #expect(data.domain == base...base.addingTimeInterval(24 * 3600))
+        #expect(data.maximumCapacityPercent.points.isEmpty)
     }
+
 }
 
 @Suite struct SignedRunTests {
@@ -205,5 +191,63 @@ private let utc: Calendar = {
     @Test func nilWhenTooFar() {
         #expect(HistoryChartBuilder.nearest(in: points, to: minute(35), within: 600) == nil)
         #expect(HistoryChartBuilder.nearest(in: [], to: minute(0), within: 600) == nil)
+    }
+}
+
+@Suite struct DownsampleTests {
+    @Test func retainsSpikesEndpointsAndOriginalHoverValues() {
+        let points = (0..<2880).map {
+            ChartPoint(date: minute($0), value: $0 == 1501 ? 100 : $0 == 1502 ? -20 : 50, segment: 0)
+        }
+        let series = ChartSeries(points)
+        #expect(series.plotPoints.count <= 1200)
+        #expect(series.plotPoints.first == points.first)
+        #expect(series.plotPoints.last == points.last)
+        #expect(series.plotPoints.contains(points[1501]))
+        #expect(series.plotPoints.contains(points[1502]))
+        #expect(series.points == points)
+        #expect(HistoryChartBuilder.nearest(in: series.points, to: minute(1503), within: 180) == points[1503])
+        #expect(series.plotPoints.map(\.date) == series.plotPoints.map(\.date).sorted())
+    }
+
+    @Test func preservesBothSidesOfGapsAndMissingValues() {
+        var values: [(date: Date, value: Double?)] = (0..<10_000).map { (minute($0), Double($0)) }
+        values[1251].value = nil
+        values.removeSubrange(5000..<5100)
+        let points = HistoryChartBuilder.segmented(values, maxGap: 180)
+        let plot = HistoryChartBuilder.downsample(points)
+        #expect(plot.map(\.segment).contains(2))
+        for offset in [0, 1250, 1252, 4999, 5100, 9999] {
+            #expect(plot.contains { $0.date == minute(offset) })
+        }
+    }
+}
+
+@MainActor
+@Suite struct HistoryModelTests {
+    @Test func fixedRangesAndDailyUpdates() async throws {
+        let store = try HistoryStore.inMemory()
+        let now = Date()
+        try await store.write(MinuteSample(timestamp: now.addingTimeInterval(-49 * 3600), percent: 10))
+        try await store.write(MinuteSample(timestamp: now.addingTimeInterval(-47 * 3600), percent: 70))
+        let oldDate = Calendar.current.date(byAdding: .year, value: -2, to: now)!
+        try await store.record(BatterySnapshot(fullChargeCapacityMAh: 8000, cycleCount: 10), at: oldDate)
+        let model = HistoryModel(store: store)
+        await model.reloadAll()
+        let recent = try #require(model.recent)
+        #expect(recent.domain.upperBound.timeIntervalSince(recent.domain.lowerBound) == 48 * 3600)
+        #expect(recent.percent.points.map(\.value) == [70])
+        #expect(model.longTerm?.cycleCount.points.map(\.value) == [10])
+        let previous = model.longTerm
+        await model.reloadAll()
+        #expect(model.longTerm == previous)
+        // 即使最新分钟时间不变，当天健康值变化也必须刷新长期曲线。
+        try await store.record(
+            BatteryHealthInfo(systemMaximumCapacityPercent: 95, condition: .good),
+            snapshot: BatterySnapshot(fullChargeCapacityMAh: 7900, cycleCount: 100),
+            at: now
+        )
+        await model.reloadAll()
+        #expect(model.longTerm?.cycleCount.points.map(\.value) == [10, 100])
     }
 }
