@@ -15,9 +15,9 @@ public final class BatteryMonitor {
     /// 写分钟数据时，最近一次读取早于这个时长（例如刚唤醒）就先重新读取。
     /// 面板关闭时最长约 70 秒读取一次（60 秒加 10 秒 leeway）。
     private static let maxMinuteSampleAge: TimeInterval = 75
-    /// SMC 读取间隔：修改充电上限或插拔电源后每秒、面板打开时每 5 秒读全部 key；面板关闭时只读 `CHSC`。
+    /// SMC 读取间隔：修改充电上限或插拔电源后每秒、面板打开时每 2.5 秒读全部 key；面板关闭时只读 `CHSC`。
     private static let smcFastInterval: Duration = .seconds(1)
-    private static let smcPanelInterval: Duration = .seconds(5)
+    private static let smcPanelInterval: Duration = .milliseconds(2500)
     private static let smcChargingInterval: Duration = .milliseconds(1500)
     private static let smcChargingTolerance: Duration = .milliseconds(500)
     /// 读不到 `CHSC` 时（如其他机型）面板关闭期间不再高频读取，靠完整读取时的 SMC 读取。
@@ -131,7 +131,7 @@ public final class BatteryMonitor {
         startHealthLoop()
     }
 
-    /// 面板打开时每 10 秒完整读取一次、每 5 秒读 SMC 和 IOPS；关闭时每 60 秒完整读取一次、每 1.5 秒读 `CHSC`。
+    /// 面板打开时每 10 秒完整读取一次、每 2.5 秒读 SMC 和 IOPS；关闭时每 60 秒完整读取一次、每 1.5 秒读 `CHSC`。
     public func setPanelVisible(_ visible: Bool) {
         guard visible != isPanelVisible else { return }
         isPanelVisible = visible
@@ -155,7 +155,7 @@ public final class BatteryMonitor {
                 try? await Task.sleep(for: interval, tolerance: tolerance)
                 guard !Task.isCancelled else { return }
                 await self?.read()
-                // 面板打开时 SMC 由每 5 秒的读取负责。
+                // 面板打开时 SMC 由每 2.5 秒的读取负责。
                 if self?.isPanelVisible == false {
                     await self?.refreshSMC(.display)
                 }
