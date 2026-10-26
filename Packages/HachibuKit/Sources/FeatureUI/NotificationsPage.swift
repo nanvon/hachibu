@@ -1,4 +1,5 @@
 import AppKit
+import BatteryCore
 import SwiftUI
 
 /// 通知页：系统通知授权、两种提醒的开关和阈值、当前状态。规则见 docs/v1技术设计.md 第 12 节。
@@ -147,3 +148,55 @@ private struct AlertStatusRow: View {
         }
     }
 }
+
+// MARK: - 预览
+
+#if DEBUG
+/// 固定返回给定的授权状态，不发送通知。
+private struct PreviewNotifier: AlertNotifier {
+    let status: NotificationAuthorization
+    func authorization() async -> NotificationAuthorization { status }
+    func requestAuthorization() async -> NotificationAuthorization { status }
+    func deliver(_ alert: BatteryAlert) async {}
+}
+
+/// 设置和提醒状态存在独立的 UserDefaults，不影响 App 本身的设置。
+private struct NotificationsPreview: View {
+    @State private var settings: AppSettings
+    @State private var alerts: AlertMonitor
+
+    init(authorization: NotificationAuthorization, temperatureAlerted: Bool = false) {
+        let defaults = UserDefaults(suiteName: "HachibuPreview.Notifications")!
+        defaults.removePersistentDomain(forName: "HachibuPreview.Notifications")
+        // 键名与 AlertMonitor 保存提醒状态的键相同。
+        defaults.set(temperatureAlerted, forKey: "temperatureAlerted")
+        let settings = AppSettings(defaults: defaults)
+        let alerts = AlertMonitor(settings: settings, notifier: PreviewNotifier(status: authorization), defaults: defaults)
+        alerts.handleReading(.battery(BatterySnapshot(temperatureCelsius: temperatureAlerted ? 41.2 : 31.5)), at: Date())
+        alerts.handleHealth(BatteryHealthInfo(systemMaximumCapacityPercent: 95, condition: .good))
+        _settings = State(initialValue: settings)
+        _alerts = State(initialValue: alerts)
+    }
+
+    var body: some View {
+        NotificationsPage(settings: settings, alerts: alerts)
+            .frame(width: 720, height: 660)
+    }
+}
+
+#Preview("Allowed") {
+    NotificationsPreview(authorization: .allowed)
+}
+
+#Preview("Temperature Alerted") {
+    NotificationsPreview(authorization: .allowed, temperatureAlerted: true)
+}
+
+#Preview("Not Requested") {
+    NotificationsPreview(authorization: .notDetermined)
+}
+
+#Preview("Denied") {
+    NotificationsPreview(authorization: .denied)
+}
+#endif

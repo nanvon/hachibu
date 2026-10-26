@@ -1,4 +1,5 @@
 import Charts
+import HistoryStore
 import SwiftUI
 
 /// 历史曲线页：近期、长期两组，各自独立的时间范围，每组一行两张图。规则见 docs/v1技术设计.md 第 11 节。
@@ -252,3 +253,76 @@ private struct LoadingPlaceholder: View {
             .frame(maxWidth: .infinity, minHeight: 120)
     }
 }
+
+// MARK: - 预览
+
+#if DEBUG
+/// 历史页的示例数据，写入内存数据库：最近 24 小时的分钟数据（每 4 小时交替使用电池和接电，中间有一段休眠缺口），
+/// 以及 120 天的每日数据。7 天范围和长期组的“全部”会显示“未记录”区间。
+@MainActor
+private enum HistoryPreviewData {
+    static func model() -> HistoryModel {
+        let store = try? HistoryStore.inMemory()
+        let model = HistoryModel(store: store)
+        if let store {
+            Task {
+                try? await fill(store, now: Date())
+                model.start()
+            }
+        }
+        return model
+    }
+
+    private static func fill(_ store: HistoryStore, now: Date) async throws {
+        var level = 80.0
+        for minute in 0..<1440 {
+            let date = now.addingTimeInterval(TimeInterval(minute - 1439) * 60)
+            let isExternal = (minute / 240) % 2 == 1
+            let load = 7000 + 3000 * sin(Double(minute) / 25)
+            let isCharging = isExternal && level < 80
+            let battery = isCharging ? 30000 : isExternal ? 0 : -load
+            // 约 70 Wh 的电池：每分钟变化 W ÷ 60 ÷ 70 × 100 个百分点。
+            level = min(100, max(5, level + battery / 1000 / 60 / 70 * 100))
+            // 模拟一段 30 分钟的休眠缺口。
+            guard !(900..<930).contains(minute) else { continue }
+            let voltage = 11400 + level * 12
+            try await store.write(MinuteSample(
+                timestamp: date,
+                percent: Int(level.rounded()),
+                isExternalPower: isExternal,
+                isCharging: isCharging,
+                systemLoadMW: Int(load),
+                batteryPowerMW: Int(battery),
+                powerInMW: isExternal ? Int(load + battery) : 0,
+                temperatureCelsius: 28 + (isCharging ? 6 : 0) + load / 3000,
+                voltageMV: Int(voltage),
+                amperageMA: Int(battery / voltage * 1000)
+            ))
+        }
+
+        for day in 0..<120 {
+            let date = now.addingTimeInterval(TimeInterval(day - 119) * 86400)
+            try await store.write(DailySample(
+                day: DailySample.day(for: date),
+                systemMaxCapacityPercent: day < 70 ? 96 : 95,
+                fullChargeCapacityMAh: 8090 - day + (day % 7) * 4,
+                designCapacityMAh: 8694,
+                cycleCount: 28 + day / 3,
+                updatedAt: date
+            ))
+        }
+    }
+}
+
+#Preview("History") {
+    NavigationStack {
+        HistoryPage(model: HistoryPreviewData.model())
+    }
+    .frame(width: 1000, height: 780)
+}
+
+#Preview("History Unavailable") {
+    HistoryPage(model: HistoryModel(store: nil))
+        .frame(width: 1000, height: 400)
+}
+#endif

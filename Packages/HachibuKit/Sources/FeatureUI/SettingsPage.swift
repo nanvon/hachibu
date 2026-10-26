@@ -327,3 +327,95 @@ final class LoginItem {
         refresh()
     }
 }
+
+// MARK: - 预览
+
+#if DEBUG
+/// 模拟接电未充电的电池和 PowerUI：写入后读回新的开关和上限。`isSupported` 为 false 时表示系统不支持充电上限。
+private final class PreviewBatterySystem: BatteryDataSource, ChargeLimitWriter, @unchecked Sendable {
+    private let lock = NSLock()
+    private let isSupported: Bool
+    private var isEnabled = true
+    private var limit = 80
+
+    init(isSupported: Bool) {
+        self.isSupported = isSupported
+    }
+
+    func read() -> RawBatteryReadings {
+        lock.withLock {
+            RawBatteryReadings(
+                powerSources: [[
+                    "Type": .string("InternalBattery"),
+                    "Current Capacity": .int(80), "Max Capacity": .int(100),
+                    "Power Source State": .string("AC Power"),
+                    "Is Charging": .bool(false),
+                ]],
+                smartBattery: nil,
+                smartBatteryPack: nil,
+                adapterDetails: nil,
+                chargeLimitArchive: nil,
+                powerUIChargeLimit: isSupported
+                    ? PowerUIChargeLimit(isSupported: true, isEnabled: isEnabled, limit: isEnabled ? limit : 100, availableLimits: [80, 85, 90, 95, 100])
+                    : PowerUIChargeLimit(isSupported: false),
+                lowPowerModeEnabled: false
+            )
+        }
+    }
+
+    func write(_ change: ChargeLimitChange) throws {
+        lock.withLock {
+            switch change {
+            case .enable: isEnabled = true
+            case .disable: isEnabled = false
+            case .limit(let percent): limit = percent
+            }
+        }
+    }
+}
+
+private struct PreviewProfiler: SystemProfilerSource {
+    func readPowerData() async throws -> RawValue { .dictionary([:]) }
+}
+
+/// 设置存在独立的 UserDefaults；电池读数来自 PreviewBatterySystem，不读取硬件。
+private struct SettingsPreview: View {
+    @State private var settings: AppSettings
+    @State private var monitor: BatteryMonitor
+    private let showsCheckForUpdates: Bool
+
+    init(canWriteChargeLimit: Bool, isSupported: Bool = true, showsCheckForUpdates: Bool = true) {
+        let defaults = UserDefaults(suiteName: "HachibuPreview.Settings")!
+        defaults.removePersistentDomain(forName: "HachibuPreview.Settings")
+        let system = PreviewBatterySystem(isSupported: isSupported)
+        let sampler = BatterySampler(
+            dataSource: system,
+            systemProfiler: PreviewProfiler(),
+            chargeLimitWriter: canWriteChargeLimit ? system : nil,
+            store: nil
+        )
+        _settings = State(initialValue: AppSettings(defaults: defaults))
+        _monitor = State(initialValue: BatteryMonitor(sampler: sampler, powerSourceReader: { nil }))
+        self.showsCheckForUpdates = showsCheckForUpdates
+    }
+
+    var body: some View {
+        SettingsPage(settings: settings, onExportDiagnostics: {}, onCheckForUpdates: showsCheckForUpdates ? { @MainActor in } : nil)
+            .environment(monitor)
+            .task { await monitor.read() }
+            .frame(width: 720, height: 900)
+    }
+}
+
+#Preview("Charge Limit Control") {
+    SettingsPreview(canWriteChargeLimit: true)
+}
+
+#Preview("Read Only, Updates Disabled") {
+    SettingsPreview(canWriteChargeLimit: false, showsCheckForUpdates: false)
+}
+
+#Preview("Charge Limit Not Supported") {
+    SettingsPreview(canWriteChargeLimit: false, isSupported: false)
+}
+#endif
