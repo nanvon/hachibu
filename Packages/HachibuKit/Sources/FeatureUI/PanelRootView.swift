@@ -763,7 +763,7 @@ struct ChargeLimitNote: View {
 
 // MARK: - 电池健康和详细数据
 
-/// 标题行右侧为健康状态；一行三列：系统最大容量、满充容量、循环次数；下面是可展开的详细数据。
+/// 标题行右侧为健康状态；一行两列：系统最大容量、循环次数；下面是满充容量对比条和可展开的详细数据。
 private struct HealthTile: View {
     let snapshot: BatterySnapshot
     let health: BatteryHealthInfo?
@@ -785,16 +785,18 @@ private struct HealthTile: View {
                     value: DisplayFormat.percent(health?.systemMaximumCapacityPercent),
                     ring: health?.systemMaximumCapacityPercent.map { Double($0) / 100 }
                 )
-                ValueDivider()
-                HealthValue(
-                    label: Text("Full Charge Capacity", bundle: .module),
-                    value: DisplayFormat.number(snapshot.fullChargeCapacityMAh),
-                    unit: snapshot.fullChargeCapacityMAh == nil ? nil : "mAh"
-                )
+                .help(Text("Reported by macOS. Same as Battery Health in System Settings.", bundle: .module))
                 ValueDivider()
                 HealthValue(label: Text("Cycle Count", bundle: .module), value: DisplayFormat.number(snapshot.cycleCount))
             }
             .padding(.top, 12)
+            FullChargeBar(
+                fullCharge: snapshot.fullChargeCapacityMAh,
+                design: snapshot.designCapacityMAh,
+                ratio: snapshot.capacityRatio
+            )
+            .help(Text("Full charge capacity estimated by the battery, and its percentage of the design capacity. AlDente shows this percentage as Health.", bundle: .module))
+            .padding(.top, 14)
             HairlineDivider()
                 .padding(.top, 12)
             DetailsSection(snapshot: snapshot)
@@ -886,6 +888,50 @@ private struct CapacityRing: View {
     }
 }
 
+/// 满充容量和设计容量的对比：上面一行写两个容量和满充 / 设计，下面的条长度为满充 / 设计。
+private struct FullChargeBar: View {
+    let fullCharge: Int?
+    let design: Int?
+    let ratio: Double?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .firstTextBaseline, spacing: 4) {
+                Text("Full Charge Capacity", bundle: .module)
+                    .foregroundStyle(.secondary)
+                Spacer(minLength: 8)
+                Text(verbatim: DisplayFormat.number(fullCharge))
+                    .fontWeight(.medium)
+                if let design {
+                    Text(verbatim: "/ \(design) mAh")
+                        .foregroundStyle(.secondary)
+                } else if fullCharge != nil {
+                    Text(verbatim: "mAh")
+                        .foregroundStyle(.secondary)
+                }
+                if let ratio {
+                    Text(verbatim: "·")
+                        .foregroundStyle(.tertiary)
+                    Text(verbatim: DisplayFormat.percent(ratio: ratio))
+                        .fontWeight(.medium)
+                }
+            }
+            .font(.system(size: 12))
+            .monospacedDigit()
+            GeometryReader { proxy in
+                ZStack(alignment: .leading) {
+                    Capsule()
+                        .fill(Color.primary.opacity(0.1))
+                    Capsule()
+                        .fill(Color.brand.opacity(0.6))
+                        .frame(width: proxy.size.width * min(1, max(0, ratio ?? 0)))
+                }
+            }
+            .frame(height: 4)
+        }
+    }
+}
+
 /// 健康读数之间的竖线。
 private struct ValueDivider: View {
     var body: some View {
@@ -954,9 +1000,6 @@ private struct DetailsSection: View {
                     ValueRow(Text("Battery Voltage", bundle: .module), value: DisplayFormat.volts(millivolts: snapshot.voltageMV, fractionLength: 2))
                     ValueRow(Text("Battery Current", bundle: .module), value: DisplayFormat.amps(milliamps: snapshot.amperageMA))
                     ValueRow(Text("Battery Power", bundle: .module), value: DisplayFormat.signedWatts(milliwatts: snapshot.batteryPowerMW))
-                    HairlineDivider()
-                    ValueRow(Text("Design Capacity", bundle: .module), value: designCapacity)
-                    ValueRow(Text("Capacity Ratio (Full Charge / Design)", bundle: .module), value: DisplayFormat.percent(ratio: snapshot.capacityRatio))
                     if isExternalPower {
                         HairlineDivider()
                         ValueRow(Text("Charger", bundle: .module), value: adapter)
@@ -968,10 +1011,6 @@ private struct DetailsSection: View {
                 .transition(PanelMotion.transition(reduceMotion: reduceMotion))
             }
         }
-    }
-
-    private var designCapacity: String {
-        snapshot.designCapacityMAh.map { "\($0) mAh" } ?? DisplayFormat.missing
     }
 
     /// 充电器名称，读不到时用额定功率。额定功率和厂商放在悬停提示里。

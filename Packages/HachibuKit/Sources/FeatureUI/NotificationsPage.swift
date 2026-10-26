@@ -94,7 +94,7 @@ struct NotificationsPage: View {
     private var healthSection: some View {
         Section {
             Toggle(isOn: $settings.healthAlertEnabled) {
-                Text("Low Battery Health", bundle: .module)
+                Text("Low Maximum Capacity", bundle: .module)
             }
             Stepper(value: $settings.healthAlertThreshold, in: AppSettings.healthThresholdRange) {
                 Text("Maximum capacity below \(settings.healthAlertThreshold)%", bundle: .module)

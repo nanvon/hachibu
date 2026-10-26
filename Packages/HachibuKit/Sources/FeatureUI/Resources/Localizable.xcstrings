@@ -300,16 +300,6 @@
         }
       }
     },
-    "Battery Health Low" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "电池健康度低"
-          }
-        }
-      }
-    },
     "Battery Level" : {
       "localizations" : {
         "zh-Hans" : {
@@ -385,16 +375,6 @@
         "stringUnit" : {
           "state" : "translated",
           "value" : "取消"
-        }
-      }
-    },
-    "Capacity Ratio (Full Charge / Design)" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "容量比（满充 / 设计）"
-          }
         }
       }
     },
@@ -588,16 +568,6 @@
         }
       }
     },
-    "Design Capacity" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "设计容量"
-          }
-        }
-      }
-    },
     "Details" : {
       "localizations" : {
         "zh-Hans" : {
@@ -638,12 +608,32 @@
         }
       }
     },
+    "Full Charge / Design" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "满充 / 设计"
+          }
+        }
+      }
+    },
     "Full Charge Capacity" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "满充容量"
+          }
+        }
+      }
+    },
+    "Full charge capacity estimated by the battery, and its percentage of the design capacity. AlDente shows this percentage as Health." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "电池估算的满充容量，以及它占设计容量的比例。AlDente 显示的 Health 就是这个比例。"
           }
         }
       }
@@ -836,12 +826,12 @@
         }
       }
     },
-    "Low Battery Health" : {
+    "Low Maximum Capacity" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "健康度低"
+            "value" : "最大容量偏低"
           }
         }
       }
@@ -892,6 +882,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "最大容量为 %lld%%，低于设定的 %lld%%。"
+          }
+        }
+      }
+    },
+    "Maximum Capacity Low" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最大容量偏低"
           }
         }
       }
@@ -1164,6 +1164,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "自 %@ 开始记录"
+          }
+        }
+      }
+    },
+    "Reported by macOS. Same as Battery Health in System Settings." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "macOS 报告的值，与系统设置中“电池健康”显示的一致。"
           }
         }
       }

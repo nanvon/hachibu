@@ -43,7 +43,7 @@ public final class SystemAlertNotifier: NSObject, AlertNotifier, UNUserNotificat
             )
         case let .lowHealth(maximumCapacityPercent, threshold):
             identifier = "lowHealth"
-            content.title = String(localized: "Battery Health Low", bundle: .module)
+            content.title = String(localized: "Maximum Capacity Low", bundle: .module)
             content.body = String(
                 localized: "Maximum capacity is \(maximumCapacityPercent)%, below your threshold of \(threshold)%.",
                 bundle: .module

@@ -170,7 +170,7 @@ private struct LongTermSection: View {
                     chart(Text("Maximum Capacity (System)", bundle: .module), data.maximumCapacityPercent, data: data, interpolation: .stepEnd) {
                         DisplayFormat.percent(Int($0.rounded()))
                     }
-                    chart(Text("Capacity Ratio (Full Charge / Design)", bundle: .module), data.capacityRatioPercent, data: data) {
+                    chart(Text("Full Charge / Design", bundle: .module), data.capacityRatioPercent, data: data) {
                         DisplayFormat.percent(ratio: $0 / 100)
                     }
                     chart(Text("Full Charge Capacity", bundle: .module), data.fullChargeCapacityMAh, data: data) {
