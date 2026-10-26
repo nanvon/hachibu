@@ -115,6 +115,23 @@ private struct FlowLayout {
         var value: String?
     }
 
+    /// 流带上数值的位置。
+    enum LabelPlacement {
+        case inside
+        /// 流带最窄处放不下数值时写在流带上方。
+        case above
+        /// 写在上方会超出图顶时改写在流带下方。
+        case below
+    }
+
+    /// 数值的估算行高，用于判断是否超出图的范围、两个数值是否重叠。
+    static let labelHeight: CGFloat = 16
+    static let smallLabelHeight: CGFloat = 14
+    /// 写在流带外的数值和流带的距离。
+    static let labelOffset: CGFloat = 4
+    /// 同一侧两个数值之间至少留出的空隙。
+    static let labelSpacing: CGFloat = 2
+
     struct Band {
         var path: Path
         var startX: CGFloat
@@ -122,9 +139,29 @@ private struct FlowLayout {
         var sourceTint: Color?
         var targetTint: Color?
         var label: String
-        var labelPoint: CGPoint
-        /// 流带最窄处放不下数值时，数值写在流带上方。
-        var labelAbove: Bool
+        var labelX: CGFloat
+        /// 流带在水平中点处的上下边。
+        var midSpan: ClosedRange<CGFloat>
+        var labelPlacement: LabelPlacement
+        /// 为避免重叠或超出图的范围而做的垂直移动。
+        var labelShift: CGFloat = 0
+
+        var isLabelOutside: Bool { labelPlacement != .inside }
+
+        /// 数值占据的纵向范围。
+        var labelSpan: ClosedRange<CGFloat> {
+            let top: CGFloat = switch labelPlacement {
+            case .inside: (midSpan.lowerBound + midSpan.upperBound) / 2 - FlowLayout.labelHeight / 2
+            case .above: midSpan.lowerBound - FlowLayout.labelOffset - FlowLayout.smallLabelHeight
+            case .below: midSpan.upperBound + FlowLayout.labelOffset
+            }
+            let height = isLabelOutside ? FlowLayout.smallLabelHeight : FlowLayout.labelHeight
+            return (top + labelShift)...(top + labelShift + height)
+        }
+
+        var labelPoint: CGPoint {
+            CGPoint(x: labelX, y: (labelSpan.lowerBound + labelSpan.upperBound) / 2)
+        }
     }
 
     var nodes: [Node] = []
@@ -167,6 +204,26 @@ private struct FlowLayout {
             ))
         }
         nodes.append(Node(node: nil, rect: hubRect, symbol: "laptopcomputer", value: DisplayFormat.watts(milliwatts: flow.computerMW)))
+        Self.arrangeLabels(&bands[..<flow.inputs.count], height: height)
+        Self.arrangeLabels(&bands[flow.inputs.count...], height: height)
+    }
+
+    /// 同一侧的数值横坐标相同，只需在纵向上避让：写在上方会超出图顶的改写在流带下方；
+    /// 两个数值重叠时，上面的往上移、下面的往下移，都不超出图的范围。
+    private static func arrangeLabels(_ bands: inout ArraySlice<Band>, height: CGFloat) {
+        for index in bands.indices where bands[index].labelPlacement == .above && bands[index].labelSpan.lowerBound < 0 {
+            bands[index].labelPlacement = .below
+        }
+        guard bands.count == 2, let first = bands.indices.first, let second = bands.indices.last else { return }
+        let needed = bands[first].labelSpan.upperBound + labelSpacing - bands[second].labelSpan.lowerBound
+        guard needed > 0 else { return }
+        let roomAbove = max(0, bands[first].labelSpan.lowerBound)
+        let roomBelow = max(0, height - bands[second].labelSpan.upperBound)
+        var up = min(needed / 2, roomAbove)
+        let down = min(needed - up, roomBelow)
+        up = min(needed - down, roomAbove)
+        bands[first].labelShift -= up
+        bands[second].labelShift += down
     }
 
     /// 一个节点时垂直居中；两个节点时第一个贴顶、第二个贴底。总高超出时等比缩小。
@@ -228,7 +285,6 @@ private struct FlowLayout {
         let midTop = (start.lowerBound + end.lowerBound) / 2
         let midBottom = (start.upperBound + end.upperBound) / 2
         let thinnest = min(start.upperBound - start.lowerBound, end.upperBound - end.lowerBound)
-        let labelAbove = thinnest < 17
         return Band(
             path: path,
             startX: startX,
@@ -236,8 +292,9 @@ private struct FlowLayout {
             sourceTint: sourceTint,
             targetTint: targetTint,
             label: label,
-            labelPoint: CGPoint(x: midX, y: labelAbove ? midTop - 4 : (midTop + midBottom) / 2),
-            labelAbove: labelAbove
+            labelX: midX,
+            midSpan: midTop...midBottom,
+            labelPlacement: thinnest < 17 ? .above : .inside
         )
     }
 }
@@ -261,10 +318,10 @@ private struct FlowRenderer {
         }
         for band in layout.bands {
             let text = Text(verbatim: band.label)
-                .font(.system(size: band.labelAbove ? 11.5 : 13, weight: .bold, design: .rounded))
+                .font(.system(size: band.isLabelOutside ? 11.5 : 13, weight: .bold, design: .rounded))
                 .monospacedDigit()
                 .foregroundStyle(.primary)
-            graphics.draw(text, at: band.labelPoint, anchor: band.labelAbove ? .bottom : .center)
+            graphics.draw(text, at: band.labelPoint, anchor: .center)
         }
     }
 

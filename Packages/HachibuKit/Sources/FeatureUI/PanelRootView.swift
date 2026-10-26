@@ -765,6 +765,17 @@ private struct PanelPreview: View {
     )))
 }
 
+/// 电池流带很细，数值写在流带外，用来检查数值是否超出图顶或互相重叠。
+#Preview("Plugged In, Slightly Draining") {
+    PanelPreview(reading: .battery(PanelPreviewData.snapshot(
+        percent: 72,
+        batteryPowerMW: -3000,
+        powerInMW: 30000,
+        systemLoadMW: 33000,
+        amperageMA: -250
+    )))
+}
+
 #Preview("Plugged In, Not Charging") {
     PanelPreview(reading: .battery(PanelPreviewData.snapshot()))
 }
