@@ -4,7 +4,7 @@ import FeatureUI
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// 主窗口。LSUIElement 应用默认不激活，打开主窗口时显式激活。
+/// 主窗口。打开时显示 Dock 图标并激活，关闭后恢复菜单栏常驻模式。
 /// 窗口显示期间历史数据每分钟刷新，关闭后停止。
 @MainActor
 final class MainWindowController: NSWindowController, NSWindowDelegate {
@@ -46,8 +46,12 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     }
 
     func showAndActivate() {
+        NSApp.setActivationPolicy(.regular)
         history?.start()
         showWindow(nil)
+        if window?.isMiniaturized == true {
+            window?.deminiaturize(nil)
+        }
         // 面板是 .nonactivatingPanel，点击后本应用仍不是前台应用，NSApp.activate() 会被系统拒绝，
         // 窗口留在其他应用后面。见 https://developer.apple.com/forums/thread/836619
         (NSApp as any LegacyActivation).activate(ignoringOtherApps: true)
@@ -56,6 +60,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
 
     func windowWillClose(_ notification: Notification) {
         history?.stop()
+        NSApp.setActivationPolicy(.accessory)
     }
 
     /// 选择保存位置后读取当前数据（已脱敏），写成 JSON。见 docs/v1技术设计.md 第 14 节。

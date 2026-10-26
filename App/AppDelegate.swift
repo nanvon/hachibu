@@ -55,6 +55,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
     }
 
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        mainWindowController.showAndActivate()
+        return false
+    }
+
     /// 打开历史数据库。失败时只记录日志：照常显示实时读数，不写库。
     private static func openHistoryStore() -> HistoryStore? {
         guard let bundleIdentifier = Bundle.main.bundleIdentifier else {
