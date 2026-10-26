@@ -56,7 +56,6 @@ import Testing
         let flow = try #require(PowerFlow(snapshot))
         #expect(flow.inputs == [PowerFlow.Stream(.charger, powerMW: snapshot.powerInMW)])
         #expect(flow.outputs == [PowerFlow.Stream(.system, powerMW: 18099)])
-        #expect(flow.computerMW == 18099)
     }
 
     @Test func health() {
@@ -134,7 +133,6 @@ import Testing
         let flow = try #require(PowerFlow(snapshot))
         #expect(flow.inputs == [PowerFlow.Stream(.battery, powerMW: 16159)])
         #expect(flow.outputs == [PowerFlow.Stream(.system, powerMW: 16159)])
-        #expect(flow.computerMW == 16159)
     }
 }
 
@@ -180,7 +178,6 @@ import Testing
         let flow = try #require(PowerFlow(snapshot))
         #expect(flow.inputs == [PowerFlow.Stream(.charger, powerMW: 83622)])
         #expect(flow.outputs == [PowerFlow.Stream(.system, powerMW: 26815), PowerFlow.Stream(.battery, powerMW: 56807)])
-        #expect(flow.computerMW == 83622)
     }
 }
 

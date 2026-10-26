@@ -505,16 +505,6 @@
         }
       }
     },
-    "Computer" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "电脑"
-          }
-        }
-      }
-    },
     "Could not change the charge limit." : {
       "localizations" : {
         "zh-Hans" : {

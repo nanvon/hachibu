@@ -23,8 +23,6 @@ public struct PowerFlow: Sendable, Equatable {
     public var inputs: [Stream]
     /// 从 MacBook 流出的流带，按从上到下排列。
     public var outputs: [Stream]
-    /// MacBook 节点上的数值：充电时为 `SystemPowerIn`，其他情况为 `SystemLoad`。
-    public var computerMW: Int?
 
     /// 不知道是否插电时返回 nil。
     public init?(_ snapshot: BatterySnapshot) {
@@ -36,7 +34,6 @@ public struct PowerFlow: Sendable, Equatable {
         // 判断方向时，绝对值小于 500 mW 视为 0。
         let battery = snapshot.batteryPowerMW.map { abs($0) < BatterySnapshot.batteryPowerDeadbandMW ? 0 : $0 }
 
-        computerMW = load
         outputs = [Stream(.system, powerMW: load)]
 
         guard isExternalPower else {
@@ -48,7 +45,6 @@ public struct PowerFlow: Sendable, Equatable {
         case let b? where b > 0:
             inputs = [Stream(.charger, powerMW: input)]
             outputs.append(Stream(.battery, powerMW: batteryMagnitude))
-            computerMW = input
         case let b? where b < 0:
             inputs = [Stream(.battery, powerMW: batteryMagnitude), Stream(.charger, powerMW: input)]
         default:

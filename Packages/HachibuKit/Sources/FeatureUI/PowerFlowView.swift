@@ -2,10 +2,11 @@ import BatteryCore
 import SwiftUI
 
 /// 三段功率流向图：供电方 → MacBook → 用电方。规则见 docs/v1技术设计.md 第 8 节，样式见第 19.2 节。
-/// 节点画成细竖条，图标和数值写在节点外侧；流带从供电方颜色渐变到用电方颜色，在 MacBook 一侧按同一比例收窄。
-/// 流带里有光点从左往右流动，`isAnimating` 为 false 或开启“减弱动态效果”时停止。读数变化时流带宽度用弹簧动画过渡。
+/// 节点画成细竖条，图标和数值写在节点外侧，贴着图的左右边缘对齐；流带为单色（供电方一侧用供电方颜色，用电方一侧用用电方颜色），
+/// 在 MacBook 一侧按同一比例收窄。流带里有光点从左往右流动，`isAnimating` 为 false 或开启“减弱动态效果”时停止。
+/// 读数变化时流带宽度用弹簧动画过渡。
 struct PowerFlowView: View {
-    private static let height: CGFloat = 156
+    private static let height: CGFloat = 116
 
     let flow: PowerFlow
     let isAnimating: Bool
@@ -27,10 +28,9 @@ struct PowerFlowView: View {
         return isAnimating && !reduceMotion ? .live : .off
     }
 
-    /// 例如“充电器 58.0 W, 电脑 58.0 W, 系统 16.0 W, 电池 42.0 W”。
+    /// 例如“充电器 58.0 W, 系统 16.0 W, 电池 42.0 W”。
     private var accessibilityText: Text {
         let parts = flow.inputs.map { Self.describe(FlowStyle.title($0.node), $0.powerMW) }
-            + [Self.describe(Text("Computer", bundle: .module), flow.computerMW)]
             + flow.outputs.map { Self.describe(FlowStyle.title($0.node), $0.powerMW) }
         return parts.dropFirst().reduce(parts[0]) { $0 + Text(verbatim: ", ") + $1 }
     }
@@ -48,10 +48,8 @@ private enum FlowMotion: Equatable {
 
 // MARK: - 样式
 
-/// 节点图标和颜色。充电器、充电中的电池为绿色，供电的电池为橙色，系统为靛蓝，MacBook 为品牌蓝。
+/// 节点图标和颜色。充电器、充电中的电池为绿色，供电的电池为橙色，系统为靛蓝，MacBook 为中性灰（见 `FlowPalette`）。
 enum FlowStyle {
-    static let hubTint = Color.brand
-
     static func title(_ node: PowerFlow.Node) -> Text {
         switch node {
         case .charger: Text("Charger", bundle: .module)
@@ -60,11 +58,12 @@ enum FlowStyle {
         }
     }
 
-    static func symbol(_ node: PowerFlow.Node) -> String {
+    /// 供电的电池与状态行“使用电池”的图标一致，充电中的电池带闪电。系统功率是整机功耗，用笔记本图标，与面板功率卡片一致。
+    static func symbol(_ node: PowerFlow.Node, isInput: Bool) -> String {
         switch node {
         case .charger: "powerplug.fill"
-        case .battery: "battery.100percent"
-        case .system: "cpu"
+        case .battery: isInput ? "battery.75percent" : "battery.100percent.bolt"
+        case .system: "laptopcomputer"
         }
     }
 
@@ -78,18 +77,16 @@ enum FlowStyle {
     }
 }
 
+/// 节点竖条用实色，流带用同色的淡色，拉开层次。
 private struct FlowPalette {
     /// 流带填充的不透明度。
     var bandOpacity: Double
-    /// 流带下方辉光的不透明度，0 表示不画。
-    var glowOpacity: Double
-    var hubIcon: Color
+    var hubBar: Color
 
     init(colorScheme: ColorScheme) {
         let dark = colorScheme == .dark
-        bandOpacity = dark ? 0.55 : 0.5
-        glowOpacity = dark ? 0.45 : 0
-        hubIcon = .primary.opacity(0.75)
+        bandOpacity = dark ? 0.35 : 0.3
+        hubBar = .primary.opacity(dark ? 0.55 : 0.45)
     }
 }
 
@@ -149,10 +146,9 @@ private struct FlowMetrics: VectorArithmetic {
     var magnitudeSquared: Double { (values * values).sum() }
 }
 
-/// 不参与动画的文字：每条流带和 MacBook 节点上的数值。
+/// 不参与动画的文字：每条流带的数值。
 private struct FlowLabels {
     var values: [FlowSlot: String] = [:]
-    var hub: String
 
     init(_ flow: PowerFlow) {
         for stream in flow.inputs {
@@ -161,7 +157,6 @@ private struct FlowLabels {
         for stream in flow.outputs {
             values[FlowSlot(stream.node, isInput: false)] = DisplayFormat.watts(milliwatts: stream.powerMW)
         }
-        hub = DisplayFormat.watts(milliwatts: flow.computerMW)
     }
 }
 
@@ -212,9 +207,9 @@ private struct FlowLayout {
     /// 流带和节点之间的空隙。
     static let bandGap: CGFloat = 2
     /// 合计较大的一侧最多占图高的比例。
-    static let sideFraction: CGFloat = 0.8
+    static let sideFraction: CGFloat = 0.88
     /// 流带到 MacBook 一侧收窄到的比例。
-    static let hubScale: CGFloat = 0.55
+    static let hubScale: CGFloat = 0.75
     static let nodeSpacing: CGFloat = 14
     static let minBandWidth: CGFloat = 3
     /// 两侧标签（图标 + 数值）的高度。
@@ -224,7 +219,8 @@ private struct FlowLayout {
         var slot: FlowSlot
         var rect: CGRect
         var opacity: CGFloat
-        var labelCenter: CGPoint
+        /// 标签贴边的位置：供电方为图的左边缘，用电方为右边缘。纵坐标为标签中心。
+        var labelAnchor: CGPoint
         var value: String
     }
 
@@ -234,8 +230,6 @@ private struct FlowLayout {
         var endX: CGFloat
         var start: ClosedRange<CGFloat>
         var end: ClosedRange<CGFloat>
-        var sourceTint: Color
-        var targetTint: Color
         var opacity: CGFloat
 
         var path: Path {
@@ -277,7 +271,6 @@ private struct FlowLayout {
     var nodes: [Node] = []
     var bands: [Band] = []
     var hubRect: CGRect
-    var hubValue: String
 
     init(metrics: FlowMetrics, labels: FlowLabels, size: CGSize) {
         let height = size.height
@@ -318,7 +311,7 @@ private struct FlowLayout {
                     slot: slot,
                     rect: CGRect(x: barX, y: side.lowerBound, width: Self.barWidth, height: side.upperBound - side.lowerBound),
                     opacity: presence,
-                    labelCenter: CGPoint(x: isInput ? Self.labelWidth / 2 : size.width - Self.labelWidth / 2, y: centers[index]),
+                    labelAnchor: CGPoint(x: isInput ? 0 : size.width, y: centers[index]),
                     value: labels.values[slot] ?? ""
                 ))
                 bands.append(isInput
@@ -326,20 +319,19 @@ private struct FlowLayout {
                         slot: slot,
                         startX: leftBarX + Self.barWidth + Self.bandGap, endX: hubX - Self.bandGap,
                         start: side, end: hubs[index],
-                        sourceTint: slot.tint, targetTint: FlowStyle.hubTint, opacity: presence
+                        opacity: presence
                     )
                     : Band(
                         slot: slot,
                         startX: hubX + Self.hubWidth + Self.bandGap, endX: rightBarX - Self.bandGap,
                         start: hubs[index], end: side,
-                        sourceTint: FlowStyle.hubTint, targetTint: slot.tint, opacity: presence
+                        opacity: presence
                     ))
             }
         }
         // 没有读数时竖条缩成一个圆点。
         let hubHeight = max(Self.hubWidth, hubBottom - hubTop)
         hubRect = CGRect(x: hubX, y: (hubTop + hubBottom - hubHeight) / 2, width: Self.hubWidth, height: hubHeight)
-        hubValue = labels.hub
     }
 
     /// 一侧两个节点都显示时才留间距，出现、消失时按显示程度缩放。
@@ -366,7 +358,11 @@ private struct FlowLayout {
                 centers = [mid - minDistance / 2, mid + minDistance / 2]
             }
         }
-        let shift = max(0, half - (centers.min() ?? half)) - max(0, (centers.max() ?? 0) - (height - half))
+        // 按显示程度加权：不显示的节点不参与，节点淡入淡出时位移连续变化。
+        let weighted = zip(centers, presence).map { center, presence in
+            (down: max(0, half - center) * min(1, presence), up: max(0, center - (height - half)) * min(1, presence))
+        }
+        let shift = (weighted.map(\.down).max() ?? 0) - (weighted.map(\.up).max() ?? 0)
         centers = centers.map { $0 + shift }
     }
 }
@@ -382,21 +378,11 @@ private struct FlowRenderer {
     /// 同一条轨道上相邻光点的平均间距。
     private static let particleSpacing: CGFloat = 44
     /// 光点拖尾的长度。
-    private static let streakLength: CGFloat = 12
+    private static let streakLength: CGFloat = 9
 
     func draw(in graphics: inout GraphicsContext) {
-        if palette.glowOpacity > 0 {
-            graphics.drawLayer { layer in
-                layer.addFilter(.blur(radius: 7))
-                layer.opacity = palette.glowOpacity
-                for band in layout.bands {
-                    layer.fill(band.path, with: gradient(for: band, opacity: band.opacity))
-                }
-            }
-        }
         for band in layout.bands {
-            let path = band.path
-            graphics.fill(path, with: gradient(for: band, opacity: palette.bandOpacity * band.opacity))
+            graphics.fill(band.path, with: .color(band.slot.tint.opacity(palette.bandOpacity * band.opacity)))
         }
         for node in layout.nodes {
             drawNode(node, in: &graphics)
@@ -411,20 +397,6 @@ private struct FlowRenderer {
         }
     }
 
-    /// 节点颜色占流带的大部分，只在靠近 MacBook 的一段过渡到品牌蓝，避免橙、蓝在中段混成灰色。
-    private func gradient(for band: FlowLayout.Band, opacity: Double) -> GraphicsContext.Shading {
-        let source = band.sourceTint.opacity(opacity)
-        let target = band.targetTint.opacity(opacity)
-        let stops: [Gradient.Stop] = band.slot.isInput
-            ? [.init(color: source, location: 0), .init(color: source, location: 0.5), .init(color: target, location: 1)]
-            : [.init(color: source, location: 0), .init(color: target, location: 0.5), .init(color: target, location: 1)]
-        return .linearGradient(
-            Gradient(stops: stops),
-            startPoint: CGPoint(x: band.startX, y: 0),
-            endPoint: CGPoint(x: band.endX, y: 0)
-        )
-    }
-
     /// 光点按流带宽度分成几条轨道，轨道的位置、间距、速度各不相同，光点带一段渐隐的拖尾，
     /// 沿流带从左往右移动，靠近两端时淡出。
     private func drawParticles(_ band: FlowLayout.Band, path: Path, time: TimeInterval, in graphics: GraphicsContext) {
@@ -432,14 +404,14 @@ private struct FlowRenderer {
         context.clip(to: path)
         let length = band.endX - band.startX
         let thickness = max(band.start.upperBound - band.start.lowerBound, band.end.upperBound - band.end.lowerBound)
-        let lanes = max(1, min(4, Int(thickness / 18)))
+        let lanes = max(1, min(2, Int(thickness / 30)))
         for lane in 0..<lanes {
             let seed = Self.fraction(Double(lane) * 0.618 + Double(band.slot.rawValue) * 0.37)
             let seed2 = Self.fraction(seed * 7.31 + 0.13)
             let spacing = Self.particleSpacing * (0.8 + 0.5 * seed2)
             let speed = 26 + 12 * seed
             let across = (CGFloat(lane) + 0.25 + 0.5 * seed2) / CGFloat(lanes)
-            let lineWidth = 1.5 + 0.7 * seed
+            let lineWidth = 1.2 + 0.4 * seed
             var x = CGFloat((time * speed + seed * spacing).truncatingRemainder(dividingBy: spacing)) - spacing
             while x < length + Self.streakLength {
                 defer { x += spacing }
@@ -457,7 +429,7 @@ private struct FlowRenderer {
                 context.stroke(
                     streak,
                     with: .linearGradient(
-                        Gradient(colors: [.white.opacity(0), .white.opacity(0.95 * fade)]),
+                        Gradient(colors: [.white.opacity(0), .white.opacity(0.6 * fade)]),
                         startPoint: point(x - Self.streakLength),
                         endPoint: point(x)
                     ),
@@ -477,23 +449,25 @@ private struct FlowRenderer {
 
         var context = graphics
         context.opacity = node.opacity
-        let icon = Text(Image(systemName: FlowStyle.symbol(node.slot.node)))
+        let icon = Text(Image(systemName: FlowStyle.symbol(node.slot.node, isInput: node.slot.isInput)))
             .font(.system(size: 12, weight: .semibold))
             .foregroundStyle(node.slot.tint)
-        context.draw(icon, at: CGPoint(x: node.labelCenter.x, y: node.labelCenter.y - 8), anchor: .center)
-        context.draw(valueText(node.value, size: 12.5), at: CGPoint(x: node.labelCenter.x, y: node.labelCenter.y + 8), anchor: .center)
+        // 图标和数值按两者中较宽的一个居中成一组，整组贴边。
+        let resolvedIcon = context.resolve(icon)
+        let resolvedValue = context.resolve(valueText(node.value, size: 12.5))
+        let unbounded = CGSize(width: CGFloat.infinity, height: .infinity)
+        let groupWidth = max(resolvedIcon.measure(in: unbounded).width, resolvedValue.measure(in: unbounded).width)
+        let point = node.labelAnchor
+        let centerX = node.slot.isInput ? point.x + groupWidth / 2 : point.x - groupWidth / 2
+        context.draw(resolvedIcon, at: CGPoint(x: centerX, y: point.y - 8), anchor: .center)
+        context.draw(resolvedValue, at: CGPoint(x: centerX, y: point.y + 8), anchor: .center)
     }
 
-    /// MacBook 节点：图标写在竖条上方，数值写在下方。
+    /// MacBook 节点是两侧汇合、分配的点，只画竖条：它的读数总与只有一条流带的那一侧相同，不重复写；笔记本图标只用在系统节点上。
     private func drawHub(in graphics: inout GraphicsContext) {
         let rect = layout.hubRect
         let bar = RoundedRectangle(cornerRadius: FlowLayout.hubWidth / 2, style: .continuous).path(in: rect)
-        graphics.fill(bar, with: .color(FlowStyle.hubTint))
-        let icon = Text(Image(systemName: "laptopcomputer"))
-            .font(.system(size: 13, weight: .medium))
-            .foregroundStyle(palette.hubIcon)
-        graphics.draw(icon, at: CGPoint(x: rect.midX, y: rect.minY - 6), anchor: .bottom)
-        graphics.draw(valueText(layout.hubValue, size: 12), at: CGPoint(x: rect.midX, y: rect.maxY + 5), anchor: .top)
+        graphics.fill(bar, with: .color(palette.hubBar))
     }
 
     private func valueText(_ value: String, size: CGFloat) -> Text {

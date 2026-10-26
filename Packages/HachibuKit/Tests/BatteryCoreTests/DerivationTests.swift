@@ -116,21 +116,18 @@ import Testing
         let flow = try #require(self.flow(external: true, battery: 2000))
         #expect(flow.inputs == [.init(.charger, powerMW: 12000)])
         #expect(flow.outputs == [.init(.system, powerMW: 10000), .init(.battery, powerMW: 2000)])
-        #expect(flow.computerMW == 12000)
     }
 
     @Test func smallBatteryPowerIsZero() throws {
         let flow = try #require(self.flow(external: true, battery: -499))
         #expect(flow.inputs == [.init(.charger, powerMW: 12000)])
         #expect(flow.outputs == [.init(.system, powerMW: 10000)])
-        #expect(flow.computerMW == 10000)
     }
 
     @Test func pluggedInDraining() throws {
         let flow = try #require(self.flow(external: true, input: 7000, battery: -3000))
         #expect(flow.inputs == [.init(.battery, powerMW: 3000), .init(.charger, powerMW: 7000)])
         #expect(flow.outputs == [.init(.system, powerMW: 10000)])
-        #expect(flow.computerMW == 10000)
     }
 
     @Test func onBattery() throws {
@@ -138,13 +135,11 @@ import Testing
         // 各流带取各自的原始读数，不配平。
         #expect(flow.inputs == [.init(.battery, powerMW: 8100)])
         #expect(flow.outputs == [.init(.system, powerMW: 8000)])
-        #expect(flow.computerMW == 8000)
     }
 
     @Test func missingValues() throws {
         let noLoad = try #require(flow(external: true, load: nil, battery: -3000))
         #expect(noLoad.outputs == [.init(.system, powerMW: nil)])
-        #expect(noLoad.computerMW == nil)
 
         let noBattery = try #require(flow(external: true, battery: nil))
         #expect(noBattery.inputs == [.init(.charger, powerMW: 12000)])
@@ -152,7 +147,6 @@ import Testing
 
         let noInput = try #require(flow(external: true, input: nil, battery: 2000))
         #expect(noInput.inputs == [.init(.charger, powerMW: nil)])
-        #expect(noInput.computerMW == nil)
     }
 }
 

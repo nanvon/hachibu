@@ -493,7 +493,7 @@ private struct SystemPowerCard: View {
         MetricCardLayout {
             MetricValue(text: DisplayFormat.watts(milliwatts: milliwatts))
         } caption: {
-            Image(systemName: "cpu")
+            Image(systemName: "laptopcomputer")
                 .foregroundStyle(Color.systemPower)
         } meter: {
             EnergyBars(count: Self.barCount, lit: litBars)
