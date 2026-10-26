@@ -11,6 +11,8 @@ final class StatusItemController: NSObject {
     private let monitor: BatteryMonitor
     private let settings: AppSettings
     private var lastIcon: MenuBarIcon?
+    private var lastAccessibilityLabel: String?
+    private var isPresentationUpdateScheduled = false
     private var appearanceObservation: NSKeyValueObservation?
 
     init(panelController: PanelController, monitor: BatteryMonitor, settings: AppSettings, statusItem: NSStatusItem) {
@@ -27,23 +29,46 @@ final class StatusItemController: NSObject {
         button.target = self
         button.action = #selector(togglePanel(_:))
         appearanceObservation = button.observe(\.effectiveAppearance) { [weak self] _, _ in
-            Task { @MainActor in self?.updatePresentation() }
+            Task { @MainActor in self?.schedulePresentationUpdate() }
         }
+        observePresentationChanges()
         updatePresentation()
     }
 
-    /// 读数或设置变化时更新；只有图标所需状态变化才重新绘制。
+    /// 只在读数或设置变化后续订，外观刷新不重复注册监听。
+    private func observePresentationChanges() {
+        withObservationTracking {
+            _ = monitor.reading
+            _ = settings.menuBarContent
+            _ = settings.menuBarIconStyle
+        } onChange: { [weak self] in
+            Task { @MainActor in
+                guard let self else { return }
+                self.observePresentationChanges()
+                self.schedulePresentationUpdate()
+            }
+        }
+    }
+
+    /// 合并同一轮读数、设置与外观变化产生的刷新请求。
+    private func schedulePresentationUpdate() {
+        guard !isPresentationUpdateScheduled else { return }
+        isPresentationUpdateScheduled = true
+        Task { [weak self] in
+            guard let self else { return }
+            self.isPresentationUpdateScheduled = false
+            self.updatePresentation()
+        }
+    }
+
+    /// 相同值不写回按钮，避免菜单栏重绘产生外观通知后再次触发布局。
     private func updatePresentation() {
         guard let button = statusItem.button else { return }
-        let presentation = withObservationTracking {
-            (
-                title: MenuBarTitle.string(for: monitor.reading, content: settings.menuBarContent),
-                content: settings.menuBarContent,
-                icon: MenuBarIcon(style: settings.menuBarIconStyle, reading: monitor.reading, appearance: button.effectiveAppearance)
-            )
-        } onChange: { [weak self] in
-            Task { @MainActor in self?.updatePresentation() }
-        }
+        let presentation = (
+            title: MenuBarTitle.string(for: monitor.reading, content: settings.menuBarContent),
+            content: settings.menuBarContent,
+            icon: MenuBarIcon(style: settings.menuBarIconStyle, reading: monitor.reading, appearance: button.effectiveAppearance)
+        )
         let title = presentation.icon.style == .ios && presentation.content == .batteryLevel && presentation.icon.percent != nil
             ? "" : presentation.title
         if button.title != title {
@@ -53,8 +78,15 @@ final class StatusItemController: NSObject {
         let batteryTitle = MenuBarTitle.string(for: monitor.reading, content: .batteryLevel)
         let accessibilityTitle = presentation.icon.style == .ios && presentation.content != .batteryLevel
             ? "\(batteryTitle), \(presentation.title)" : presentation.title
-        button.setAccessibilityLabel("Hachibu, \(accessibilityTitle)")
-        button.imagePosition = title.isEmpty ? .imageOnly : .imageLeading
+        let accessibilityLabel = "Hachibu, \(accessibilityTitle)"
+        if lastAccessibilityLabel != accessibilityLabel {
+            button.setAccessibilityLabel(accessibilityLabel)
+            lastAccessibilityLabel = accessibilityLabel
+        }
+        let imagePosition: NSControl.ImagePosition = title.isEmpty ? .imageOnly : .imageLeading
+        if button.imagePosition != imagePosition {
+            button.imagePosition = imagePosition
+        }
         if lastIcon != presentation.icon {
             button.image = presentation.icon.image()
             lastIcon = presentation.icon

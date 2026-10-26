@@ -3,9 +3,9 @@ import FeatureUI
 import SwiftUI
 
 /// 菜单栏弹出面板：负责定位、显示和关闭；内容由 FeatureUI 提供。
-/// 关闭时机：再次点击菜单栏图标、点击面板以外的位置、按 Esc、面板失去 key 状态。
+/// 关闭时机：再次点击菜单栏图标、点击面板以外的位置、按 Esc、切换到其他应用。
 @MainActor
-final class PanelController: NSObject, NSWindowDelegate {
+final class PanelController: NSObject {
     private static let cornerRadius: CGFloat = 28
     private static let gapBelowMenuBar: CGFloat = 6
     private static let screenMargin: CGFloat = 8
@@ -17,6 +17,7 @@ final class PanelController: NSObject, NSWindowDelegate {
     private var content: NSView?
     private weak var anchorButton: NSStatusBarButton?
     private var eventMonitors: [Any] = []
+    private var applicationActivationObserver: NSObjectProtocol?
 
     /// `onVisibilityChange` 在面板显示、关闭时调用，用于切换采样频率。
     init(
@@ -65,7 +66,6 @@ final class PanelController: NSObject, NSWindowDelegate {
         panel.hasShadow = true
         panel.hidesOnDeactivate = false
         panel.isReleasedWhenClosed = false
-        panel.delegate = self
         panel.onCancel = { [weak self] in self?.close() }
         panel.contentView = Self.makeBackground(for: content)
         panel.setContentSize(content.fittingSize)
@@ -84,12 +84,6 @@ final class PanelController: NSObject, NSWindowDelegate {
         panel.orderOut(nil)
         removeEventMonitors()
         onVisibilityChange(false)
-    }
-
-    // MARK: - NSWindowDelegate
-
-    func windowDidResignKey(_ notification: Notification) {
-        close()
     }
 
     // MARK: - Private
@@ -111,6 +105,7 @@ final class PanelController: NSObject, NSWindowDelegate {
         panel.setFrameOrigin(NSPoint(x: x, y: y))
 
         panel.makeKeyAndOrderFront(nil)
+        panel.invalidateShadow()
         installEventMonitors()
         onVisibilityChange(true)
     }
@@ -125,12 +120,17 @@ final class PanelController: NSObject, NSWindowDelegate {
 
         guard animated, panel.isVisible, !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else {
             panel.setFrame(frame, display: panel.isVisible)
+            panel.invalidateShadow()
             return
         }
         NSAnimationContext.runAnimationGroup { context in
             context.duration = Self.resizeDuration
             context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
             panel.animator().setFrame(frame, display: true)
+        } completionHandler: { [weak self] in
+            Task { @MainActor [weak self] in
+                self?.panel.invalidateShadow()
+            }
         }
     }
 
@@ -138,16 +138,32 @@ final class PanelController: NSObject, NSWindowDelegate {
         removeEventMonitors()
         let mask: NSEvent.EventTypeMask = [.leftMouseDown, .rightMouseDown]
 
+        // 非激活面板失去 key 可能早于菜单栏按钮 action，不能据此关闭。
+        // 改为监听应用切换，让 Command-Tab 等没有鼠标点击的操作也能关闭面板。
+        applicationActivationObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didActivateApplicationNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            guard let application = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication else { return }
+            let processIdentifier = application.processIdentifier
+            MainActor.assumeIsolated {
+                guard processIdentifier != ProcessInfo.processInfo.processIdentifier else { return }
+                self?.close()
+            }
+        }
+
         // 其他应用里的点击。
-        if let monitor = NSEvent.addGlobalMonitorForEvents(matching: mask, handler: { [weak self] _ in
-            self?.close()
+        if let monitor = NSEvent.addGlobalMonitorForEvents(matching: mask, handler: { [weak self] event in
+            guard let self, !self.isAnchorButtonClick(event) else { return }
+            self.close()
         }) {
             eventMonitors.append(monitor)
         }
 
         // 本应用里、面板和菜单栏图标以外的点击（例如主窗口）。
         if let monitor = NSEvent.addLocalMonitorForEvents(matching: mask, handler: { [weak self] event in
-            if let self, event.window !== self.panel, event.window !== self.anchorButton?.window {
+            if let self, event.window !== self.panel, !self.isAnchorButtonClick(event) {
                 self.close()
             }
             return event
@@ -156,15 +172,33 @@ final class PanelController: NSObject, NSWindowDelegate {
         }
     }
 
+    private func isAnchorButtonClick(_ event: NSEvent) -> Bool {
+        guard event.type == .leftMouseDown || event.type == .leftMouseUp,
+              let button = anchorButton, let window = button.window else {
+            return false
+        }
+        let buttonFrame = window.convertToScreen(button.convert(button.bounds, to: nil))
+        return buttonFrame.contains(NSEvent.mouseLocation)
+    }
+
     private func removeEventMonitors() {
         eventMonitors.forEach(NSEvent.removeMonitor)
         eventMonitors.removeAll()
+        if let applicationActivationObserver {
+            NSWorkspace.shared.notificationCenter.removeObserver(applicationActivationObserver)
+            self.applicationActivationObserver = nil
+        }
     }
 
     private static func makeBackground(for content: NSView) -> NSView {
         if #available(macOS 26.0, *) {
             let glass = NSGlassEffectView()
             glass.cornerRadius = cornerRadius
+            // 玻璃圆角只定义材质轮廓，同时裁剪承载内容的图层，避免圆角外露出矩形边。
+            glass.wantsLayer = true
+            glass.layer?.cornerRadius = cornerRadius
+            glass.layer?.cornerCurve = .continuous
+            glass.layer?.masksToBounds = true
             glass.contentView = content
             return glass
         }
