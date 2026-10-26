@@ -30,7 +30,7 @@ public final class SystemAlertNotifier: NSObject, AlertNotifier, UNUserNotificat
     }
 
     /// 同类提醒用同一个标识符，新的替换通知中心里旧的那条。
-    public func deliver(_ alert: BatteryAlert) async {
+    public func deliver(_ alert: BatteryAlert) async throws {
         let content = UNMutableNotificationContent()
         let identifier: String
         switch alert {
@@ -51,13 +51,9 @@ public final class SystemAlertNotifier: NSObject, AlertNotifier, UNUserNotificat
         }
         content.sound = .default
 
-        do {
-            try await UNUserNotificationCenter.current().add(
-                UNNotificationRequest(identifier: identifier, content: content, trigger: nil)
-            )
-        } catch {
-            logger.error("Failed to deliver notification: \(String(describing: error), privacy: .public)")
-        }
+        try await UNUserNotificationCenter.current().add(
+            UNNotificationRequest(identifier: identifier, content: content, trigger: nil)
+        )
     }
 
     /// 主窗口在前台时也显示横幅。

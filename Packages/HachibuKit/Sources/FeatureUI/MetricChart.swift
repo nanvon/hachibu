@@ -2,7 +2,7 @@ import Charts
 import SwiftUI
 
 /// 一个指标的历史曲线：上方是指标名和大号读数，下方卡片里是曲线和渐变面积。
-/// 读数平时显示最新点；悬停时换成悬停处最近一个点的值和时间。同组的几张图共享 `hoverDate`，一起显示同一时刻的竖线和读数。
+/// 读数平时显示最新点；悬停时显示选中采样时刻的值，缺失显示“—”。同组的几张图共享 `hoverDate`。
 /// 样式见 docs/v1技术设计.md 19.3。
 struct MetricChart: View {
     enum YScale: Equatable {
@@ -62,11 +62,11 @@ struct MetricChart: View {
 
     private var hoveredPoint: ChartPoint? {
         guard let hoverDate else { return nil }
-        return HistoryChartBuilder.nearest(in: points, to: hoverDate, within: maxGap)
+        return series.reading(at: hoverDate)
     }
 
     private var header: some View {
-        let shown = hoveredPoint ?? points.last
+        let shown = series.reading(at: hoverDate)
         return HStack(alignment: .lastTextBaseline) {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
@@ -81,8 +81,8 @@ struct MetricChart: View {
                     .contentTransition(.numericText())
             }
             Spacer(minLength: 8)
-            if let shown {
-                Text(verbatim: formatDate(shown.date))
+            if let shownDate = hoverDate ?? shown?.date {
+                Text(verbatim: formatDate(shownDate))
                     .font(.system(size: 11.5))
                     .fontWeight(hoveredPoint == nil ? .regular : .medium)
                     .foregroundStyle(hoveredPoint == nil ? HierarchicalShapeStyle.tertiary : .primary)
@@ -251,20 +251,21 @@ private struct MetricChartInteraction: View {
         GeometryReader { geometry in
             ZStack(alignment: .topLeading) {
                 if let hoverDate,
-                   let point = HistoryChartBuilder.nearest(in: points, to: hoverDate, within: maxGap),
                    let plotAnchor = proxy.plotFrame,
-                   let x = proxy.position(forX: point.date),
-                   let y = proxy.position(forY: point.value) {
+                   let x = proxy.position(forX: hoverDate) {
                     let frame = geometry[plotAnchor]
                     Path { path in
                         path.move(to: CGPoint(x: frame.minX + x, y: frame.minY))
                         path.addLine(to: CGPoint(x: frame.minX + x, y: frame.maxY))
                     }
                     .stroke(Color.primary.opacity(0.3), lineWidth: 1)
-                    Circle()
-                        .fill(pointColor(point))
-                        .frame(width: 8, height: 8)
-                        .position(x: frame.minX + x, y: frame.minY + y)
+                    if let point = HistoryChartBuilder.nearest(in: points, to: hoverDate, within: 0),
+                       let y = proxy.position(forY: point.value) {
+                        Circle()
+                            .fill(pointColor(point))
+                            .frame(width: 8, height: 8)
+                            .position(x: frame.minX + x, y: frame.minY + y)
+                    }
                 }
                 Rectangle()
                     .fill(.clear)

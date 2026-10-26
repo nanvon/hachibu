@@ -43,8 +43,8 @@ public struct DiagnosticReport: Sendable, Equatable, Codable {
     public static func collect(
         dataSource: any BatteryDataSource = IOKitBatteryDataSource(),
         systemProfiler: any SystemProfilerSource = SystemProfilerReader()
-    ) async -> DiagnosticReport {
-        let readings = dataSource.read()
+    ) async throws -> DiagnosticReport {
+        let readings = try dataSource.read()
         let profilerOutput = try? await systemProfiler.readPowerData()
         return DiagnosticReport(
             formatVersion: currentFormatVersion,

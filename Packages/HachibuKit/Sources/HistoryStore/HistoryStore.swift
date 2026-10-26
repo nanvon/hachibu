@@ -290,10 +290,17 @@ public final class HistoryStore: Sendable {
 
     // MARK: - 电池、每日数据、事件
 
-    /// 本机读数对应的电池 id。读到序列号时按哈希查找，没有就新建；读不到时用最近一次见到的电池；没有电池时为 nil。
+    static func latestNativeBatteryID(_ db: Database) throws -> Int64? {
+        try Int64.fetchOne(db, sql: """
+            SELECT id FROM batteries WHERE last_native_seen_at IS NOT NULL
+            ORDER BY last_native_seen_at DESC, id DESC LIMIT 1
+            """)
+    }
+
+    /// 本机读数对应的电池 id。读不到序列号时只沿用本机识别过的电池，不采用仅导入的电池。
     /// 新电池与上一次见到的电池不同时记 `battery_changed`。迁移前没有电池的本机每日数据归给第一次确定的电池。
     static func resolveBattery(_ db: Database, snapshot: BatterySnapshot, at date: Date) throws -> Int64? {
-        let previous = try Int64.fetchOne(db, sql: "SELECT id FROM batteries ORDER BY last_seen_at DESC, id DESC LIMIT 1")
+        let previous = try latestNativeBatteryID(db)
         guard let hash = snapshot.batterySerialHash else { return previous }
 
         let ts = UnixTime.seconds(date)
@@ -312,16 +319,19 @@ public final class HistoryStore: Sendable {
                 arguments: [snapshot.designCapacityMAh, snapshot.designCycleCount, batteryID, snapshot.designCapacityMAh, snapshot.designCycleCount]
             )
             try db.execute(
-                sql: "UPDATE batteries SET first_seen_at = MIN(first_seen_at, ?), last_seen_at = MAX(last_seen_at, ?) WHERE id = ?",
-                arguments: [ts, ts, batteryID]
+                sql: """
+                    UPDATE batteries SET first_seen_at = MIN(first_seen_at, ?), last_seen_at = MAX(last_seen_at, ?),
+                        last_native_seen_at = MAX(COALESCE(last_native_seen_at, ?), ?) WHERE id = ?
+                    """,
+                arguments: [ts, ts, ts, ts, batteryID]
             )
         } else {
             try db.execute(
                 sql: """
-                    INSERT INTO batteries (serial_sha256, design_mah, design_cycle_count, first_seen_at, last_seen_at)
-                    VALUES (?, ?, ?, ?, ?)
+                    INSERT INTO batteries (serial_sha256, design_mah, design_cycle_count, first_seen_at, last_seen_at, last_native_seen_at)
+                    VALUES (?, ?, ?, ?, ?, ?)
                     """,
-                arguments: [hash, snapshot.designCapacityMAh, snapshot.designCycleCount, ts, ts]
+                arguments: [hash, snapshot.designCapacityMAh, snapshot.designCycleCount, ts, ts, ts]
             )
             batteryID = db.lastInsertedRowID
         }

@@ -57,7 +57,7 @@ private final class BlockedChargeLimitWriter: ChargeLimitWriter, @unchecked Send
         await sampler.writeMinuteSample(at: date)
         let samples = try await store.minuteSamples(from: date.addingTimeInterval(-60), to: date.addingTimeInterval(60))
         #expect(writer.isBlocked)
-        guard case .battery(let snapshot) = reading.reading else {
+        guard case .battery(let snapshot)? = reading.reading else {
             Issue.record("Battery missing")
             return
         }
@@ -75,6 +75,20 @@ private struct FixedBatterySource: BatteryDataSource {
 
 private struct UnusedProfiler: SystemProfilerSource {
     func readPowerData() async throws -> RawValue { .dictionary([:]) }
+}
+
+private final class FailableBatterySource: BatteryDataSource, @unchecked Sendable {
+    private let lock = NSLock()
+    private var raw: RawBatteryReadings?
+
+    init(_ raw: RawBatteryReadings?) { self.raw = raw }
+    func set(_ raw: RawBatteryReadings?) { lock.withLock { self.raw = raw } }
+    func read() throws -> RawBatteryReadings {
+        try lock.withLock {
+            guard let raw else { throw BatteryDataSourceError.powerSourcesUnavailable }
+            return raw
+        }
+    }
 }
 
 /// 模拟完整采样卡在慢接口；由测试显式释放，不依赖真实硬件和运行循环。
@@ -271,6 +285,44 @@ private final class ReorderedPowerSource: @unchecked Sendable {
         #expect(monitor.reading == previous)
         power.set(.noBattery)
         await monitor.refreshPowerSource()
+        #expect(monitor.reading == .noBattery)
+    }
+
+    @Test func fullFailurePreservesQuickStateAndDoesNotWriteOldSamples() async throws {
+        let source = FailableBatterySource(rawPower(external: true))
+        let store = try HistoryStore.inMemory()
+        let sampler = BatterySampler(dataSource: source, systemProfiler: UnusedProfiler(), chargeLimitWriter: nil, store: store)
+        let monitor = BatteryMonitor(sampler: sampler, powerSourceReader: {
+            .battery(BatterySnapshot(percent: 79, isExternalPower: false, isCharging: false))
+        })
+        var failures = 0
+        monitor.onRead = { reading, _ in if reading == nil { failures += 1 } }
+        await monitor.read()
+        await monitor.refreshPowerSource()
+        let previous = monitor.reading
+        source.set(nil)
+        await monitor.read()
+        #expect(monitor.reading == previous)
+        #expect(failures == 1)
+
+        let now = Date()
+        await sampler.writeMinuteSample(at: now)
+        #expect(try await store.minuteSamples(from: now.addingTimeInterval(-60), to: now.addingTimeInterval(60)).isEmpty)
+        source.set(rawPower(external: false))
+        await monitor.read()
+        await sampler.writeMinuteSample(at: now)
+        #expect(try await store.minuteSamples(from: now.addingTimeInterval(-60), to: now.addingTimeInterval(60)).count == 1)
+    }
+
+    @Test func fullFailureAtStartupIsDistinctFromConfirmedNoBattery() async {
+        let source = FailableBatterySource(nil)
+        let monitor = monitor(source: source, power: { nil })
+        await monitor.read()
+        #expect(monitor.reading == nil)
+        var noBattery = rawPower(external: false)
+        noBattery.powerSources = []
+        source.set(noBattery)
+        await monitor.read()
         #expect(monitor.reading == .noBattery)
     }
 }

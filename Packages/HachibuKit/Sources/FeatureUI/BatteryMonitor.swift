@@ -36,10 +36,10 @@ public final class BatteryMonitor {
         sampler.canWriteChargeLimit
     }
 
-    /// 每次读取完成后调用，读数没变也调用。提醒判定用。
-    @ObservationIgnored public var onRead: (@MainActor (BatteryReading, Date) -> Void)?
+    /// 每次读取完成后调用，失败传 nil。提醒判定用，失败时中断温度持续计时。
+    @ObservationIgnored public var onRead: (@MainActor (BatteryReading?, Date) async -> Void)?
     /// 每次 `system_profiler` 读取成功后调用，健康信息没变也调用。
-    @ObservationIgnored public var onHealthRefresh: (@MainActor (BatteryHealthInfo) -> Void)?
+    @ObservationIgnored public var onHealthRefresh: (@MainActor (BatteryHealthInfo) async -> Void)?
 
     @ObservationIgnored private let sampler: BatterySampler
     @ObservationIgnored private let powerSourceReader: @Sendable () -> BatteryReading?
@@ -190,12 +190,16 @@ public final class BatteryMonitor {
 
     func read() async {
         let result = await sampler.read()
-        update(result.reading, at: result.date)
+        await update(result.reading, at: result.date)
     }
 
-    private func update(_ newReading: BatteryReading, at date: Date) {
+    private func update(_ newReading: BatteryReading?, at date: Date) async {
         // 多个触发同时读取时可能乱序返回，只保留较新的结果。
         if let lastReadAt, date < lastReadAt { return }
+        guard let newReading else {
+            await onRead?(nil, date)
+            return
+        }
         lastReadAt = date
         let updated: BatteryReading
         if let latestPowerSource, latestPowerSource.date > date {
@@ -204,7 +208,7 @@ public final class BatteryMonitor {
             updated = newReading
         }
         if reading != updated { reading = updated }
-        onRead?(updated, date)
+        await onRead?(updated, date)
     }
 
     /// 修改系统充电上限，完成后立即用读回的值刷新。上一次修改未完成时忽略。
@@ -213,7 +217,7 @@ public final class BatteryMonitor {
         isWritingChargeLimit = true
         chargeLimitWriteFailed = false
         let result = await sampler.writeChargeLimit(change)
-        update(result.reading, at: result.date)
+        await update(result.reading, at: result.date)
         chargeLimitWriteFailed = !result.applied
         isWritingChargeLimit = false
     }
@@ -240,7 +244,7 @@ public final class BatteryMonitor {
             if health != self.health {
                 self.health = health
             }
-            onHealthRefresh?(health)
+            await onHealthRefresh?(health)
         }
         await sampler.aggregateHistory(now: Date())
     }

@@ -5,16 +5,22 @@ import IOKit.ps
 /// 硬件数据的读取来源。v2 增加 SMC 读取时实现新的来源，不改调用方。
 public protocol BatteryDataSource: Sendable {
     /// 完整读取一次：IOPS、IORegistry 两个节点、充电器信息、充电上限（PowerUI 和文件）、低电量模式。
-    func read() -> RawBatteryReadings
+    /// 电源列表读取失败时抛错；读取成功但没有内置电池时返回空列表。
+    func read() throws -> RawBatteryReadings
+}
+
+public enum BatteryDataSourceError: Error, Sendable {
+    case powerSourcesUnavailable
 }
 
 /// 通过 IOKit 公开接口、PowerUI 只读接口和充电上限文件读取。
 public struct IOKitBatteryDataSource: BatteryDataSource {
     public init() {}
 
-    public func read() -> RawBatteryReadings {
-        RawBatteryReadings(
-            powerSources: Self.powerSources() ?? [],
+    public func read() throws -> RawBatteryReadings {
+        guard let sources = Self.powerSources() else { throw BatteryDataSourceError.powerSourcesUnavailable }
+        return RawBatteryReadings(
+            powerSources: sources,
             smartBattery: Self.registryProperties(IOServiceMatching("AppleSmartBattery")),
             smartBatteryPack: Self.registryProperties(IOServiceNameMatching("AppleSmartBatteryPack")),
             adapterDetails: Self.adapterDetails(),
@@ -39,12 +45,13 @@ public struct IOKitBatteryDataSource: BatteryDataSource {
         guard let info = IOPSCopyPowerSourcesInfo()?.takeRetainedValue(),
               let list = IOPSCopyPowerSourcesList(info)?.takeRetainedValue()
         else { return nil }
-        return (list as [CFTypeRef]).compactMap { source in
-            guard let description = IOPSGetPowerSourceDescription(info, source)?.takeUnretainedValue() else {
-                return nil
-            }
-            return RawValue(propertyList: description)?.dictionaryValue
+        var sources: [[String: RawValue]] = []
+        for source in list as [CFTypeRef] {
+            guard let description = IOPSGetPowerSourceDescription(info, source)?.takeUnretainedValue(),
+                  let dictionary = RawValue(propertyList: description)?.dictionaryValue else { return nil }
+            sources.append(dictionary)
         }
+        return sources
     }
 
     private static func registryProperties(_ matching: CFMutableDictionary) -> [String: RawValue]? {

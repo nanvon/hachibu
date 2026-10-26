@@ -196,6 +196,56 @@ private let utc: Calendar = {
     }
 }
 
+@Suite struct ChartReadingTests {
+    @Test func missingSelectedSampleDoesNotBorrowAdjacentOrLatestValue() {
+        let data = HistoryChartBuilder.recent(
+            minuteSamples: [
+                MinuteSample(timestamp: minute(0), percent: 50, temperatureCelsius: 30),
+                MinuteSample(timestamp: minute(1), percent: 51),
+                MinuteSample(timestamp: minute(2), percent: 52, temperatureCelsius: 32),
+            ],
+            now: minute(3), firstRecordedAt: minute(0)
+        )
+        #expect(data.percent.reading(at: minute(1))?.value == 51)
+        #expect(data.temperatureCelsius.reading(at: minute(1)) == nil)
+        #expect(data.temperatureCelsius.reading(at: minute(2))?.value == 32)
+        #expect(data.temperatureCelsius.reading(at: minute(100)) == nil)
+        #expect(data.temperatureCelsius.reading(at: nil)?.value == 32)
+    }
+
+    @Test func selectedDailyMetricsKeepOneDateWhenCapacityIsMissing() {
+        let data = HistoryChartBuilder.longTerm(
+            dailySamples: [
+                DailyHealth(day: "2026-10-19", systemMaxCapacityPercent: 95, cycleCount: 10),
+                DailyHealth(day: "2026-10-20", cycleCount: 11),
+            ],
+            now: minute(24 * 60), firstRecordedDay: "2026-10-19", calendar: utc
+        )
+        let selected = base.addingTimeInterval(12 * 3600)
+        #expect(data.cycleCount.reading(at: selected)?.value == 11)
+        #expect(data.maximumCapacityPercent.reading(at: selected) == nil)
+    }
+}
+
+@Suite struct HistoryCalendarTests {
+    @Test func longTermDatesUseGregorianYearsInTheRequestedTimeZone() throws {
+        let zone = try #require(TimeZone(identifier: "Asia/Shanghai"))
+        var buddhist = Calendar(identifier: .buddhist)
+        buddhist.timeZone = zone
+        var gregorian = utc
+        gregorian.timeZone = zone
+        let expectedStart = try #require(gregorian.date(from: DateComponents(year: 2026, month: 10, day: 19)))
+        #expect(HistoryChartBuilder.startOfDay("2026-10-19", calendar: buddhist) == expectedStart)
+        let data = HistoryChartBuilder.longTerm(
+            dailySamples: [DailyHealth(day: "2026-10-19", cycleCount: 10)],
+            now: base, firstRecordedDay: "2026-10-19", calendar: buddhist
+        )
+        #expect(data.domain.lowerBound == expectedStart)
+        #expect(data.cycleCount.points.first?.date == expectedStart.addingTimeInterval(12 * 3600))
+        #expect(data.cycleCount.points.first?.value == 10)
+    }
+}
+
 @Suite struct DownsampleTests {
     @Test func retainsSpikesEndpointsAndOriginalHoverValues() {
         let points = (0..<2880).map {

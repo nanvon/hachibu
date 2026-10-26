@@ -16,17 +16,32 @@ struct TemperatureAlertRule: Equatable {
     private var highSince: Date?
     private var lowSince: Date?
     private var lastReadingAt: Date?
+    private var lastThreshold: Int?
 
     init(hasAlerted: Bool = false) {
         self.hasAlerted = hasAlerted
     }
 
+    /// 开关、授权或阈值变化后，不能把之前的时间计入新的持续区间。
+    mutating func resetTiming() {
+        highSince = nil
+        lowSince = nil
+        lastReadingAt = nil
+    }
+
+    /// 系统没有接受通知请求，保留本次读数时间与高温区间，下次读数可重试。
+    mutating func deliveryFailed() {
+        hasAlerted = false
+    }
+
     /// 处理一次读数。返回 true 表示这次应当发出提醒。
     mutating func update(temperature: Double?, threshold: Int, at date: Date) -> Bool {
+        if lastThreshold != threshold {
+            resetTiming()
+            lastThreshold = threshold
+        }
         guard let temperature else {
-            highSince = nil
-            lowSince = nil
-            lastReadingAt = nil
+            resetTiming()
             return false
         }
         if let lastReadingAt, date.timeIntervalSince(lastReadingAt) > Self.maxReadingGap {
@@ -59,7 +74,6 @@ struct TemperatureAlertRule: Equatable {
         let since = highSince ?? date
         if date.timeIntervalSince(since) >= Self.triggerDuration {
             hasAlerted = true
-            highSince = nil
             return true
         }
         highSince = since

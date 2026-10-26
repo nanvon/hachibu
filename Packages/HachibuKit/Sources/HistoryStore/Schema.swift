@@ -123,6 +123,25 @@ extension HistoryStore {
             try db.drop(table: "daily_samples")
         }
 
+        // 导入的历史时间不能决定本机当前电池；单独记录本机识别时间。
+        migrator.registerMigration("v3") { db in
+            try db.alter(table: "batteries") { t in
+                t.add(column: "last_native_seen_at", .integer)
+            }
+            // 仅从本机每日记录和换电池事件恢复身份，不根据导入记录推断。
+            try db.execute(sql: """
+                UPDATE batteries SET last_native_seen_at = (
+                    SELECT MAX(ts) FROM (
+                        SELECT updated_at AS ts FROM daily_health
+                        WHERE source_id = \(HistoryStore.nativeSourceID) AND battery_id = batteries.id
+                        UNION ALL
+                        SELECT ts FROM battery_events
+                        WHERE kind = 'battery_changed' AND battery_id = batteries.id
+                    )
+                )
+                """)
+        }
+
         return migrator
     }
 }

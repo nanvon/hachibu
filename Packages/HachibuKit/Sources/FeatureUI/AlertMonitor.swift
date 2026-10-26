@@ -1,6 +1,9 @@
 import BatteryCore
 import Foundation
 import Observation
+import os
+
+private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Hachibu", category: "Alerts")
 
 /// 系统通知授权状态。
 public enum NotificationAuthorization: Sendable, Equatable {
@@ -19,7 +22,8 @@ public enum BatteryAlert: Sendable, Equatable {
 public protocol AlertNotifier: Sendable {
     func authorization() async -> NotificationAuthorization
     func requestAuthorization() async -> NotificationAuthorization
-    func deliver(_ alert: BatteryAlert) async
+    /// 系统接受通知请求后返回；失败抛错，由调用方保留重试机会。
+    func deliver(_ alert: BatteryAlert) async throws
 }
 
 /// 某个提醒当前的状态，通知页显示用。
@@ -46,6 +50,8 @@ public final class AlertMonitor {
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private var temperatureRule: TemperatureAlertRule
     @ObservationIgnored private var healthRule: HealthAlertRule
+    @ObservationIgnored private var isDeliveringTemperature = false
+    @ObservationIgnored private var isDeliveringHealth = false
 
     public init(settings: AppSettings, notifier: any AlertNotifier, defaults: UserDefaults = .standard) {
         self.settings = settings
@@ -81,65 +87,89 @@ public final class AlertMonitor {
 
     /// 重新读取授权状态。用户可能在系统设置里改过。
     public func refreshAuthorization() async {
-        setAuthorization(await notifier.authorization())
+        await setAuthorization(await notifier.authorization())
     }
 
     public func requestAuthorization() async {
-        setAuthorization(await notifier.requestAuthorization())
+        await setAuthorization(await notifier.requestAuthorization())
     }
 
     /// 每次读取后调用，读数没变也要调用：温度提醒按持续时间判定。
-    public func handleReading(_ reading: BatteryReading, at date: Date) {
-        guard case .battery(let snapshot) = reading else { return }
-        if latestTemperature != snapshot.temperatureCelsius {
-            latestTemperature = snapshot.temperatureCelsius
+    public func handleReading(_ reading: BatteryReading?, at date: Date) async {
+        let temperature: Double?
+        if case .battery(let snapshot)? = reading {
+            temperature = snapshot.temperatureCelsius
+        } else {
+            temperature = nil
         }
-        guard settings.temperatureAlertEnabled, authorization == .allowed else { return }
+        if latestTemperature != temperature { latestTemperature = temperature }
+        guard !isDeliveringTemperature else {
+            temperatureRule.resetTiming()
+            return
+        }
+        guard settings.temperatureAlertEnabled, authorization == .allowed else {
+            temperatureRule.resetTiming()
+            return
+        }
 
         let threshold = settings.temperatureAlertThreshold
-        let shouldAlert = temperatureRule.update(temperature: snapshot.temperatureCelsius, threshold: threshold, at: date)
+        let shouldAlert = temperatureRule.update(temperature: temperature, threshold: threshold, at: date)
+        if shouldAlert, let celsius = temperature {
+            isDeliveringTemperature = true
+            do {
+                try await notifier.deliver(.highTemperature(celsius: celsius, threshold: threshold))
+            } catch {
+                // 保留已经满足的高温时长，下一次有效读数可重试。
+                temperatureRule.deliveryFailed()
+                logger.error("Failed to deliver temperature alert: \(String(describing: error), privacy: .public)")
+            }
+            isDeliveringTemperature = false
+        }
         if temperatureRule.hasAlerted != isTemperatureAlerted {
             isTemperatureAlerted = temperatureRule.hasAlerted
             defaults.set(isTemperatureAlerted, forKey: Key.temperatureAlerted)
         }
-        if shouldAlert, let celsius = snapshot.temperatureCelsius {
-            deliver(.highTemperature(celsius: celsius, threshold: threshold))
-        }
     }
 
     /// 每次 `system_profiler` 读取成功后调用（约每小时一次）。
-    public func handleHealth(_ health: BatteryHealthInfo) {
+    public func handleHealth(_ health: BatteryHealthInfo) async {
         if latestMaximumCapacity != health.systemMaximumCapacityPercent {
             latestMaximumCapacity = health.systemMaximumCapacityPercent
         }
-        Task {
-            await refreshAuthorization()
-            evaluateHealth()
-        }
+        let wasAllowed = authorization == .allowed
+        await refreshAuthorization()
+        // 从未授权变为允许时，refreshAuthorization 已判定过，失败也不在同一次读数中重复发送。
+        if wasAllowed { await evaluateHealth() }
     }
 
-    private func evaluateHealth() {
-        guard settings.healthAlertEnabled, authorization == .allowed else { return }
+    private func evaluateHealth() async {
+        guard settings.healthAlertEnabled, authorization == .allowed, !isDeliveringHealth else { return }
 
         let threshold = settings.healthAlertThreshold
-        guard healthRule.update(maximumCapacity: latestMaximumCapacity, threshold: threshold),
+        var confirmedRule = healthRule
+        guard confirmedRule.update(maximumCapacity: latestMaximumCapacity, threshold: threshold),
               let maximumCapacity = latestMaximumCapacity else { return }
-        healthAlertedThreshold = healthRule.alertedThreshold
-        defaults.set(healthAlertedThreshold, forKey: Key.healthAlertedThreshold)
-        deliver(.lowHealth(maximumCapacityPercent: maximumCapacity, threshold: threshold))
+        isDeliveringHealth = true
+        defer { isDeliveringHealth = false }
+        do {
+            try await notifier.deliver(.lowHealth(maximumCapacityPercent: maximumCapacity, threshold: threshold))
+            healthRule = confirmedRule
+            healthAlertedThreshold = healthRule.alertedThreshold
+            defaults.set(healthAlertedThreshold, forKey: Key.healthAlertedThreshold)
+        } catch {
+            logger.error("Failed to deliver health alert: \(String(describing: error), privacy: .public)")
+        }
     }
 
     /// 授权变为允许时，用已有的健康度读数判定一次，不必等下一次 `system_profiler`。
-    private func setAuthorization(_ authorization: NotificationAuthorization) {
+    private func setAuthorization(_ authorization: NotificationAuthorization) async {
         guard authorization != self.authorization else { return }
         self.authorization = authorization
         if authorization == .allowed {
-            evaluateHealth()
+            await evaluateHealth()
+        } else {
+            temperatureRule.resetTiming()
         }
-    }
-
-    private func deliver(_ alert: BatteryAlert) {
-        Task { [notifier] in await notifier.deliver(alert) }
     }
 
     private enum Key {

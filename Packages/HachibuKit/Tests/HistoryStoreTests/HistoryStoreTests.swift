@@ -225,6 +225,18 @@ private func batteryCount(_ store: HistoryStore) throws -> Int {
         #expect(DailyHealth.day(for: lateEvening, calendar: shanghai) == "2026-10-20")
     }
 
+    @Test func storedDaysUseGregorianYearsWithNonGregorianSystemCalendar() async throws {
+        var buddhist = Calendar(identifier: .buddhist)
+        buddhist.timeZone = shanghai.timeZone
+        let date = base.addingTimeInterval(-3600)
+        #expect(DailyHealth.day(for: date, calendar: buddhist) == "2026-10-20")
+        let store = try HistoryStore.inMemory()
+        try await store.record(snapshot(), at: date, calendar: buddhist)
+        try await store.record(snapshot(), at: date.addingTimeInterval(60), calendar: shanghai)
+        #expect(try await store.dailyHealth().map(\.day) == ["2026-10-20"])
+        #expect(try await store.recordingSummary()?.dayCount == 1)
+    }
+
     @Test func minuteRecordWritesSampleAndDailyCapacity() async throws {
         let store = try HistoryStore.inMemory()
         try await store.record(snapshot(), at: minute(3).addingTimeInterval(20), calendar: utc)
@@ -361,7 +373,7 @@ private func batteryCount(_ store: HistoryStore) throws -> Int {
         let migrations = try await reopened.dbQueue.read { db in
             try HistoryStore.migrator.appliedIdentifiers(db)
         }
-        #expect(migrations == ["v1", "v2"])
+        #expect(migrations == ["v1", "v2", "v3"])
     }
 
     /// v1 的每日数据转入 `daily_health`，没有电池；第一次确定电池时归给它。旧的小时行新增列为 NULL。
@@ -402,6 +414,32 @@ private func batteryCount(_ store: HistoryStore) throws -> Int {
         }
         #expect(unassigned == 0)
         #expect(try await store.events(.batteryChanged).isEmpty)
+    }
+
+    @Test func v3OnlyRestoresNativeBatteryIdentityFromNativeRecords() async throws {
+        let queue = try DatabaseQueue()
+        try HistoryStore.migrator.migrate(queue, upTo: "v2")
+        try await queue.write { db in
+            try db.execute(sql: """
+                INSERT INTO batteries (id, serial_sha256, first_seen_at, last_seen_at)
+                VALUES (1, 'native', 100, 100), (2, 'imported', 200, 9999999999), (3, 'event-only', 300, 300);
+                INSERT INTO daily_health (day, source_id, battery_id, cycle_count, updated_at)
+                VALUES ('2026-10-01', 1, 1, 60, 100);
+                INSERT INTO battery_events (ts, kind, battery_id) VALUES (300, 'battery_changed', 3);
+                """)
+        }
+        let store = try HistoryStore(dbQueue: queue)
+        let nativeID = try await queue.read { db in try HistoryStore.latestNativeBatteryID(db) }
+        #expect(nativeID == 3)
+        let importedNativeTime = try await queue.read { db in
+            try Int64.fetchOne(db, sql: "SELECT last_native_seen_at FROM batteries WHERE id = 2")
+        }
+        #expect(importedNativeTime == nil)
+        try await store.record(snapshot(serial: nil), at: base, calendar: utc)
+        let recordedBattery = try await queue.read { db in
+            try Int64.fetchOne(db, sql: "SELECT battery_id FROM daily_health WHERE day = '2026-10-20' AND source_id = 1")
+        }
+        #expect(recordedBattery == 3)
     }
 }
 

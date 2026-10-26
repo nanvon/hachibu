@@ -134,7 +134,7 @@ public final class HistoryModel {
         longTermGeneration += 1
         let generation = longTermGeneration
         let now = Date()
-        let today = Calendar.current.startOfDay(for: now)
+        let today = DailyHealth.gregorianCalendar().startOfDay(for: now)
         let cachedSamples = cachedDailySamples
         let cachedDay = longTermDay
         do {

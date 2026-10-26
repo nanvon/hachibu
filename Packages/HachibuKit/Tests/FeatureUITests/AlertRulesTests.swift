@@ -77,6 +77,31 @@ import Testing
         #expect(results.filter { $0 }.count == 2)
         #expect(results.last == true)
     }
+
+    @Test func changingThresholdRestartsHighTemperatureTiming() {
+        var rule = TemperatureAlertRule()
+        _ = feed(&rule, [41, 41, 41])
+        let firstHotReading = rule.update(temperature: 46, threshold: 45, at: start.addingTimeInterval(180))
+        #expect(!firstHotReading)
+        let results = [240.0, 300, 360].map {
+            rule.update(temperature: 46, threshold: 45, at: start.addingTimeInterval($0))
+        }
+        #expect(results == [false, false, true])
+    }
+
+    @Test func changingThresholdRestartsRecoveryTiming() {
+        var rule = TemperatureAlertRule(hasAlerted: true)
+        _ = feed(&rule, [37, 37, 37, 37, 37])
+        // 37°C 在新阈值 35°C 下已经不属于恢复区间。
+        _ = rule.update(temperature: 32, threshold: 35, at: start.addingTimeInterval(300))
+        #expect(rule.hasAlerted)
+        for second in [360.0, 420, 480, 540] {
+            _ = rule.update(temperature: 32, threshold: 35, at: start.addingTimeInterval(second))
+        }
+        #expect(rule.hasAlerted)
+        _ = rule.update(temperature: 32, threshold: 35, at: start.addingTimeInterval(600))
+        #expect(!rule.hasAlerted)
+    }
 }
 
 @Suite struct HealthAlertRuleTests {

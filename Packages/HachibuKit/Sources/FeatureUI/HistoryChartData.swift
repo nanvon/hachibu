@@ -28,6 +28,12 @@ struct ChartSeries: Equatable, Sendable {
         plotPoints = HistoryChartBuilder.downsample(points)
     }
 
+    /// 没有悬停时显示最新值；悬停时只读选中时刻，缺失值不借用其他时刻。
+    func reading(at selection: Date?) -> ChartPoint? {
+        guard let selection else { return points.last }
+        return HistoryChartBuilder.nearest(in: points, to: selection, within: 0)
+    }
+
     static func == (lhs: Self, rhs: Self) -> Bool {
         lhs.points == rhs.points && lhs.plotPoints == rhs.plotPoints
     }
@@ -137,6 +143,7 @@ enum HistoryChartBuilder {
         firstRecordedDay: String?,
         calendar: Calendar = .current
     ) -> LongTermChartData {
+        let calendar = DailyHealth.gregorianCalendar(timeZone: calendar.timeZone)
         let today = calendar.startOfDay(for: now)
         let end = calendar.date(byAdding: .day, value: 1, to: today) ?? today.addingTimeInterval(24 * 3600)
         let firstRecordedStart = firstRecordedDay.flatMap { startOfDay($0, calendar: calendar) }
@@ -170,6 +177,7 @@ enum HistoryChartBuilder {
 
     /// 解析 `YYYY-MM-DD`，返回当天 0 点。格式不符时为 nil。
     static func startOfDay(_ day: String, calendar: Calendar = .current) -> Date? {
+        let calendar = DailyHealth.gregorianCalendar(timeZone: calendar.timeZone)
         let parts = day.split(separator: "-").compactMap { Int($0) }
         guard parts.count == 3 else { return nil }
         return calendar.date(from: DateComponents(year: parts[0], month: parts[1], day: parts[2]))

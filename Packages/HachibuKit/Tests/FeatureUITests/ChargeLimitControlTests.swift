@@ -36,7 +36,7 @@ import Testing
 
         let lowered = await sampler.writeChargeLimit(.limit(85))
         #expect(lowered.applied)
-        #expect(lowered.reading.chargeLimit == .on(percent: 85))
+        #expect(lowered.reading?.chargeLimit == .on(percent: 85))
 
         #expect(await sampler.writeChargeLimit(.disable).applied)
 
@@ -60,7 +60,7 @@ import Testing
 
         let result = await sampler.writeChargeLimit(.limit(100))
         #expect(result.applied)
-        #expect(result.reading.chargeLimit == .off)
+        #expect(result.reading?.chargeLimit == .off)
     }
 
     @Test func notInteractiveWhileBlockedOrWriting() throws {

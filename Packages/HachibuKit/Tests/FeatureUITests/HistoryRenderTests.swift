@@ -9,6 +9,47 @@ import Testing
 @MainActor
 @Suite struct HistoryRenderTests {
     @Test(.enabled(if: ProcessInfo.processInfo.environment["HACHIBU_RENDER_DIR"] != nil))
+    func renderMissingHoveredMetric() throws {
+        let directory = URL(fileURLWithPath: ProcessInfo.processInfo.environment["HACHIBU_RENDER_DIR"]!)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let start = Date(timeIntervalSince1970: 1_792_454_400)
+        let dates = (0..<5).map { start.addingTimeInterval(Double($0) * 60) }
+        let percent = ChartSeries(dates.enumerated().map {
+            ChartPoint(date: $0.element, value: Double(60 + $0.offset * 5), segment: 0)
+        })
+        let temperature = ChartSeries(HistoryChartBuilder.segmented(dates.enumerated().map {
+            ($0.element, $0.offset == 2 ? nil : Double(30 + $0.offset))
+        }, maxGap: 180))
+        for scheme in [ColorScheme.light, .dark] {
+            let charts = HStack(alignment: .top, spacing: 18) {
+                MetricChart(
+                    title: Text(verbatim: "Battery Level"), series: percent, hoverPoints: percent.points,
+                    domain: dates[0]...dates[4], maxGap: 180, yScale: .fixed(0...100), style: .line(.blue),
+                    formatValue: { "\(Int($0))%" },
+                    formatDate: { $0.formatted(date: .omitted, time: .shortened) },
+                    hoverDate: .constant(dates[2])
+                )
+                MetricChart(
+                    title: Text(verbatim: "Battery Temperature"), series: temperature, hoverPoints: percent.points,
+                    domain: dates[0]...dates[4], maxGap: 180, style: .line(.red),
+                    formatValue: { DisplayFormat.celsius($0) },
+                    formatDate: { $0.formatted(date: .omitted, time: .shortened) },
+                    hoverDate: .constant(dates[2])
+                )
+            }
+            let renderer = ImageRenderer(content: charts
+                .padding(20)
+                .frame(width: 940)
+                .background(scheme == .dark ? Color(white: 0.12) : Color(white: 0.96))
+                .environment(\.colorScheme, scheme))
+            renderer.scale = 2
+            let image = try #require(renderer.cgImage)
+            let data = try #require(NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:]))
+            try data.write(to: directory.appendingPathComponent("history-hover-missing-\(scheme == .dark ? "dark" : "light").png"))
+        }
+    }
+
+    @Test(.enabled(if: ProcessInfo.processInfo.environment["HACHIBU_RENDER_DIR"] != nil))
     func renderHoveredChart() throws {
         let directory = URL(fileURLWithPath: ProcessInfo.processInfo.environment["HACHIBU_RENDER_DIR"]!)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)

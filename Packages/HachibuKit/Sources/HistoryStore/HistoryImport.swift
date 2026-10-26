@@ -255,7 +255,8 @@ extension HistoryStore {
             ))
             let currentSerial = try String.fetchOne(
                 db,
-                sql: "SELECT serial_sha256 FROM batteries ORDER BY last_seen_at DESC, id DESC LIMIT 1"
+                sql: "SELECT serial_sha256 FROM batteries WHERE id = ?",
+                arguments: [try Self.latestNativeBatteryID(db)]
             )
             let fileSerials = Set(file.days.compactMap(\.serialHash))
             return HistoryImportPreview(
@@ -338,7 +339,8 @@ extension HistoryStore {
             try db.execute(
                 sql: """
                     DELETE FROM batteries
-                    WHERE id NOT IN (SELECT battery_id FROM daily_health WHERE battery_id IS NOT NULL)
+                    WHERE last_native_seen_at IS NULL
+                      AND id NOT IN (SELECT battery_id FROM daily_health WHERE battery_id IS NOT NULL)
                       AND id NOT IN (SELECT battery_id FROM battery_events WHERE battery_id IS NOT NULL)
                     """
             )

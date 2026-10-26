@@ -33,17 +33,23 @@ public actor BatterySampler {
         self.store = store
     }
 
-    /// 完整读取一次，返回结果和读取时间。
-    func read() -> (reading: BatteryReading, date: Date) {
+    /// 完整读取一次。失败时返回 nil，并停止用之前的读数写入新样本。
+    func read() -> (reading: BatteryReading?, date: Date) {
         // IOPS 在完整读取的最开始采集；不能用 PowerUI 等调用结束的时间把旧状态标成新状态。
         let date = Date()
-        let reading = BatteryReading(dataSource.read())
-        latest = reading
-        return (reading, date)
+        do {
+            let reading = BatteryReading(try dataSource.read())
+            latest = reading
+            return (reading, date)
+        } catch {
+            latest = nil
+            logger.error("Failed to read battery: \(String(describing: error), privacy: .public)")
+            return (nil, date)
+        }
     }
 
     /// 修改系统充电上限，再完整读取一次。`applied` 表示写入成功且读回的设置已符合这次修改。
-    func writeChargeLimit(_ change: ChargeLimitChange) async -> (reading: BatteryReading, date: Date, applied: Bool) {
+    func writeChargeLimit(_ change: ChargeLimitChange) async -> (reading: BatteryReading?, date: Date, applied: Bool) {
         var written = false
         if let chargeLimitWriter {
             do {
@@ -59,7 +65,7 @@ public actor BatterySampler {
             }
         }
         let result = read()
-        guard case .battery(let snapshot) = result.reading, written else {
+        guard case .battery(let snapshot)? = result.reading, written else {
             return (result.reading, result.date, false)
         }
         let applied = change.isApplied(to: snapshot.chargeLimit)

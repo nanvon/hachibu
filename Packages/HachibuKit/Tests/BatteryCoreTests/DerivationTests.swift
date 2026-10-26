@@ -128,8 +128,18 @@ import Testing
         }
     }
 
-    @Test func collectRedactsAndToleratesProfilerFailure() async {
-        let report = await DiagnosticReport.collect(dataSource: FakeDataSource(), systemProfiler: FailingProfiler())
+    private struct FailingDataSource: BatteryDataSource {
+        func read() throws -> RawBatteryReadings { throw BatteryDataSourceError.powerSourcesUnavailable }
+    }
+
+    @Test func collectDoesNotExportAReadFailureAsNoBattery() async {
+        await #expect(throws: BatteryDataSourceError.self) {
+            try await DiagnosticReport.collect(dataSource: FailingDataSource(), systemProfiler: FailingProfiler())
+        }
+    }
+
+    @Test func collectRedactsAndToleratesProfilerFailure() async throws {
+        let report = try await DiagnosticReport.collect(dataSource: FakeDataSource(), systemProfiler: FailingProfiler())
         #expect(report.formatVersion == DiagnosticReport.currentFormatVersion)
         #expect(report.readings.powerSources.first?["Hardware Serial Number"] == nil)
         #expect(report.readings.powerSources.first?["Current Capacity"] == .int(80))

@@ -50,6 +50,14 @@ private func parse(_ records: [(String, String, Any)], calendar: Calendar = utc)
         #expect(file.timeZone == "Asia/Shanghai")
     }
 
+    @Test func importUsesGregorianDatesWithNonGregorianCalendar() throws {
+        var buddhist = Calendar(identifier: .buddhist)
+        buddhist.timeZone = TimeZone(identifier: "Asia/Shanghai")!
+        let file = try parse([("cycle_count", "2026-10-20T20:00:00Z", 68)], calendar: buddhist)
+        #expect(file.firstDay == "2026-10-21")
+        #expect(file.timeZone == "Asia/Shanghai")
+    }
+
     @Test func invalidRecordsAreSkipped() throws {
         let file = try parse([
             ("cycle_count", "2026-10-20T08:00:00Z", 68),
@@ -215,6 +223,72 @@ private func parse(_ records: [(String, String, Any)], calendar: Calendar = utc)
         // 另一块电池没有设计容量，不能计算容量比。
         let day = try #require(try await store.dailyHealth().first)
         #expect(day.designCapacityMAh == nil)
+    }
+
+    @Test func importedBatteryCannotBecomeUnknownNativeBattery() async throws {
+        let store = try HistoryStore.inMemory()
+        let imported = try parse([
+            ("battery_serial", "2026-10-01T08:00:00Z", "B"),
+            ("design_mah", "2026-10-01T08:00:00Z", 6000),
+            ("full_charge_mah", "2026-10-01T08:00:00Z", 5500),
+        ])
+        try await store.importHistory(imported)
+        let date = Date(timeIntervalSince1970: 1_792_454_400 + 3600)
+        try await store.record(BatterySnapshot(fullChargeCapacityMAh: 7942, cycleCount: 68), at: date, calendar: utc)
+        let nativeBattery = try await store.dbQueue.read { db in
+            try Int64.fetchOne(db, sql: "SELECT battery_id FROM daily_health WHERE source_id = 1")
+        }
+        #expect(nativeBattery == nil)
+        #expect(try await store.dailyHealth().last?.designCapacityMAh == nil)
+        let preview = try await store.previewImport(parse([
+            ("battery_serial", "2026-10-02T08:00:00Z", "C"),
+            ("cycle_count", "2026-10-02T08:00:00Z", 1),
+        ]))
+        #expect(!preview.isDifferentBattery)
+
+        try await store.record(nativeSnapshot, at: date.addingTimeInterval(60), calendar: utc)
+        #expect(try await store.events(.batteryChanged).isEmpty)
+        let identified = try await store.dbQueue.read { db in
+            try String.fetchOne(db, sql: "SELECT b.serial_sha256 FROM batteries b JOIN daily_health d ON d.battery_id = b.id WHERE d.source_id = 1")
+        }
+        #expect(identified == BatterySnapshot.serialHash("A"))
+    }
+
+    @Test func newerImportedDatesDoNotChangeNativeIdentityOrImportWarning() async throws {
+        let store = try await nativeStore()
+        let file = try parse([
+            ("battery_serial", "2099-10-01T08:00:00Z", "B"),
+            ("cycle_count", "2099-10-01T08:00:00Z", 5),
+        ])
+        try await store.importHistory(file)
+        let newFileForB = try parse([
+            ("battery_serial", "2099-10-02T08:00:00Z", "B"),
+            ("cycle_count", "2099-10-02T08:00:00Z", 6),
+        ])
+        #expect(try await store.previewImport(newFileForB).isDifferentBattery)
+        let date = Date(timeIntervalSince1970: 1_792_454_400 + 7200)
+        var missingSerial = nativeSnapshot
+        missingSerial.batterySerialHash = nil
+        try await store.record(missingSerial, at: date, calendar: utc)
+        try await store.record(nativeSnapshot, at: date.addingTimeInterval(60), calendar: utc)
+        #expect(try await store.events(.batteryChanged).isEmpty)
+        let nativeHash = try await store.dbQueue.read { db in
+            try String.fetchOne(db, sql: "SELECT b.serial_sha256 FROM batteries b JOIN daily_health d ON d.battery_id = b.id WHERE d.source_id = 1")
+        }
+        #expect(nativeHash == BatterySnapshot.serialHash("A"))
+    }
+
+    @Test func deletingImportPreservesNativeIdentityWithoutDailyValues() async throws {
+        let store = try HistoryStore.inMemory()
+        let date = Date(timeIntervalSince1970: 1_792_454_400)
+        try await store.record(BatterySnapshot(batterySerialHash: BatterySnapshot.serialHash("A")), at: date, calendar: utc)
+        let id = try await store.importHistory(parse([("cycle_count", "2026-10-01T08:00:00Z", 5)]))
+        try await store.deleteImportedSource(id: id)
+        try await store.record(BatterySnapshot(fullChargeCapacityMAh: 7942), at: date.addingTimeInterval(60), calendar: utc)
+        let nativeHash = try await store.dbQueue.read { db in
+            try String.fetchOne(db, sql: "SELECT b.serial_sha256 FROM batteries b JOIN daily_health d ON d.battery_id = b.id WHERE d.source_id = 1")
+        }
+        #expect(nativeHash == BatterySnapshot.serialHash("A"))
     }
 
     @Test func deleteRemovesImportedDataAndOrphanBatteries() async throws {

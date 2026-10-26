@@ -188,8 +188,16 @@ public struct DailyHealth: Sendable, Equatable {
         self.includesImportedData = includesImportedData
     }
 
-    /// 按 `calendar` 的时区取本地日期，格式 `YYYY-MM-DD`。
+    /// 存储与解析日期键统一用公历；只跟随系统时区，不跟随用户选择的日历。
+    public static func gregorianCalendar(timeZone: TimeZone = .current) -> Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+        return calendar
+    }
+
+    /// 按 `calendar` 的时区取公历本地日期，格式 `YYYY-MM-DD`。
     public static func day(for date: Date, calendar: Calendar = .current) -> String {
+        let calendar = gregorianCalendar(timeZone: calendar.timeZone)
         let components = calendar.dateComponents([.year, .month, .day], from: date)
         return String(format: "%04d-%02d-%02d", components.year ?? 0, components.month ?? 0, components.day ?? 0)
     }

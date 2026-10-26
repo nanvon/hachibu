@@ -36,10 +36,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let batteryMonitor = BatteryMonitor(sampler: sampler)
         self.batteryMonitor = batteryMonitor
         batteryMonitor.onRead = { [alertMonitor] reading, date in
-            alertMonitor.handleReading(reading, at: date)
+            await alertMonitor.handleReading(reading, at: date)
         }
         batteryMonitor.onHealthRefresh = { [alertMonitor] health in
-            alertMonitor.handleHealth(health)
+            await alertMonitor.handleHealth(health)
         }
         alertMonitor.start()
         batteryMonitor.start()

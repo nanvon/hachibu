@@ -3,6 +3,6 @@
 import BatteryCore
 import Foundation
 
-let report = await DiagnosticReport.collect()
+let report = try await DiagnosticReport.collect()
 FileHandle.standardOutput.write(try report.jsonData())
 FileHandle.standardOutput.write(Data("\n".utf8))

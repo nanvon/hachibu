@@ -99,7 +99,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         guard await savePanel.beginSheetModal(for: window) == .OK, let url = savePanel.url else { return }
 
         do {
-            let report = await DiagnosticReport.collect()
+            let report = try await DiagnosticReport.collect()
             try report.jsonData().write(to: url, options: .atomic)
         } catch {
             await NSAlert(error: error).beginSheetModal(for: window)

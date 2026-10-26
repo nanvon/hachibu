@@ -172,8 +172,10 @@ private struct NotificationsPreview: View {
         defaults.set(temperatureAlerted, forKey: "temperatureAlerted")
         let settings = AppSettings(defaults: defaults)
         let alerts = AlertMonitor(settings: settings, notifier: PreviewNotifier(status: authorization), defaults: defaults)
-        alerts.handleReading(.battery(BatterySnapshot(temperatureCelsius: temperatureAlerted ? 41.2 : 31.5)), at: Date())
-        alerts.handleHealth(BatteryHealthInfo(systemMaximumCapacityPercent: 95, condition: .good))
+        Task {
+            await alerts.handleReading(.battery(BatterySnapshot(temperatureCelsius: temperatureAlerted ? 41.2 : 31.5)), at: Date())
+            await alerts.handleHealth(BatteryHealthInfo(systemMaximumCapacityPercent: 95, condition: .good))
+        }
         _settings = State(initialValue: settings)
         _alerts = State(initialValue: alerts)
     }
