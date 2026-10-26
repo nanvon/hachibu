@@ -26,10 +26,16 @@ show_sidebar = False
 include_icon_view_settings = True
 include_list_view_settings = False
 arrange_by = None
+scroll_position = (0, 0)
 icon_size = layout["iconSize"]
 text_size = 13
 label_pos = "bottom"
 icon_locations = {
     application.name: (layout["application"]["x"], layout["application"]["y"]),
     "Applications": (layout["applications"]["x"], layout["applications"]["y"]),
+    # dmgbuild 1.6.7 将多分辨率背景和卷图标放在根目录。
+    # 开启“显示隐藏文件”时也不要让辅助文件自动排列到安装说明上。
+    ".background.tiff": (10000, 10000),
+    ".VolumeIcon.icns": (10200, 10000),
+    ".DS_Store": (10400, 10000),
 }
