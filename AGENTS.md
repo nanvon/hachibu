@@ -4,7 +4,7 @@
 
 ## 项目现状
 
-Hachibu 是 macOS 菜单栏电池监控应用，定位为 AlDente 的平替，已开源并在 GitHub Releases 公开发布。名字来自“腹八分目”，对应只充到约 80% 的护电思路。v1 的功能（下文“v1 功能范围”）已经实现并在真机上验收：数据采集、历史存储与聚合、菜单栏、面板、历史曲线、通知、设置、诊断导出、Sparkle 更新。发布流水线和 Sparkle 密钥已配置，v0.0.1 起由 GitHub Actions 发布。测试 fixture 有接电未充电、使用电池、充电中三种状态，接电放电还没有录。
+Hachibu 是 macOS 菜单栏电池监控应用，定位为 AlDente 的平替，已开源并在 GitHub Releases 公开发布。名字来自“腹八分目”，对应只充到约 80% 的保护电池的思路。v1 的功能（下文“v1 功能范围”）已经实现并在真机上验收：数据采集、历史存储与聚合、菜单栏、面板、历史曲线、通知、设置、诊断导出、Sparkle 更新。发布流水线和 Sparkle 密钥已配置，v0.0.1 起由 GitHub Actions 发布。测试 fixture 有插电未充电、使用电池、充电中三种状态，插电放电还没有录。
 
 文档：
 
@@ -58,7 +58,7 @@ Hachibu 是 macOS 菜单栏电池监控应用，定位为 AlDente 的平替，�
 - 公开状态走 IOPowerSources（含变化通知）；扩展指标用 `IORegistryEntryCreateCFProperties` 一次读取 `AppleSmartBattery` 和 `AppleSmartBatteryPack` 两个节点。
 - `PowerTelemetryData`：`SystemPowerIn` 输入功率、`SystemLoad` 系统功率、`BatteryPower` 电池功率（负数放电），单位 mW；`SystemVoltageIn` / `SystemCurrentIn` 单位 mV / mA。约每 60 秒刷新一次，和 `UpdateTime`（Unix 秒）同步变化，界面要标注更新时间。不要做配平计算。
 - 温度在 `AppleSmartBatteryPack` 节点的 `BatteryData.Temperature`，除以 100 得 °C。`AppleSmartBattery` 主节点没有温度。v1 不读 SMC、不读 IOHID。
-- 最大容量两个口径分开命名、分开存储：系统最大容量（`system_profiler`，本机 95%）和容量比 `FullChargeCapacity / DesignCapacity`（本机 91.4%）。
+- 最大容量两种计算方式分开命名、分开存储：系统最大容量（`system_profiler`，本机 95%）和容量比 `FullChargeCapacity / DesignCapacity`（本机 91.4%）。
 - 设计循环次数用 IORegistry 的 `DesignCycleCount9C`，不用 IOPS 的 `DesignCycleCount`（两者不一致）。
 - 系统充电上限优先用私有框架 PowerUI 读取（校验方法类型编码），不可用时退回读私有文件 `/Library/Preferences/com.apple.powerd.charging.plist`，格式不符就视为未知。写入只用 PowerUI 的 `setMCLLimit:error:`、`enableMCL:`、`disableMCL:`，同样校验类型编码，以 PowerUI 读回为准；不直接改 powerd 文件。规则见设计文档第 6 节。`NotChargingReason` 不参与状态判断。
 - 缺失的指标显示“—”，数据库存 `NULL`，不存 0；休眠期间保留数据缺口，不补数据。

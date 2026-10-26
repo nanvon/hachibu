@@ -64,7 +64,7 @@ public struct HourlySample: Sendable, Equatable {
     /// 小时起点。
     public var hour: Date
     public var sampleCount: Int
-    /// 该小时内接电的分钟数。
+    /// 该小时内插电的分钟数。
     public var externalMinutes: Int
     /// 该小时内充电的分钟数。
     public var chargingMinutes: Int?
@@ -122,7 +122,7 @@ public struct HourlyAverage: Sendable, Equatable {
     /// 小时起点。
     public var hour: Date
     public var sampleCount: Int
-    /// 该小时内接电的分钟数。
+    /// 该小时内插电的分钟数。
     public var externalMinutes: Int
     public var percent: Double?
     public var systemLoadMW: Double?

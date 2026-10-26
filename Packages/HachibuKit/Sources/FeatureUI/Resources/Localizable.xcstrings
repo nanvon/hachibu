@@ -670,7 +670,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "满充 / 设计"
+            "value" : "满充容量 / 设计容量"
           }
         }
       }
@@ -820,7 +820,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "从 Hachibu 导入格式的文件导入每日的满充容量、循环次数和最大容量。导入的数据只保存在本机，不包含在诊断数据中。"
+            "value" : "从 Hachibu 导入格式的文件读取每日的满充容量、循环次数和最大容量。导入的数据只保存在本机，不包含在诊断数据中。"
           }
         }
       }
@@ -840,7 +840,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "排除的无效记录：%1$lld 条。跳过的无法识别的记录：%2$lld 条。"
+            "value" : "已排除 %1$lld 条无效记录，跳过 %2$lld 条无法识别的记录。"
           }
         }
       }
@@ -1183,7 +1183,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "接电"
+            "value" : "插电时段"
           }
         }
       }
@@ -1193,7 +1193,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "已接电，电量下降中"
+            "value" : "已接通电源，电量仍在下降"
           }
         }
       }
@@ -1203,7 +1203,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "已接电，未充电"
+            "value" : "已接通电源，未充电"
           }
         }
       }
@@ -1471,7 +1471,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "文件中没有电池序列号，导入的日子除非带有设计容量，否则无法计算容量比。"
+            "value" : "文件中没有电池序列号。导入的记录如果没有设计容量，就无法计算容量比。"
           }
         }
       }

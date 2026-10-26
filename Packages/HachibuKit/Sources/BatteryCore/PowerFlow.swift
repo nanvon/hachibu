@@ -26,7 +26,7 @@ public struct PowerFlow: Sendable, Equatable {
     /// MacBook 节点上的数值：充电时为 `SystemPowerIn`，其他情况为 `SystemLoad`。
     public var computerMW: Int?
 
-    /// 不知道是否接电时返回 nil。
+    /// 不知道是否插电时返回 nil。
     public init?(_ snapshot: BatterySnapshot) {
         guard let isExternalPower = snapshot.isExternalPower else { return nil }
 

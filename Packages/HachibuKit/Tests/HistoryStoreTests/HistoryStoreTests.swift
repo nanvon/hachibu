@@ -100,7 +100,7 @@ private func minute(_ offset: Int) -> Date {
 }
 
 @Suite struct AggregationTests {
-    /// 第 0 小时：3 个样本，2 个接电、1 个充电，温度一个 NULL；第 1 小时：1 个样本，全部指标 NULL。
+    /// 第 0 小时：3 个样本，2 个插电、1 个充电，温度一个 NULL；第 1 小时：1 个样本，全部指标 NULL。
     private func seed(_ store: HistoryStore) async throws {
         try await store.write(MinuteSample(timestamp: minute(0), percent: 60, isExternalPower: true, isCharging: true, systemLoadMW: 10000, batteryPowerMW: 2000, powerInMW: 12000, temperatureCelsius: 30, amperageMA: 160))
         try await store.write(MinuteSample(timestamp: minute(1), percent: 62, isExternalPower: true, isCharging: false, systemLoadMW: 20000, batteryPowerMW: -1000))

@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import BatteryCore
 
-/// 用本机录制的接电未充电数据测试完整解析。期望值取自 fixture 文件本身。
+/// 用本机录制的插电未充电数据测试完整解析。期望值取自 fixture 文件本身。
 @Suite struct FixtureParsingTests {
     let report: DiagnosticReport
 

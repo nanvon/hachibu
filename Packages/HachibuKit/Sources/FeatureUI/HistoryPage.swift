@@ -212,7 +212,7 @@ private struct LoadingPlaceholder: View {
 // MARK: - 预览
 
 #if DEBUG
-/// 历史页的示例数据，写入内存数据库：最近 48 小时的分钟数据（每 4 小时交替使用电池和接电，中间有一段休眠缺口），
+/// 历史页的示例数据，写入内存数据库：最近 48 小时的分钟数据（每 4 小时交替使用电池和插电，中间有一段休眠缺口），
 /// 以及 120 天的每日数据。
 @MainActor
 private enum HistoryPreviewData {

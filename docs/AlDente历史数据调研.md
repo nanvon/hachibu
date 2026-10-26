@@ -8,9 +8,9 @@
 
 本机一年多的满充容量和循环记录可以导入。清理异常、按日去重后，有 **343 天有效容量和循环记录**；系统最大容量百分比有 **285 天有效记录**，最后记录于 2026-08-08。
 
-Hachibu 当前设计的 `minute_samples`、`hourly_samples`、`daily_samples` 可以承接主要曲线，但无法完整、无损保存 AlDente 的全部历史。来源库还保存健康状态、电池身份、校准事件和充电上限，这些没有对应字段。来源库也没有直接保存历史接电状态和充电状态，不能自行补成确定值。
+Hachibu 当前设计的 `minute_samples`、`hourly_samples`、`daily_samples` 可以承接主要曲线，但无法完整、无损保存 AlDente 的全部历史。来源库还保存健康状态、电池身份、校准事件和充电上限，这些没有对应字段。来源库也没有直接保存历史插电状态和充电状态，不能自行补成确定值。
 
-长期容量和循环的导入可行性已经确认。功率指标与 Hachibu 是否同源、同口径，以及温度传感器来源，尚未确认。
+长期容量和循环的导入可行性已经确认。功率指标与 Hachibu 是否同源、定义是否一致，以及温度传感器来源，尚未确认。
 
 ## 2. 调研范围和方法
 
@@ -73,9 +73,9 @@ CREATE TABLE "macOSbatteryCondition" (
 | `lastCalibration` | REAL | 最近校准事件的 Unix 时间 | 3 | 2026-03-11～2026-09-21，日期取记录时间 |
 | `batteryPercentage` | INTEGER | 电量百分比 | 10,080 | 约 2026-09-28～2026-10-22 |
 | `batteryTemp` | REAL | 温度，读数与摄氏温度一致 | 10,080 | 同上 |
-| `chargingPower` | REAL | 电池充放电功率候选；采集口径待确认 | 10,080 | 同上 |
-| `systemLoad` | REAL | 系统功率候选；采集口径待确认 | 10,080 | 同上 |
-| `systemPowerIn` | REAL | 输入功率候选；采集口径待确认 | 10,080 | 同上 |
+| `chargingPower` | REAL | 电池充放电功率候选；采集方式待确认 | 10,080 | 同上 |
+| `systemLoad` | REAL | 系统功率候选；采集方式待确认 | 10,080 | 同上 |
+| `systemPowerIn` | REAL | 输入功率候选；采集方式待确认 | 10,080 | 同上 |
 | `chargeLimit` | INTEGER | 充电上限百分比 | 10,080 | 同上 |
 
 ### 3.1 时间精度和时区
@@ -117,7 +117,7 @@ id=1     → 2026-10-06T02:25:33.240
 
 ## 4. 健康度、容量和循环的含义
 
-### 4.1 两种健康度口径必须分开
+### 4.1 两种健康度计算方式必须分开
 
 实际记录示例，时间均为数据库中的 UTC 原文：
 
@@ -137,7 +137,7 @@ batteryDesignCap
 
 - `batteryMaxCap` 保存满充容量，最新为 7942 mAh，不能直接当成健康百分比。
 - `macOSbatteryMaxCap` 保存系统最大容量百分比，对应 Hachibu 的 `system_max_capacity_pct`。
-- `7942 / 8694 × 100 ≈ 91.4%` 是容量比，与系统最大容量的 95% 属于不同口径。这个计算使用不同时间的最新记录，仅用于说明口径区别，不能视为同一时刻采样。
+- `7942 / 8694 × 100 ≈ 91.4%` 是容量比，与系统最大容量的 95% 属于不同的计算方式。这个计算使用不同时间的最新记录，仅用于说明两者的区别，不能视为同一时刻采样。
 - 来源库没有独立的容量比历史表，历史容量比需要使用对应容量数据计算。
 
 本机 AlDente 当前版本的静态代码中，读取 `FullChargeCapacity` 后写入 `batteryMaxCap` 对应的传感器属性，读取 `DesignCapacity` 后写入设计容量属性。这个证据支持当前版本的容量含义，不能证明此前每个版本的采集实现均完全相同。
@@ -231,9 +231,9 @@ value：1773136186.7426
 | `batteryCycles` | `daily_samples.cycle_count` | 同上，缺失日期不补 |
 | `macOSbatteryMaxCap` | `daily_samples.system_max_capacity_pct` | 同上，2026-08-08 后保持缺失 |
 | `batteryDesignCap` | `daily_samples.design_mah` | 保存实际记录；沿用规则需单独定义 |
-| `batteryPercentage` | `minute_samples.percent` | 每分钟取最后有效值；历史版本的系统/硬件电量口径仍需核实 |
+| `batteryPercentage` | `minute_samples.percent` | 每分钟取最后有效值；历史版本用的是系统电量还是硬件电量仍需核实 |
 | `batteryTemp` | `minute_samples.temperature_c` | 值域与摄氏温度一致，传感器来源待确认 |
-| `chargingPower` | `minute_samples.battery_power_mw`，候选 | 采集来源、单位和与目标口径的一致性尚未完成核实 |
+| `chargingPower` | `minute_samples.battery_power_mw`，候选 | 采集来源、单位和与 Hachibu 定义的一致性尚未完成核实 |
 | `systemLoad` | `minute_samples.system_load_mw`，候选 | 同上 |
 | `systemPowerIn` | `minute_samples.power_in_mw`，候选 | 同上，且采样时点不同 |
 | `macOSbatteryCondition` | 无 | 每日表未设计健康状态字段 |
@@ -251,7 +251,7 @@ Hachibu 当前代码通过 `PowerTelemetryData` 读取功率，通过 `AppleSmar
 - `is_charging`：系统报告的充电状态。
 - 电池电压和电流。
 
-这些字段应保持 `NULL`。不能用充电功率为 0 推断未接电，也不能填成 `false`。历史接电底色因此无法完整恢复；`hourly_samples.external_minutes` 同样不能用 0 代替未知。
+这些字段应保持 `NULL`。不能用充电功率为 0 推断未插电，也不能填成 `false`。历史插电底色因此无法完整恢复；`hourly_samples.external_minutes` 同样不能用 0 代替未知。
 
 ## 7. 建议的导入、去重与冲突规则
 
@@ -282,7 +282,7 @@ Hachibu 当前代码通过 `PowerTelemetryData` 读取功率，通过 `AppleSmar
 
 早于目标分钟保留期限的数据按目标规则聚合。处理与目标已有小时重叠的数据时，不能直接覆盖整小时，也不能对两个平均值简单求平均。
 
-若需要合并聚合结果，应保留每个指标的有效样本数，才能正确加权；另一种方案是明确整小时来源优先级，不混合两个来源。未知接电状态不能汇总成 0 分钟接电。
+若需要合并聚合结果，应保留每个指标的有效样本数，才能正确加权；另一种方案是明确整小时来源优先级，不混合两个来源。未知插电状态不能汇总成 0 分钟插电。
 
 ### 7.5 保存原始信息
 
@@ -298,8 +298,8 @@ Hachibu 当前代码通过 `PowerTelemetryData` 读取功率，通过 `AppleSmar
 
 后续需要确认：
 
-- 三张功率表的采集来源、单位、符号及失效值，是否与 Hachibu 同口径。
-- 温度传感器来源，以及历史版本电量百分比采用系统口径还是硬件口径。
+- 三张功率表的采集来源、单位、符号及失效值，是否与 Hachibu 定义一致。
+- 温度传感器来源，以及历史版本电量百分比用的是系统值还是硬件值。
 - 导入统计时区，设计容量向后沿用的范围与推导标记。
 - 完整保留来源数据还是仅导入目标曲线，以及对应的来源、撤销和聚合冲突设计。
 - 合法的数据来源：AlDente 自身能否导出历史数据。
@@ -316,7 +316,7 @@ Hachibu 当前代码通过 `PowerTelemetryData` 读取功率，通过 `AppleSmar
 
 仓库依据：
 
-- `docs/v1技术设计.md` 第 5、10、11、18 节：数据口径、存储、曲线和导入预留。
+- `docs/v1技术设计.md` 第 5、10、11、18 节：数据定义、存储、曲线和导入预留。
 - `Packages/HachibuKit/Sources/HistoryStore/HistoryStore.swift`：调研时的存储实现状态。
 - `Packages/HachibuKit/Sources/BatteryCore/BatterySnapshot.swift`：调研时 Hachibu 的实际字段来源。
 

@@ -47,7 +47,7 @@ struct RecentChartData: Equatable, Sendable {
     var maxGap: TimeInterval
     /// 早于第一条记录的区间，标“未记录”。
     var notRecorded: Range<Date>?
-    /// 接电时段，画底色。
+    /// 插电时段，画底色。
     var pluggedIn: [Range<Date>]
     var percent: ChartSeries
     var temperatureCelsius: ChartSeries

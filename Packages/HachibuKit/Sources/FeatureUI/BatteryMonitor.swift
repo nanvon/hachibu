@@ -173,7 +173,7 @@ public final class BatteryMonitor {
         }
     }
 
-    /// 独立于采样 actor，完整读取被 PowerUI 阻塞时仍能更新接电/充电状态。
+    /// 独立于采样 actor，完整读取被 PowerUI 阻塞时仍能更新插电/充电状态。
     func refreshPowerSource() async {
         let reader = powerSourceReader
         let result = await Task.detached(priority: .userInitiated) {

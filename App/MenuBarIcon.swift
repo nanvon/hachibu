@@ -15,7 +15,7 @@ struct MenuBarIcon: Equatable {
         isDark = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
         if case .battery(let snapshot) = reading {
             percent = snapshot.percent.map { min(max($0, 0), 100) }
-            // 插拔标记使用实时电源状态，避免尚未更新的功率把接电误画成拔线。
+            // 插头和闪电标记使用实时电源状态，避免尚未更新的功率把插电误画成未插电。
             if snapshot.isExternalPower == true {
                 mark = snapshot.isCharging == true ? .charging : .pluggedIn
             } else {

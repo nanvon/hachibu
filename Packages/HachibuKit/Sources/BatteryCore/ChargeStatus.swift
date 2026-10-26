@@ -13,7 +13,7 @@ public enum ChargeStatus: Sendable, Equatable {
     /// 只有本次插电已到达过当前上限（`hasReachedChargeLimit`）时，这个区间内插电未充电才算已达到上限。
     static let chargeLimitResumeMargin = 5
 
-    /// 按顺序匹配，用第一条符合的。不知道是否接电时返回 nil。
+    /// 按顺序匹配，用第一条符合的。不知道是否插电时返回 nil。
     /// `NotChargingReason` 不参与判断。
     public init?(_ snapshot: BatterySnapshot) {
         guard let isExternalPower = snapshot.isExternalPower else { return nil }

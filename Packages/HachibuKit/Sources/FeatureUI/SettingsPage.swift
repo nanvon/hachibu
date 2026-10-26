@@ -467,7 +467,7 @@ final class LoginItem {
 // MARK: - 预览
 
 #if DEBUG
-/// 模拟接电未充电的电池和 PowerUI：写入后读回新的开关和上限。`isSupported` 为 false 时表示系统不支持充电上限。
+/// 模拟插电未充电的电池和 PowerUI：写入后读回新的开关和上限。`isSupported` 为 false 时表示系统不支持充电上限。
 private final class PreviewBatterySystem: BatteryDataSource, ChargeLimitWriter, @unchecked Sendable {
     private let lock = NSLock()
     private let isSupported: Bool

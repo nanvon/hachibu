@@ -57,7 +57,7 @@ public struct BatterySnapshot: Sendable, Equatable {
     /// 电池序列号的 SHA-256（小写十六进制），用于区分电池，不保留原文。
     public var batterySerialHash: String?
 
-    /// 充电器信息，`IOPSCopyExternalPowerAdapterDetails()`。未接电时为 nil。
+    /// 充电器信息，`IOPSCopyExternalPowerAdapterDetails()`。未插电时为 nil。
     public var adapter: PowerAdapter?
     public var lowPowerModeEnabled: Bool
     /// 系统充电上限设置，读不到时为 nil（未知）。

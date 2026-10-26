@@ -8,7 +8,7 @@ enum Fixtures {
         .deletingLastPathComponent()
         .appendingPathComponent("Fixtures")
 
-    /// MacBookPro18,1、macOS 27.0.1、140W 充电器、接电未充电、系统充电上限 80%。
+    /// MacBookPro18,1、macOS 27.0.1、140W 充电器、插电未充电、系统充电上限 80%。
     static let acNotCharging = "ac-not-charging_MacBookPro18-1_macOS27.0.1"
     /// 同一台机器，使用电池，AlDente 已退出。
     static let onBattery = "on-battery_MacBookPro18-1_macOS27.0.1"

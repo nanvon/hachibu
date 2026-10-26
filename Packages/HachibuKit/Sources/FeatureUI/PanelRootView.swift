@@ -191,7 +191,7 @@ private struct TintedSymbol: View {
     }
 }
 
-/// 状态文字和图标。充电相关用绿色，接电放电用橙色，其他用次要色。
+/// 状态文字和图标。充电相关用绿色，插电放电用橙色，其他用次要色。
 struct StatusLabel: View {
     let status: ChargeStatus?
 
@@ -312,7 +312,7 @@ private struct BatteryLevelCard: View {
                     Image(systemName: "bolt.fill")
                     Text(verbatim: DisplayFormat.duration(minutes: minutes))
                 case nil:
-                    // 没有剩余时间时（接电未充电等）显示状态图标。
+                    // 没有剩余时间时（插电未充电等）显示状态图标。
                     if let status = ChargeStatus(snapshot) {
                         Image(systemName: StatusLabel.symbolName(status))
                     }
@@ -910,7 +910,7 @@ private struct HairlineDivider: View {
     }
 }
 
-/// 详细数据始终显示；电压、电流只保留充电器输入端，接电时显示。
+/// 详细数据始终显示；电压、电流只保留充电器输入端，插电时显示。
 private struct DetailsSection: View {
     let snapshot: BatterySnapshot
 
