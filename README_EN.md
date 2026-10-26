@@ -40,10 +40,10 @@ For a laptop that stays plugged in most of the time, keeping the charge around 8
 ### Menu Bar and Panel
 
 - **Menu bar** — A battery icon in macOS or iOS style, optionally followed by battery level (%), system power (W), or battery temperature (°C). Click to open the panel.
-- **Charging status** — Distinguishes On Battery, Charging, Fully Charged, Charge Limit Reached, Plugged In Not Charging, and Plugged In Draining, with time remaining or time until full.
+- **Charging status** — Distinguishes On Battery, Charging, Fully Charged, Charge Limit Reached, Above Charge Limit, Plugged In Not Charging, and Plugged In Draining, with time remaining or time until full.
 - **Power flow** — Input power, system power, and battery power across three nodes: charger, computer, and battery. Values come straight from the hardware with no derived numbers. The hardware refreshes them about every 60 seconds.
 - **Reading cards** — Battery level, battery temperature (marked "High" at the alert threshold), and system power.
-- **System charge limit** — On macOS 26.4 and later, turn the system charge limit on or off and pick a level from 80% to 100% in the panel or in Settings → Battery Charging. This is the same setting as System Settings → Battery. It can't be changed while another charge control app is running.
+- **System charge limit** — On macOS 26.4 and later, turn the system charge limit on or off and pick a level from 80% to 100% in the panel or in Settings → Battery Charging. This is the same setting as System Settings → Battery. It can't be changed while another charge control app is running. When the battery is above the limit, macOS runs on battery until it drops to the limit. Limits below 80%, holding the current level (running on the charger without charging), and forced discharge are not supported: on recent firmware, the SMC keys needed to pause charging can't be accessed even with administrator privileges.
 - **Battery health** — Maximum capacity reported by macOS and health status, cycle count, and full charge capacity as a ratio of design capacity; battery power and Low Power Mode. While plugged in, shows the charger's name and input voltage and current.
 
 ### History

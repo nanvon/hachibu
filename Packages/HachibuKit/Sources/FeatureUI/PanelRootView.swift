@@ -209,14 +209,15 @@ struct StatusLabel: View {
         switch status {
         case .onBattery: "battery.75percent"
         case .charging: "bolt.fill"
-        case .pluggedInDraining, .fullyCharged, .chargeLimitReached, .pluggedInNotCharging: "powerplug.fill"
+        case .aboveChargeLimit, .pluggedInDraining, .fullyCharged, .chargeLimitReached, .pluggedInNotCharging:
+            "powerplug.fill"
         }
     }
 
     static func tint(_ status: ChargeStatus) -> Color {
         switch status {
         case .charging, .fullyCharged, .chargeLimitReached: .green
-        case .pluggedInDraining: .orange
+        case .aboveChargeLimit, .pluggedInDraining: .orange
         case .onBattery, .pluggedInNotCharging: .secondary
         }
     }
@@ -225,6 +226,7 @@ struct StatusLabel: View {
         switch status {
         case .onBattery: Text("On Battery", bundle: .module)
         case .charging: Text("Charging", bundle: .module)
+        case .aboveChargeLimit(let limit): Text("Above Charge Limit, Using Battery to \(limit)%", bundle: .module)
         case .pluggedInDraining: Text("Plugged In, Draining", bundle: .module)
         case .fullyCharged: Text("Fully Charged", bundle: .module)
         case .chargeLimitReached(let limit): Text("Charge Limit Reached (\(limit)%)", bundle: .module)
@@ -1174,6 +1176,17 @@ private struct PanelPreview: View {
         powerInMW: 30000,
         systemLoadMW: 33000,
         amperageMA: -250
+    )))
+}
+
+/// 电量高于上限时系统不用充电器，由电池供电，本机实测输入功率约 0.2 W。
+#Preview("Above Charge Limit") {
+    PanelPreview(reading: .battery(PanelPreviewData.snapshot(
+        percent: 81,
+        batteryPowerMW: -25800,
+        powerInMW: 165,
+        systemLoadMW: 25980,
+        amperageMA: -2100
     )))
 }
 

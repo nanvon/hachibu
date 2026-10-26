@@ -29,6 +29,9 @@ private let outputDirectory = ProcessInfo.processInfo.environment["HACHIBU_RENDE
             amperageMA: 3400, timeToFullMinutes: 48, temperatureCelsius: 41.2
         ))),
         Sample(name: "Plugged In, Not Charging", reading: .battery(PanelPreviewData.snapshot())),
+        Sample(name: "Above Charge Limit", reading: .battery(PanelPreviewData.snapshot(
+            percent: 81, batteryPowerMW: -25800, powerInMW: 165, systemLoadMW: 25980, amperageMA: -2100
+        ))),
         Sample(
             name: "Limit Off, AlDente Running",
             reading: .battery(PanelPreviewData.snapshot(isCharging: true, batteryPowerMW: 30000, chargeLimit: .off)),

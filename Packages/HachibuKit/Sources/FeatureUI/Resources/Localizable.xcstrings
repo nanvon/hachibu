@@ -208,6 +208,16 @@
         }
       }
     },
+    "Above Charge Limit, Using Battery to %lld%%" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "高于充电上限，使用电池至 %lld%%"
+          }
+        }
+      }
+    },
     "Alerted" : {
       "localizations" : {
         "zh-Hans" : {

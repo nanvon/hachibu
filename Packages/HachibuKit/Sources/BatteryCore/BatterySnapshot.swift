@@ -64,6 +64,8 @@ public struct BatterySnapshot: Sendable, Equatable {
     public var chargeLimit: ChargeLimitSetting?
     /// 系统充电上限的可选值（%，升序），来自 PowerUI 的 `availableChargeLimitsWithError:`。读不到时为 nil。
     public var chargeLimitOptions: [Int]?
+    /// 本次插电期间电量已在未充电时到达当前充电上限。不是读数，由 `ChargeLimitHoldTracker` 根据连续读数推导，解析结果为 false。
+    public var hasReachedChargeLimit: Bool
 
     /// 已开启的系统充电上限（%）。未开启、不支持或未知时为 nil。
     public var chargeLimitPercent: Int? {
@@ -100,7 +102,8 @@ public struct BatterySnapshot: Sendable, Equatable {
         adapter: PowerAdapter? = nil,
         lowPowerModeEnabled: Bool = false,
         chargeLimit: ChargeLimitSetting? = nil,
-        chargeLimitOptions: [Int]? = nil
+        chargeLimitOptions: [Int]? = nil,
+        hasReachedChargeLimit: Bool = false
     ) {
         self.percent = percent
         self.isExternalPower = isExternalPower
@@ -125,6 +128,7 @@ public struct BatterySnapshot: Sendable, Equatable {
         self.lowPowerModeEnabled = lowPowerModeEnabled
         self.chargeLimit = chargeLimit
         self.chargeLimitOptions = chargeLimitOptions
+        self.hasReachedChargeLimit = hasReachedChargeLimit
     }
 }
 

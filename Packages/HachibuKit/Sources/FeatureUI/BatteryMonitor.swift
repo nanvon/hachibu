@@ -45,6 +45,7 @@ public final class BatteryMonitor {
     @ObservationIgnored private let powerSourceReader: @Sendable () -> BatteryReading?
     @ObservationIgnored private var latestPowerSource: (reading: BatteryReading, date: Date)?
     @ObservationIgnored private var lastReadAt: Date?
+    @ObservationIgnored private var chargeLimitHold = ChargeLimitHoldTracker()
     @ObservationIgnored private var powerSourceTask: Task<Void, Never>?
     @ObservationIgnored private var immediateReadTask: Task<Void, Never>?
     @ObservationIgnored private var needsImmediateRead = false
@@ -183,7 +184,7 @@ public final class BatteryMonitor {
         if let latestPowerSource, result.date < latestPowerSource.date { return }
         if let lastReadAt, result.date < lastReadAt { return }
         latestPowerSource = (powerSource, result.date)
-        let updated = reading?.updatingPowerSource(from: powerSource) ?? powerSource
+        let updated = trackingChargeLimitHold(reading?.updatingPowerSource(from: powerSource) ?? powerSource)
         if reading != updated { reading = updated }
         // 快速读数不更新完整采样的新鲜度，也不重复触发温度提醒。
     }
@@ -201,14 +202,22 @@ public final class BatteryMonitor {
             return
         }
         lastReadAt = date
-        let updated: BatteryReading
+        var updated: BatteryReading
         if let latestPowerSource, latestPowerSource.date > date {
             updated = newReading.updatingPowerSource(from: latestPowerSource.reading)
         } else {
             updated = newReading
         }
+        updated = trackingChargeLimitHold(updated)
         if reading != updated { reading = updated }
         await onRead?(updated, date)
+    }
+
+    /// 更新是否已到达充电上限的记录，并写入快照。
+    private func trackingChargeLimitHold(_ reading: BatteryReading) -> BatteryReading {
+        guard case .battery(var snapshot) = reading else { return reading }
+        chargeLimitHold.apply(to: &snapshot)
+        return .battery(snapshot)
     }
 
     /// 修改系统充电上限，完成后立即用读回的值刷新。上一次修改未完成时忽略。
