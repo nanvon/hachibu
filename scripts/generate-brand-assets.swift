@@ -252,9 +252,12 @@ func logo(light: Bool) -> Artwork {
 for light in [false, true] {
     let name = light ? "logo-dark" : "logo-light"
     let art = logo(light: light)
-    try svg(art, title: "Hachibu", to: "design/brand/\(name).svg")
-    try svg(art, title: "Hachibu", to: "docs/assets/brand/\(name).svg")
-    try write(png(art), to: "docs/assets/brand/\(name).png")
+    // README 按画布居中；左右保留相同留白，应用内 PDF 仍沿用原尺寸。
+    let bounds = art.shapes.reduce(CGRect.null) { $0.union($1.path.boundingBoxOfPath) }
+    let readmeLogo = Artwork(width: ceil(bounds.maxX + bounds.minX), height: art.height, shapes: art.shapes)
+    try svg(readmeLogo, title: "Hachibu", to: "design/brand/\(name).svg")
+    try svg(readmeLogo, title: "Hachibu", to: "docs/assets/brand/\(name).svg")
+    try write(png(readmeLogo), to: "docs/assets/brand/\(name).png")
     try pdf(art, to: "\(featureCatalog)/BrandLogo.imageset/\(name).pdf")
 }
 try json(["images": [
