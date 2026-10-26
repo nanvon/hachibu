@@ -40,6 +40,8 @@ public struct PanelRootView: View {
         )
         // 面板成为 key window 时系统会把第一个控件设为焦点，开启“键盘导航”后会画焦点环，这里统一不显示。
         .focusEffectDisabled()
+        // 与 PanelController 的玻璃底板同圆角。
+        .panelOutline(in: RoundedRectangle(cornerRadius: 28, style: .continuous))
     }
 }
 
@@ -410,7 +412,7 @@ private struct TemperatureCard: View {
     }
 
     var body: some View {
-        MetricCardLayout(tint: .red) {
+        MetricCardLayout {
             MetricValue(text: DisplayFormat.celsius(celsius))
                 .foregroundStyle(isHigh ? Color.orange : Color.primary)
         } caption: {
@@ -428,7 +430,8 @@ private struct TemperatureCard: View {
         } meter: {
             ThermometerTrack(
                 fraction: celsius.map { Self.fraction($0) },
-                thresholdFraction: Self.fraction(Double(highCelsius))
+                thresholdFraction: Self.fraction(Double(highCelsius)),
+                isHigh: isHigh
             )
         }
         .help(Text("Temperature", bundle: .module))
@@ -442,10 +445,11 @@ private struct TemperatureCard: View {
     }
 }
 
-/// 细胶囊轨道，从左填到当前温度，颜色由浅到深；末端一颗白色圆点。
+/// 细胶囊轨道，从左填到当前温度，单色：正常为红色，达到提醒阈值为橙色；末端一颗白色圆点。
 private struct ThermometerTrack: View {
     let fraction: Double?
     let thresholdFraction: Double
+    let isHigh: Bool
 
     var body: some View {
         GeometryReader { geometry in
@@ -456,7 +460,7 @@ private struct ThermometerTrack: View {
                     .frame(height: 5)
                 if let fraction {
                     Capsule()
-                        .fill(LinearGradient(colors: [.orange.opacity(0.55), .red], startPoint: .leading, endPoint: .trailing))
+                        .fill(isHigh ? Color.orange : Color.red)
                         .frame(width: max(5, width * fraction), height: 5)
                     Circle()
                         .fill(.white)
@@ -484,7 +488,7 @@ private struct SystemPowerCard: View {
     let milliwatts: Int?
 
     var body: some View {
-        MetricCardLayout(tint: .systemPower) {
+        MetricCardLayout {
             MetricValue(text: DisplayFormat.watts(milliwatts: milliwatts))
         } caption: {
             Image(systemName: "cpu")
@@ -514,7 +518,7 @@ private struct EnergyBars: View {
         HStack(alignment: .bottom, spacing: 2.5) {
             ForEach(0..<count, id: \.self) { index in
                 Capsule()
-                    .fill(index < lit ? AnyShapeStyle(Color.systemPower.gradient) : AnyShapeStyle(Color.primary.opacity(0.08)))
+                    .fill(index < lit ? Color.systemPower : Color.primary.opacity(0.08))
                     .frame(height: 5 + 8 * Double(index) / Double(count - 1))
                     .frame(maxWidth: .infinity)
             }
@@ -523,13 +527,11 @@ private struct EnergyBars: View {
     }
 }
 
-/// 温度、功率卡片的共同布局：大号数值，下面一行小图标说明，底部一个小图形。左上角有一团指标颜色的光。
+/// 温度、功率卡片的共同布局：大号数值，下面一行小图标说明，底部一个小图形。底色与其他块相同，指标颜色只用在图标和图形上。
 private struct MetricCardLayout<Value: View, Caption: View, Meter: View>: View {
-    let tint: Color
     @ViewBuilder let value: Value
     @ViewBuilder let caption: Caption
     @ViewBuilder let meter: Meter
-    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -540,14 +542,7 @@ private struct MetricCardLayout<Value: View, Caption: View, Meter: View>: View {
         }
         .padding(MetricsRow.cardPadding)
         .frame(height: MetricsRow.cardHeight)
-        .panelTile(padding: EdgeInsets()) {
-            RadialGradient(
-                colors: [tint.opacity(colorScheme == .dark ? 0.22 : 0.16), tint.opacity(0)],
-                center: .topTrailing,
-                startRadius: 0,
-                endRadius: 90
-            )
-        }
+        .panelTile(padding: EdgeInsets())
     }
 }
 
@@ -1132,6 +1127,7 @@ private struct PanelPreview: View {
             onQuit: {}
         )
         .panelGlass(in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .panelOutline(in: RoundedRectangle(cornerRadius: 28, style: .continuous))
         .padding(24)
     }
 }

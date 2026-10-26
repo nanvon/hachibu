@@ -30,6 +30,11 @@ extension View {
         }
     }
 
+    /// 面板外轮廓的细边，画在玻璃底板上沿边缘一圈。浅色模式下其他应用多为白色窗口，只靠窗口阴影分不清面板边界；深色模式不画。
+    func panelOutline(in shape: some InsettableShape) -> some View {
+        modifier(PanelOutline(shape: shape))
+    }
+
     /// macOS 26+ 用玻璃按钮（带悬停、按压反馈），更早系统用 `.bordered`。
     func panelGlassButtonStyle() -> some View {
         modifier(PanelGlassButton())
@@ -84,7 +89,12 @@ enum PanelTileStyle {
     }
 
     static func shadow(_ colorScheme: ColorScheme) -> Color {
-        .black.opacity(colorScheme == .dark ? 0.22 : 0.06)
+        .black.opacity(colorScheme == .dark ? 0.22 : 0.1)
+    }
+
+    /// 浅色模式下块外缘的深色细边：面板放在白色窗口上时，白色的块和玻璃底板颜色接近，靠它分开。深色模式不画。
+    static func edge(_ colorScheme: ColorScheme) -> Color {
+        .black.opacity(colorScheme == .dark ? 0 : 0.08)
     }
 }
 
@@ -103,10 +113,26 @@ private struct PanelTile<Backdrop: View>: ViewModifier {
                     shape.fill(PanelTileStyle.fillGradient(colorScheme))
                     backdrop.clipShape(shape)
                     shape.strokeBorder(PanelTileStyle.rim(colorScheme), lineWidth: 1)
+                    // 画在块的外面，不压住亮边。
+                    shape.inset(by: -0.5).strokeBorder(PanelTileStyle.edge(colorScheme), lineWidth: 0.5)
                 }
                 .compositingGroup()
                 .shadow(color: PanelTileStyle.shadow(colorScheme), radius: 6, y: 2)
             }
+    }
+}
+
+private struct PanelOutline<S: InsettableShape>: ViewModifier {
+    let shape: S
+    @Environment(\.colorScheme) private var colorScheme
+
+    func body(content: Content) -> some View {
+        content.overlay {
+            if colorScheme == .light {
+                shape.strokeBorder(.black.opacity(0.14), lineWidth: 0.5)
+                    .allowsHitTesting(false)
+            }
+        }
     }
 }
 

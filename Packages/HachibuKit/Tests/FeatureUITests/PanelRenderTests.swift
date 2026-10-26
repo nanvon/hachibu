@@ -41,38 +41,44 @@ private let outputDirectory = ProcessInfo.processInfo.environment["HACHIBU_RENDE
     func renderStates() throws {
         let directory = URL(fileURLWithPath: outputDirectory!)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        for scheme in [ColorScheme.light, .dark] {
-            let renderer = ImageRenderer(content: Self.contactSheet(scheme: scheme))
+        // 浅色模式另出一组白色窗口背景的图：其他应用都是浅色时，面板要能和背景分开。
+        let variants: [(scheme: ColorScheme, backdrop: Backdrop, suffix: String)] = [
+            (.light, .wallpaper, "light"),
+            (.dark, .wallpaper, "dark"),
+            (.light, .whiteWindow, "light-white"),
+        ]
+        for variant in variants {
+            let renderer = ImageRenderer(content: Self.contactSheet(scheme: variant.scheme, backdrop: variant.backdrop))
             renderer.scale = 2
             let image = try #require(renderer.cgImage)
             let data = try #require(NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:]))
-            try data.write(to: directory.appendingPathComponent("panel-\(scheme == .dark ? "dark" : "light").png"))
-            let detailRenderer = ImageRenderer(content: Self.panel(Self.samples[2], scheme: scheme)
+            try data.write(to: directory.appendingPathComponent("panel-\(variant.suffix).png"))
+            let detailRenderer = ImageRenderer(content: Self.panel(Self.samples[2], scheme: variant.scheme)
                 .padding(24)
-                .background(Wallpaper(scheme: scheme))
-                .environment(\.colorScheme, scheme)
+                .background(variant.backdrop.view(scheme: variant.scheme))
+                .environment(\.colorScheme, variant.scheme)
                 .environment(\.locale, Locale(identifier: "zh-Hans")))
             detailRenderer.scale = 2
             let detailImage = try #require(detailRenderer.cgImage)
             let detailData = try #require(NSBitmapImageRep(cgImage: detailImage).representation(using: .png, properties: [:]))
-            try detailData.write(to: directory.appendingPathComponent("panel-detail-\(scheme == .dark ? "dark" : "light").png"))
+            try detailData.write(to: directory.appendingPathComponent("panel-detail-\(variant.suffix).png"))
         }
     }
 
     /// 所有状态横排，顶端对齐。
-    private static func contactSheet(scheme: ColorScheme) -> some View {
+    private static func contactSheet(scheme: ColorScheme, backdrop: Backdrop) -> some View {
         HStack(alignment: .top, spacing: 28) {
             ForEach(samples, id: \.name) { sample in
                 VStack(alignment: .leading, spacing: 8) {
                     Text(verbatim: sample.name)
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.85))
+                        .foregroundStyle(backdrop == .whiteWindow ? .black.opacity(0.6) : .white.opacity(0.85))
                     panel(sample, scheme: scheme)
                 }
             }
         }
         .padding(32)
-        .background(Wallpaper(scheme: scheme))
+        .background(backdrop.view(scheme: scheme))
         .environment(\.colorScheme, scheme)
         .environment(\.locale, Locale(identifier: "zh-Hans"))
     }
@@ -100,7 +106,22 @@ private let outputDirectory = ProcessInfo.processInfo.environment["HACHIBU_RENDE
         // 近似玻璃底板：半透明纯色加一道亮边。
         .background(scheme == .dark ? Color(white: 0.13).opacity(0.82) : Color(white: 0.96).opacity(0.78), in: shape)
         .overlay(shape.strokeBorder(.white.opacity(scheme == .dark ? 0.16 : 0.6), lineWidth: 1))
+        .panelOutline(in: shape)
         .shadow(color: .black.opacity(0.3), radius: 24, y: 10)
+    }
+}
+
+/// 面板后面的背景：壁纸，或者浅色应用的白色窗口。
+private enum Backdrop {
+    case wallpaper
+    case whiteWindow
+
+    @ViewBuilder
+    func view(scheme: ColorScheme) -> some View {
+        switch self {
+        case .wallpaper: Wallpaper(scheme: scheme)
+        case .whiteWindow: Color.white
+        }
     }
 }
 
