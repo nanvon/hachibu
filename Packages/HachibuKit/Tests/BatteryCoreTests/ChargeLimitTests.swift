@@ -126,6 +126,19 @@ import Testing
         #expect(!ChargeLimitChange.disable.isApplied(to: .unsupported))
     }
 
+    @Test func fullChargeLimitAcceptsDisabledReadBack() {
+        #expect(ChargeLimitChange.limit(100).isApplied(to: .off))
+        #expect(ChargeLimitChange.limit(100).isApplied(to: .on(percent: 100)))
+        #expect(!ChargeLimitChange.limit(100).isApplied(to: .on(percent: 95)))
+        #expect(!ChargeLimitChange.limit(100).isApplied(to: nil))
+        #expect(!ChargeLimitChange.limit(100).isApplied(to: .unsupported))
+    }
+
+    @Test(arguments: [80, 85, 90, 95])
+    func lowerChargeLimitsRejectDisabledReadBack(_ percent: Int) {
+        #expect(!ChargeLimitChange.limit(percent).isApplied(to: .off))
+    }
+
     @Test func missingFileReadsAsNil() {
         let url = URL(fileURLWithPath: "/nonexistent/com.apple.powerd.charging.plist")
         #expect(ChargeLimitFile.readArchive(at: url) == nil)

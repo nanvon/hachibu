@@ -32,6 +32,8 @@ public enum ChargeLimitChange: Sendable, Equatable {
     public func isApplied(to setting: ChargeLimitSetting?) -> Bool {
         switch (self, setting) {
         case (.enable, .on?), (.disable, .off?): true
+        // PowerUI 设置 100% 时会关闭充电上限，读回关闭也表示本次修改成功。
+        case (.limit(100), .off?): true
         case (.limit(let target), .on(let percent)?): target == percent
         default: false
         }

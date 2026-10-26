@@ -54,6 +54,15 @@ import Testing
         #expect(await !sampler.writeChargeLimit(.disable).applied)
     }
 
+    @Test func samplerAcceptsFullChargeLimitDisablingSystemLimit() async {
+        let system = FakeChargeLimitSystem()
+        let sampler = BatterySampler(dataSource: system, systemProfiler: NoProfiler(), chargeLimitWriter: system, store: nil)
+
+        let result = await sampler.writeChargeLimit(.limit(100))
+        #expect(result.applied)
+        #expect(result.reading.chargeLimit == .off)
+    }
+
     @Test func notInteractiveWhileBlockedOrWriting() throws {
         let blocked = try #require(ChargeLimitControl(snapshot: snapshot(.on(percent: 80)), canWrite: true, isBlocked: true))
         #expect(!blocked.isInteractive)
@@ -107,6 +116,7 @@ private final class FakeChargeLimitSystem: BatteryDataSource, ChargeLimitWriter,
             switch change {
             case .enable: isEnabled = true
             case .disable: isEnabled = false
+            case .limit(100): isEnabled = false
             case .limit(let percent): limit = percent
             }
         }
