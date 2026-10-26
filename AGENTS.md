@@ -58,7 +58,7 @@ Hachibu 是 macOS 菜单栏电池监控应用，定位为 AlDente 的平替，�
 - 公开状态走 IOPowerSources（含变化通知）；扩展指标用 `IORegistryEntryCreateCFProperties` 一次读取 `AppleSmartBattery` 和 `AppleSmartBatteryPack` 两个节点。
 - `PowerTelemetryData`：`SystemPowerIn` 输入功率、`SystemLoad` 系统功率、`BatteryPower` 电池功率（负数放电），单位 mW；`SystemVoltageIn` / `SystemCurrentIn` 单位 mV / mA。约每 60 秒刷新一次，和 `UpdateTime`（Unix 秒）同步变化，面板不标注更新时间。不要做配平计算。
 - 温度在 `AppleSmartBatteryPack` 节点的 `BatteryData.Temperature`，除以 100 得 °C。`AppleSmartBattery` 主节点没有温度。不读 IOHID。
-- 读 SMC 用于实时显示，只发 KeyInfo 和 Read，读取模块里没有写入代码。IORegistry 和 IOPS 的充电状态、功率约每 60 秒才更新，切换充电上限后要等下一个刷新点才报告；SMC 每秒更新。用到的 key（CHSC 充电状态、B0AP 电池功率、PDTR 输入功率、PSTR 系统功率、VD0R / ID0R 输入电压电流、TB0T 温度等）的类型、字节序（本机为小端）、单位、合理范围和读不到时退回 IORegistry / IOPS 的规则，见设计文档 5.1。每个数值直接取自对应的 key，不做配平；数据库仍写完整采样的 IOPS / IORegistry 读数。
+- 读 SMC 用于实时显示，只发 KeyInfo 和 Read，读取模块里没有写入代码。IORegistry 和 IOPS 的充电状态、功率约每 60 秒才更新，切换充电上限后要等下一个刷新点才报告；SMC 每秒更新。用到的 key（CHSC 充电状态、B0AP 电池功率（充电为正、放电为负）、PDTR 输入功率、PSTR 系统功率、VD0R / ID0R 输入电压电流、TB0T 温度等）的类型、字节序（本机为小端）、单位、合理范围和读不到时退回 IORegistry / IOPS 的规则，见设计文档 5.1。每个数值直接取自对应的 key，不做配平；数据库仍写完整采样的 IOPS / IORegistry 读数。
 - 最大容量两种计算方式分开命名、分开存储：系统最大容量（`system_profiler`，本机 95%）和容量比 `FullChargeCapacity / DesignCapacity`（本机 91.4%）。
 - 设计循环次数用 IORegistry 的 `DesignCycleCount9C`，不用 IOPS 的 `DesignCycleCount`（两者不一致）。
 - 系统充电上限优先用私有框架 PowerUI 读取（校验方法类型编码），不可用时退回读私有文件 `/Library/Preferences/com.apple.powerd.charging.plist`，格式不符就视为未知。写入只用 PowerUI 的 `setMCLLimit:error:`、`enableMCL:`、`disableMCL:`，同样校验类型编码，以 PowerUI 读回为准；不直接改 powerd 文件。规则见设计文档第 6 节。`NotChargingReason` 不参与状态判断。
