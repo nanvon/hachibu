@@ -3,29 +3,25 @@ import SwiftUI
 
 /// 三段功率流向图：供电方 → MacBook → 用电方。规则见 docs/v1技术设计.md 第 8 节，样式见第 19.2 节。
 /// 节点画成细竖条，图标和数值写在节点外侧，贴着图的左右边缘对齐；流带为单色（供电方一侧用供电方颜色，用电方一侧用用电方颜色），
-/// 在 MacBook 一侧按同一比例收窄。流带里有光点从左往右流动，`isAnimating` 为 false 或开启“减弱动态效果”时停止。
-/// 读数变化时流带宽度用弹簧动画过渡。
+/// 在 MacBook 一侧按同一比例收窄。流带里有光点从左往右流动，约 15 帧每秒；`isAnimating` 为 false 或开启“减弱动态效果”时停在固定位置。
+/// 节点出现、消失或电池换边时流带用弹簧动画过渡；只有功率数值变化时直接显示新值，不逐帧重画静态层。
 struct PowerFlowView: View {
     private static let height: CGFloat = 116
 
     let flow: PowerFlow
-    let isAnimating: Bool
-    /// 渲染测试用：把光点固定在这个时刻，不启动动画。
-    var frozenTime: TimeInterval?
+    /// 面板显示时为 true。渲染测试保持 false，光点停在固定位置。
+    var isAnimating = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         let metrics = FlowMetrics(flow)
-        AnimatedFlow(metrics: metrics, labels: FlowLabels(flow), motion: motion)
-            .animation(reduceMotion ? .easeInOut(duration: 0.2) : .spring(duration: 0.7, bounce: 0.12), value: metrics)
+        AnimatedFlow(metrics: metrics, labels: FlowLabels(flow), isLive: isAnimating && !reduceMotion)
+            .animation(reduceMotion ? .easeInOut(duration: 0.2) : .spring(duration: 0.7, bounce: 0.12), value: metrics.visibleSlots)
+            // 写在外层，先于上面的修饰处理：读数变化时取消动画（包括面板外层的动画），显示的流带变化时再由上面重新加上。
+            .animation(nil, value: metrics)
             .frame(height: Self.height)
             .accessibilityElement()
             .accessibilityLabel(accessibilityText)
-    }
-
-    private var motion: FlowMotion {
-        if let frozenTime { return .frozen(frozenTime) }
-        return isAnimating && !reduceMotion ? .live : .off
     }
 
     /// 例如“充电器 58.0 W, 系统 16.0 W, 电池 42.0 W”。
@@ -38,12 +34,6 @@ struct PowerFlowView: View {
     private static func describe(_ title: Text, _ milliwatts: Int?) -> Text {
         title + Text(verbatim: " \(DisplayFormat.watts(milliwatts: milliwatts))")
     }
-}
-
-private enum FlowMotion: Equatable {
-    case off
-    case live
-    case frozen(TimeInterval)
 }
 
 // MARK: - 样式
@@ -138,6 +128,8 @@ private struct FlowMetrics: VectorArithmetic {
 
     func watts(_ slot: FlowSlot) -> CGFloat { CGFloat(values[slot.rawValue]) }
     func presence(_ slot: FlowSlot) -> CGFloat { CGFloat(min(1, max(0, values[slot.rawValue + 4]))) }
+    /// 显示中的流带。只有它变化时才做过渡动画。
+    var visibleSlots: [Bool] { FlowSlot.allCases.map { presence($0) > 0 } }
 
     static var zero: FlowMetrics { FlowMetrics(values: .zero) }
     static func + (lhs: FlowMetrics, rhs: FlowMetrics) -> FlowMetrics { FlowMetrics(values: lhs.values + rhs.values) }
@@ -160,11 +152,11 @@ private struct FlowLabels {
     }
 }
 
-/// 读数变化时 SwiftUI 对 `metrics` 插值，每一帧重新布局。
+/// 显示的流带变化时 SwiftUI 对 `metrics` 插值，每一帧重新布局。
 private struct AnimatedFlow: View, Animatable {
     var metrics: FlowMetrics
     let labels: FlowLabels
-    let motion: FlowMotion
+    let isLive: Bool
     @Environment(\.colorScheme) private var colorScheme
 
     nonisolated var animatableData: FlowMetrics {
@@ -177,18 +169,15 @@ private struct AnimatedFlow: View, Animatable {
             let layout = FlowLayout(metrics: metrics, labels: labels, size: geometry.size)
             let palette = FlowPalette(colorScheme: colorScheme)
             ZStack {
-                // 文字、节点、流带和辉光只随读数或尺寸变化重绘。
+                // 流带、节点和文字只随读数或尺寸变化重绘。
                 Canvas { graphics, _ in
-                    FlowRenderer(layout: layout, palette: palette, time: nil).draw(in: &graphics)
+                    FlowRenderer(layout: layout, palette: palette).draw(in: &graphics)
                 }
-                TimelineView(.animation(minimumInterval: 1.0 / 30, paused: motion != .live)) { context in
+                // 光点每秒只移动约 30pt，15 帧每秒已足够连贯，帧率减半以降低面板打开时的开销。
+                TimelineView(.animation(minimumInterval: 1.0 / 15, paused: !isLive)) { context in
                     Canvas { graphics, _ in
-                        let time: TimeInterval? = switch motion {
-                        case .off: nil
-                        case .live: context.date.timeIntervalSinceReferenceDate
-                        case .frozen(let time): time
-                        }
-                        FlowRenderer(layout: layout, palette: palette, time: time).drawParticles(in: &graphics)
+                        let time = isLive ? context.date.timeIntervalSinceReferenceDate : FlowRenderer.restingParticleTime
+                        FlowRenderer(layout: layout, palette: palette).drawParticles(at: time, in: &graphics)
                     }
                 }
             }
@@ -372,9 +361,9 @@ private struct FlowLayout {
 private struct FlowRenderer {
     let layout: FlowLayout
     let palette: FlowPalette
-    /// 光点所在的时刻；为 nil 时不画光点。
-    let time: TimeInterval?
 
+    /// 不播放动画时光点停在这个时刻的位置，与定稿渲染图一致。
+    static let restingParticleTime: TimeInterval = 1.3
     /// 同一条轨道上相邻光点的平均间距。
     private static let particleSpacing: CGFloat = 44
     /// 光点拖尾的长度。
@@ -390,8 +379,7 @@ private struct FlowRenderer {
         drawHub(in: &graphics)
     }
 
-    func drawParticles(in graphics: inout GraphicsContext) {
-        guard let time else { return }
+    func drawParticles(at time: TimeInterval, in graphics: inout GraphicsContext) {
         for band in layout.bands {
             drawParticles(band, path: band.path, time: time, in: graphics)
         }

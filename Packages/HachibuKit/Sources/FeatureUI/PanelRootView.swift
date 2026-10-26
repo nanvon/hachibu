@@ -51,9 +51,8 @@ struct PanelContent: View {
     let health: BatteryHealthInfo?
     let highTemperatureCelsius: Int
     let chargeLimitControl: ChargeLimitControl?
-    let isFlowAnimating: Bool
-    /// 渲染测试用：把功率流光点固定在这个时刻。
-    var flowFrozenTime: TimeInterval?
+    /// 功率流光点是否流动。渲染测试保持 false，光点停在固定位置。
+    var isFlowAnimating = false
     let onChangeChargeLimit: @MainActor (ChargeLimitChange) -> Void
     let onOpenMainWindow: @MainActor () -> Void
     let onOpenSettings: @MainActor () -> Void
@@ -78,7 +77,6 @@ struct PanelContent: View {
                     highTemperatureCelsius: highTemperatureCelsius,
                     chargeLimitControl: chargeLimitControl,
                     isFlowAnimating: isFlowAnimating,
-                    flowFrozenTime: flowFrozenTime,
                     onChangeChargeLimit: onChangeChargeLimit
                 )
             }
@@ -94,13 +92,36 @@ struct PanelContent: View {
         .padding(12)
         .frame(width: 360)
         .lineLimit(1)
-        .animation(PanelMotion.animation(reduceMotion: reduceMotion), value: reading)
+        // 只在面板结构变化时做动画；读数数值变化直接显示，避免每次刷新都逐帧重画整个面板。
+        .animation(PanelMotion.animation(reduceMotion: reduceMotion), value: PanelStructure(reading))
         .animation(PanelMotion.animation(reduceMotion: reduceMotion), value: health)
         .animation(PanelMotion.animation(reduceMotion: reduceMotion), value: chargeLimitControl)
     }
 
     private var snapshot: BatterySnapshot? {
         if case .battery(let snapshot) = reading { snapshot } else { nil }
+    }
+}
+
+/// 读数里决定面板结构的部分：有没有电池、状态、充电器信息的有无、低电量模式。
+private struct PanelStructure: Equatable {
+    var hasBattery: Bool?
+    var status: ChargeStatus?
+    var hasAdapter = false
+    var lowPowerModeEnabled: Bool?
+
+    init(_ reading: BatteryReading?) {
+        switch reading {
+        case nil:
+            break
+        case .noBattery:
+            hasBattery = false
+        case .battery(let snapshot):
+            hasBattery = true
+            status = ChargeStatus(snapshot)
+            hasAdapter = snapshot.adapter != nil
+            lowPowerModeEnabled = snapshot.lowPowerModeEnabled
+        }
     }
 }
 
@@ -111,17 +132,11 @@ private struct BatteryPanelContent: View {
     let highTemperatureCelsius: Int
     let chargeLimitControl: ChargeLimitControl?
     let isFlowAnimating: Bool
-    let flowFrozenTime: TimeInterval?
     let onChangeChargeLimit: @MainActor (ChargeLimitChange) -> Void
 
     var body: some View {
-        PowerTile(snapshot: snapshot, isFlowAnimating: isFlowAnimating, flowFrozenTime: flowFrozenTime)
-        MetricsRow(
-            snapshot: snapshot,
-            highTemperatureCelsius: highTemperatureCelsius,
-            isAnimating: isFlowAnimating,
-            frozenTime: flowFrozenTime
-        )
+        PowerTile(snapshot: snapshot, isFlowAnimating: isFlowAnimating)
+        MetricsRow(snapshot: snapshot, highTemperatureCelsius: highTemperatureCelsius)
         if let chargeLimitControl {
             ChargeLimitTile(control: chargeLimitControl, onChange: onChangeChargeLimit)
         }
@@ -135,13 +150,12 @@ private struct BatteryPanelContent: View {
 private struct PowerTile: View {
     let snapshot: BatterySnapshot
     let isFlowAnimating: Bool
-    let flowFrozenTime: TimeInterval?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             StatusHeader(status: ChargeStatus(snapshot))
             if let flow = PowerFlow(snapshot) {
-                PowerFlowView(flow: flow, isAnimating: isFlowAnimating, frozenTime: flowFrozenTime)
+                PowerFlowView(flow: flow, isAnimating: isFlowAnimating)
             }
         }
         .panelTile(padding: EdgeInsets(top: 11, leading: 14, bottom: 10, trailing: 14))
@@ -247,24 +261,23 @@ private struct MetricsRow: View {
     let snapshot: BatterySnapshot
     /// 温度达到该值时显示“偏高”，即设置里的温度提醒阈值。
     let highTemperatureCelsius: Int
-    let isAnimating: Bool
-    let frozenTime: TimeInterval?
 
     var body: some View {
         HStack(spacing: 8) {
-            BatteryLevelCard(snapshot: snapshot, isAnimating: isAnimating, frozenTime: frozenTime)
+            BatteryLevelCard(snapshot: snapshot)
             TemperatureCard(celsius: snapshot.temperatureCelsius, highCelsius: highTemperatureCelsius)
             SystemPowerCard(milliwatts: snapshot.systemLoadMW)
         }
     }
 }
 
-/// 电量卡片画成一杯水：水位等于电量，水面是两层错开的波浪，面板打开时缓慢流动，充电时流得快一些。
+/// 电量卡片画成一杯水：水位等于电量，水面是两层错开的静止波浪；为降低面板打开时的开销不做流动动画。
 /// 水是半透明的淡蓝，文字被水淹到的部分换成深品牌蓝（深色模式为亮蓝）。
 private struct BatteryLevelCard: View {
+    /// 波浪固定的相位。
+    private static let wavePhase: Double = 1.04
+
     let snapshot: BatterySnapshot
-    let isAnimating: Bool
-    let frozenTime: TimeInterval?
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -272,32 +285,23 @@ private struct BatteryLevelCard: View {
         Double(min(100, max(0, snapshot.percent ?? 0))) / 100
     }
 
-    private var isCharging: Bool {
-        if case .charging = ChargeStatus(snapshot) { true } else { false }
-    }
-
     var body: some View {
-        let isLive = frozenTime == nil && isAnimating && !reduceMotion
-        let content = labels
-        TimelineView(.animation(minimumInterval: 1.0 / 30, paused: !isLive)) { context in
-            let time = frozenTime ?? (isLive ? context.date.timeIntervalSinceReferenceDate : 0)
-            let phase = time * (isCharging ? 2.2 : 0.8)
-            content
-                .foregroundStyle(.primary)
-                .overlay {
-                    content
-                        .foregroundStyle(underwaterText)
-                        .mask(Wave(level: level, phase: phase, amplitude: 2.4))
-                }
-                .panelTile(padding: EdgeInsets()) {
-                    water(phase: phase)
-                }
-        }
-        .animation(PanelMotion.animation(reduceMotion: reduceMotion), value: level)
-        .help(helpText)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text("Battery Level", bundle: .module))
-        .accessibilityValue(Text(verbatim: DisplayFormat.percent(snapshot.percent)) + Text(verbatim: ", ") + helpText)
+        let phase = Self.wavePhase
+        labels
+            .foregroundStyle(.primary)
+            .overlay {
+                labels
+                    .foregroundStyle(underwaterText)
+                    .mask(Wave(level: level, phase: phase, amplitude: 2.4))
+            }
+            .panelTile(padding: EdgeInsets()) {
+                water(phase: phase)
+            }
+            .animation(PanelMotion.animation(reduceMotion: reduceMotion), value: level)
+            .help(helpText)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(Text("Battery Level", bundle: .module))
+            .accessibilityValue(Text(verbatim: DisplayFormat.percent(snapshot.percent)) + Text(verbatim: ", ") + helpText)
     }
 
     /// 数值和剩余时间，铺满整张卡片，用来和水位对齐。

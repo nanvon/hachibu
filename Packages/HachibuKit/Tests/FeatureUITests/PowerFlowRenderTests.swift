@@ -47,7 +47,7 @@ private let outputDirectory = ProcessInfo.processInfo.environment["HACHIBU_RENDE
                         .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(.secondary)
                     if let flow = PowerFlow(sample.snapshot) {
-                        PowerFlowView(flow: flow, isAnimating: false, frozenTime: 1.3)
+                        PowerFlowView(flow: flow)
                             .frame(width: flowWidth)
                             .padding(.horizontal, 14)
                             .padding(.vertical, 12)

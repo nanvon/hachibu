@@ -99,8 +99,6 @@ private let outputDirectory = ProcessInfo.processInfo.environment["HACHIBU_RENDE
             health: sample.health,
             highTemperatureCelsius: 40,
             chargeLimitControl: control,
-            isFlowAnimating: false,
-            flowFrozenTime: 1.3,
             onChangeChargeLimit: { _ in },
             onOpenMainWindow: {},
             onOpenSettings: {},

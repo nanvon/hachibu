@@ -15,8 +15,9 @@ public final class BatteryMonitor {
     /// 写分钟数据时，最近一次读取早于这个时长（例如刚唤醒）就先重新读取。
     /// 面板关闭时最长约 70 秒读取一次（60 秒加 10 秒 leeway）。
     private static let maxMinuteSampleAge: TimeInterval = 75
-    /// SMC 读取间隔：面板打开或修改充电上限后每秒读全部 key；面板关闭时只读 `CHSC`。
+    /// SMC 读取间隔：修改充电上限或插拔电源后每秒、面板打开时每 5 秒读全部 key；面板关闭时只读 `CHSC`。
     private static let smcFastInterval: Duration = .seconds(1)
+    private static let smcPanelInterval: Duration = .seconds(5)
     private static let smcChargingInterval: Duration = .milliseconds(1500)
     private static let smcChargingTolerance: Duration = .milliseconds(500)
     /// 读不到 `CHSC` 时（如其他机型）面板关闭期间不再高频读取，靠完整读取时的 SMC 读取。
@@ -24,10 +25,10 @@ public final class BatteryMonitor {
     /// 超过这个时长没有更新的 SMC 读数不再叠加，退回 IOPS / IORegistry。
     private static let smcDisplayMaxAge: TimeInterval = 90
     private static let smcChargingMaxAge: TimeInterval = 10
-    /// 修改充电上限后加快读取 10 秒；期间 `CHSC` 变化就延长到变化后 3 秒，最长 20 秒。
-    private static let chargeLimitBoostDuration: TimeInterval = 10
-    private static let chargeLimitBoostSettle: TimeInterval = 3
-    private static let chargeLimitBoostLimit: TimeInterval = 20
+    /// 修改充电上限或插拔电源后加快读取 10 秒；期间 `CHSC` 变化就延长到变化后 3 秒，最长 20 秒。
+    private static let stateChangeBoostDuration: TimeInterval = 10
+    private static let stateChangeBoostSettle: TimeInterval = 3
+    private static let stateChangeBoostLimit: TimeInterval = 20
     /// “保持当前电量”自动写入失败后，这么久内不再自动写入。
     private static let chargeLimitHoldRetryDelay: TimeInterval = 60
     private static let chargeLimitHoldKey = "chargeLimitHold"
@@ -44,7 +45,7 @@ public final class BatteryMonitor {
     public private(set) var chargeLimitWriteFailed = false
     /// AlDente 等充电控制工具正在运行。此时不提供充电上限控制，避免两套工具同时控制充电。
     public private(set) var isChargeControlAppRunning = false
-    /// 菜单栏面板正在显示。面板关闭时停止功率流动画。
+    /// 菜单栏面板正在显示。决定读取间隔。
     public private(set) var isPanelVisible = false
 
     /// 电量高于上限时“保持当前电量”。由 App 层按 `AppSettings.chargeAboveLimitAction` 设置，规则见 docs/v1技术设计.md 第 6 节。
@@ -74,7 +75,7 @@ public final class BatteryMonitor {
     @ObservationIgnored private var smcCharging: (isCharging: Bool, date: Date)?
     @ObservationIgnored private var smcChargingReadAt: Date?
     @ObservationIgnored private var isSMCChargingAvailable = true
-    @ObservationIgnored private var chargeLimitBoost: (start: Date, end: Date)?
+    @ObservationIgnored private var stateChangeBoost: (start: Date, end: Date)?
     @ObservationIgnored private var smcTask: Task<Void, Never>?
     /// 保持当前电量期间的用户上限和临时值，保存在 `holdDefaults`。
     @ObservationIgnored private var chargeLimitHold: ChargeLimitHold?
@@ -130,7 +131,7 @@ public final class BatteryMonitor {
         startHealthLoop()
     }
 
-    /// 面板打开时每 10 秒完整读取一次、每秒读 SMC 和 IOPS；关闭时每 60 秒完整读取一次、每 1.5 秒读 `CHSC`。
+    /// 面板打开时每 10 秒完整读取一次、每 5 秒读 SMC 和 IOPS；关闭时每 60 秒完整读取一次、每 1.5 秒读 `CHSC`。
     public func setPanelVisible(_ visible: Bool) {
         guard visible != isPanelVisible else { return }
         isPanelVisible = visible
@@ -154,7 +155,7 @@ public final class BatteryMonitor {
                 try? await Task.sleep(for: interval, tolerance: tolerance)
                 guard !Task.isCancelled else { return }
                 await self?.read()
-                // 面板打开时 SMC 由每秒的读取负责。
+                // 面板打开时 SMC 由每 5 秒的读取负责。
                 if self?.isPanelVisible == false {
                     await self?.refreshSMC(.display)
                 }
@@ -176,11 +177,16 @@ public final class BatteryMonitor {
     }
 
     private var isFastSMCReading: Bool {
-        isPanelVisible || chargeLimitBoost.map { Date() < $0.end } == true
+        isPanelVisible || isStateChangeBoosting
+    }
+
+    private var isStateChangeBoosting: Bool {
+        stateChangeBoost.map { Date() < $0.end } == true
     }
 
     private var smcInterval: (Duration, Duration?) {
-        if isFastSMCReading { return (Self.smcFastInterval, nil) }
+        if isStateChangeBoosting { return (Self.smcFastInterval, nil) }
+        if isPanelVisible { return (Self.smcPanelInterval, nil) }
         if !isSMCChargingAvailable { return (Self.smcUnavailableInterval, Self.panelClosedTolerance) }
         return (Self.smcChargingInterval, Self.smcChargingTolerance)
     }
@@ -189,7 +195,7 @@ public final class BatteryMonitor {
         guard case .battery? = baseReading else { return }
         if isFastSMCReading {
             await refreshSMC(.display)
-            // 面板上的电量和剩余时间来自 IOPS，同样每秒刷新。
+            // 面板上的电量和剩余时间来自 IOPS，与 SMC 同时刷新。
             if isPanelVisible { await refreshPowerSource() }
             return
         }
@@ -279,7 +285,12 @@ public final class BatteryMonitor {
         if let latestPowerSource, result.date < latestPowerSource.date { return }
         if let lastReadAt, result.date < lastReadAt { return }
         latestPowerSource = (powerSource, result.date)
+        let wasExternalPower = baseReading?.isExternalPower
         baseReading = baseReading?.updatingPowerSource(from: powerSource) ?? powerSource
+        // 插拔电源后充电器几秒内开始供电，功率和充电状态要等约一分钟才由 IOPS 报告，这段时间加快读 SMC。
+        if let wasExternalPower, let isExternalPower = powerSource.isExternalPower, wasExternalPower != isExternalPower {
+            startStateChangeBoost()
+        }
         publish()
         // 快速读数不更新完整采样的新鲜度，也不重复触发温度提醒。
     }
@@ -306,7 +317,7 @@ public final class BatteryMonitor {
             isSMCChargingAvailable = smcCharging != nil
         }
         if let previous, let current = latestSMCCharging, previous != current {
-            extendChargeLimitBoost()
+            extendStateChangeBoost()
         }
         publish()
     }
@@ -341,19 +352,19 @@ public final class BatteryMonitor {
         evaluateChargeLimitHold()
     }
 
-    private func startChargeLimitBoost() {
+    private func startStateChangeBoost() {
         let now = Date()
-        chargeLimitBoost = (now, now.addingTimeInterval(Self.chargeLimitBoostDuration))
+        stateChangeBoost = (now, now.addingTimeInterval(Self.stateChangeBoostDuration))
         if readTask != nil { startSMCLoop() }
     }
 
-    private func extendChargeLimitBoost() {
-        guard let boost = chargeLimitBoost, Date() < boost.end else { return }
+    private func extendStateChangeBoost() {
+        guard let boost = stateChangeBoost, Date() < boost.end else { return }
         let end = min(
-            max(boost.end, Date().addingTimeInterval(Self.chargeLimitBoostSettle)),
-            boost.start.addingTimeInterval(Self.chargeLimitBoostLimit)
+            max(boost.end, Date().addingTimeInterval(Self.stateChangeBoostSettle)),
+            boost.start.addingTimeInterval(Self.stateChangeBoostLimit)
         )
-        chargeLimitBoost = (boost.start, end)
+        stateChangeBoost = (boost.start, end)
     }
 
     func read() async {
@@ -420,7 +431,7 @@ public final class BatteryMonitor {
         }
         isWritingChargeLimit = false
         // 充电器 1–3 秒内开始或停止充电，IOPS / IORegistry 要等约一分钟才报告，这段时间加快读 SMC。
-        startChargeLimitBoost()
+        startStateChangeBoost()
         await refreshSMC(.display)
         return applied
     }
@@ -529,6 +540,10 @@ public final class BatteryMonitor {
 }
 
 private extension BatteryReading {
+    var isExternalPower: Bool? {
+        if case .battery(let snapshot) = self { snapshot.isExternalPower } else { nil }
+    }
+
     /// 只合并 IOPS 字段；功率、温度和遥测时间保留原值，等待完整采样。
     func updatingPowerSource(from fresh: BatteryReading) -> BatteryReading {
         guard case .battery(var snapshot) = self, case .battery(let powerSource) = fresh else { return fresh }
