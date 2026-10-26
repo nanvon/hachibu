@@ -4,7 +4,7 @@ import SwiftUI
 extension Color {
     /// 品牌蓝 `#287DD0`，深色模式下调亮，定义在 Asset Catalog。
     static let brand = Color("BrandBlue", bundle: .module)
-    /// 系统功率：曲线、流向图中流向系统的流带、面板功率卡片的图标。
+    /// 系统功率：流向图中流向系统的流带、面板功率卡片的图标。
     static let systemPower = Color.indigo
 }
 
@@ -45,7 +45,7 @@ extension View {
 }
 
 extension EnvironmentValues {
-    /// 渲染测试用：`ImageRenderer` 画不出 AppKit 控件，为 true 时开关改为静态图形。
+    /// 渲染测试用：`ImageRenderer` 画不出 AppKit 控件，为 true 时开关、按钮和分段控件改为静态图形。
     @Entry var rendersStaticControls = false
 }
 

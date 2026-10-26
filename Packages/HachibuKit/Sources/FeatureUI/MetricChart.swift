@@ -25,7 +25,8 @@ struct MetricChart: View {
     var bands: [Range<Date>] = []
     var notRecorded: Range<Date>?
     var yScale: YScale = .automatic(includesZero: false)
-    var interpolation: InterpolationMethod = .linear
+    /// 单调三次插值使曲线平滑，避免在相邻读数之间超调；读数仍取真实采样点。
+    private let interpolation: InterpolationMethod = .monotone
     let style: Style
     let formatValue: (Double) -> String
     let formatDate: (Date) -> String

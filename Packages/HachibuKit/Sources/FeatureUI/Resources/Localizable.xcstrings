@@ -1,26 +1,6 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
-    "%@ remaining" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "剩余 %@"
-          }
-        }
-      }
-    },
-    "%@ until full" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@后充满"
-          }
-        }
-      }
-    },
     "%@ · %lld days · Imported %@" : {
       "en" : {
         "variations" : {
@@ -44,6 +24,26 @@
         "stringUnit" : {
           "state" : "translated",
           "value" : "%1$@ · %2$lld 天 · 导入于 %3$@"
+        }
+      }
+    },
+    "%@ remaining" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "剩余 %@"
+          }
+        }
+      }
+    },
+    "%@ until full" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@后充满"
+          }
         }
       }
     },
@@ -101,6 +101,32 @@
         }
       }
     },
+    "%lld days were also recorded on this Mac. Those days keep this Mac's data and only fill in missing values." : {
+      "en" : {
+        "variations" : {
+          "plural" : {
+            "one" : {
+              "stringUnit" : {
+                "state" : "translated",
+                "value" : "%lld day was also recorded on this Mac. That day keeps this Mac's data and only fills in missing values."
+              }
+            },
+            "other" : {
+              "stringUnit" : {
+                "state" : "translated",
+                "value" : "%lld days were also recorded on this Mac. Those days keep this Mac's data and only fill in missing values."
+              }
+            }
+          }
+        }
+      },
+      "zh-Hans" : {
+        "stringUnit" : {
+          "state" : "translated",
+          "value" : "其中 %lld 天本机也有记录，这些天以本机数据为准，只补充缺失的值。"
+        }
+      }
+    },
     "1 Hour" : {
       "localizations" : {
         "zh-Hans" : {
@@ -148,32 +174,6 @@
             "state" : "translated",
             "value" : "30 天"
           }
-        }
-      }
-    },
-    "%lld days were also recorded on this Mac. Those days keep this Mac's data and only fill in missing values." : {
-      "en" : {
-        "variations" : {
-          "plural" : {
-            "one" : {
-              "stringUnit" : {
-                "state" : "translated",
-                "value" : "%lld day was also recorded on this Mac. That day keeps this Mac's data and only fills in missing values."
-              }
-            },
-            "other" : {
-              "stringUnit" : {
-                "state" : "translated",
-                "value" : "%lld days were also recorded on this Mac. Those days keep this Mac's data and only fill in missing values."
-              }
-            }
-          }
-        }
-      },
-      "zh-Hans" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "其中 %lld 天本机也有记录，这些天以本机数据为准，只补充缺失的值。"
         }
       }
     },
@@ -281,6 +281,7 @@
       }
     },
     "Battery Current" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -321,6 +322,7 @@
       }
     },
     "Battery Power (Charging +, Draining −)" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -351,6 +353,7 @@
       }
     },
     "Battery Voltage" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -419,6 +422,7 @@
       }
     },
     "Charger Input Power" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -776,6 +780,16 @@
         }
       }
     },
+    "iOS" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iOS"
+          }
+        }
+      }
+    },
     "Last updated %@" : {
       "localizations" : {
         "zh-Hans" : {
@@ -842,6 +856,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "低电量模式"
+          }
+        }
+      }
+    },
+    "macOS" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "macOS"
           }
         }
       }
@@ -1013,6 +1037,7 @@
       }
     },
     "On" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -1469,6 +1494,7 @@
       }
     },
     "Updated %llds ago" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -1499,6 +1525,7 @@
       }
     },
     "Voltage, Current" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -1509,6 +1536,7 @@
       }
     },
     "Voltage, Current, Charger" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -1530,26 +1558,6 @@
     },
     "Zero" : {
 
-    },
-    "iOS" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "iOS"
-          }
-        }
-      }
-    },
-    "macOS" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "macOS"
-          }
-        }
-      }
     }
   },
   "version" : "1.0"

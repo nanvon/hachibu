@@ -7,17 +7,20 @@ public struct PanelRootView: View {
     private let monitor: BatteryMonitor
     private let settings: AppSettings
     private let onOpenMainWindow: @MainActor () -> Void
+    private let onOpenSettings: @MainActor () -> Void
     private let onQuit: @MainActor () -> Void
 
     public init(
         monitor: BatteryMonitor,
         settings: AppSettings,
         onOpenMainWindow: @escaping @MainActor () -> Void,
+        onOpenSettings: @escaping @MainActor () -> Void,
         onQuit: @escaping @MainActor () -> Void
     ) {
         self.monitor = monitor
         self.settings = settings
         self.onOpenMainWindow = onOpenMainWindow
+        self.onOpenSettings = onOpenSettings
         self.onQuit = onQuit
     }
 
@@ -32,6 +35,7 @@ public struct PanelRootView: View {
                 Task { await monitor.setChargeLimit(change) }
             },
             onOpenMainWindow: onOpenMainWindow,
+            onOpenSettings: onOpenSettings,
             onQuit: onQuit
         )
         // 面板成为 key window 时系统会把第一个控件设为焦点，开启“键盘导航”后会画焦点环，这里统一不显示。
@@ -50,6 +54,7 @@ struct PanelContent: View {
     var flowFrozenTime: TimeInterval?
     let onChangeChargeLimit: @MainActor (ChargeLimitChange) -> Void
     let onOpenMainWindow: @MainActor () -> Void
+    let onOpenSettings: @MainActor () -> Void
     let onQuit: @MainActor () -> Void
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -79,6 +84,7 @@ struct PanelContent: View {
             PanelFooter(
                 lowPowerModeEnabled: snapshot?.lowPowerModeEnabled,
                 onOpenMainWindow: onOpenMainWindow,
+                onOpenSettings: onOpenSettings,
                 onQuit: onQuit
             )
             .padding(.top, 2)
@@ -123,7 +129,7 @@ private struct BatteryPanelContent: View {
 
 // MARK: - 功率
 
-/// 标题行为状态文字和更新时间，下面是功率流向图。
+/// 标题行为状态文字，下面是功率流向图。
 private struct PowerTile: View {
     let snapshot: BatterySnapshot
     let isFlowAnimating: Bool
@@ -131,34 +137,18 @@ private struct PowerTile: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            // 状态文字较长时（例如“已达到充电上限”），更新时间改为图标加短写，仍放不下再缩小状态文字。
-            ViewThatFits(in: .horizontal) {
-                header(isCompact: false)
-                header(isCompact: true)
-            }
+            StatusHeader(status: ChargeStatus(snapshot))
             if let flow = PowerFlow(snapshot) {
                 PowerFlowView(flow: flow, isAnimating: isFlowAnimating, frozenTime: flowFrozenTime)
             }
         }
         .panelTile(padding: EdgeInsets(top: 11, leading: 14, bottom: 10, trailing: 14))
     }
-
-    private func header(isCompact: Bool) -> some View {
-        HStack(spacing: 8) {
-            StatusHeader(status: ChargeStatus(snapshot), canShrink: isCompact)
-            Spacer(minLength: 6)
-            if let updatedAt = snapshot.telemetryUpdatedAt {
-                UpdatedAgoText(date: updatedAt, isCompact: isCompact)
-                    .fixedSize()
-            }
-        }
-    }
 }
 
-/// 面板里的状态行：图标放在同色的圆形底上。`canShrink` 为 false 时文字不缩小，供 `ViewThatFits` 判断是否放得下。
+/// 面板里的状态行：图标放在同色的圆形底上。
 private struct StatusHeader: View {
     let status: ChargeStatus?
-    let canShrink: Bool
 
     var body: some View {
         HStack(spacing: 8) {
@@ -167,8 +157,7 @@ private struct StatusHeader: View {
             }
             StatusLabel.text(status)
                 .font(.system(size: 13.5, weight: .semibold))
-                .minimumScaleFactor(canShrink ? 0.75 : 1)
-                .fixedSize(horizontal: !canShrink, vertical: false)
+                .minimumScaleFactor(0.75)
         }
     }
 }
@@ -239,34 +228,6 @@ struct StatusLabel: View {
         case .chargeLimitReached(let limit): Text("Charge Limit Reached (\(limit)%)", bundle: .module)
         case .pluggedInNotCharging: Text("Plugged In, Not Charging", bundle: .module)
         case nil: Text(verbatim: DisplayFormat.missing)
-        }
-    }
-}
-
-/// 功率遥测约每 60 秒刷新一次，标注距离 `UpdateTime` 的秒数。`isCompact` 为 true 时写成时钟图标加“12 秒”。
-private struct UpdatedAgoText: View {
-    let date: Date
-    let isCompact: Bool
-
-    var body: some View {
-        TimelineView(.periodic(from: .now, by: 1)) { context in
-            let seconds = max(0, Int(context.date.timeIntervalSince(date)))
-            Group {
-                if isCompact {
-                    HStack(spacing: 3) {
-                        Image(systemName: "clock")
-                        Text(verbatim: Duration.seconds(seconds).formatted(.units(allowed: [.seconds], width: .narrow)))
-                    }
-                } else {
-                    Text("Updated \(seconds)s ago", bundle: .module)
-                }
-            }
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
-                .monospacedDigit()
-                .padding(.horizontal, 8)
-                .padding(.vertical, 3)
-                .background(Color.primary.opacity(0.06), in: Capsule())
         }
     }
 }
@@ -763,7 +724,7 @@ struct ChargeLimitNote: View {
 
 // MARK: - 电池健康和详细数据
 
-/// 标题行右侧为健康状态；一行两列：系统最大容量、循环次数；下面是满充容量对比条和可展开的详细数据。
+/// 标题行右侧为健康状态；一行两列：系统最大容量、循环次数；下面是满充容量对比条和常驻的详细数据。
 private struct HealthTile: View {
     let snapshot: BatterySnapshot
     let health: BatteryHealthInfo?
@@ -951,11 +912,9 @@ private struct HairlineDivider: View {
     }
 }
 
-/// 电压、电流等不常看的读数，默认折叠，展开状态存 `UserDefaults`。接电时加上充电器信息。
+/// 详细数据始终显示；电压、电流只保留充电器输入端，接电时显示。
 private struct DetailsSection: View {
     let snapshot: BatterySnapshot
-    @AppStorage("panelDetailsExpanded") private var isExpanded = false
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var isExternalPower: Bool {
         snapshot.isExternalPower == true
@@ -963,53 +922,21 @@ private struct DetailsSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Button {
-                withAnimation(PanelMotion.animation(reduceMotion: reduceMotion)) {
-                    isExpanded.toggle()
-                }
-            } label: {
-                HStack(spacing: 6) {
-                    Text("Details", bundle: .module)
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(.secondary)
-                    Spacer(minLength: 8)
-                    if !isExpanded {
-                        Group {
-                            if isExternalPower {
-                                Text("Voltage, Current, Charger", bundle: .module)
-                            } else {
-                                Text("Voltage, Current", bundle: .module)
-                            }
-                        }
-                        .font(.system(size: 11.5))
-                        .foregroundStyle(.tertiary)
-                    }
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundStyle(.tertiary)
-                        .rotationEffect(.degrees(isExpanded ? 180 : 0))
-                }
+            Text("Details", bundle: .module)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.secondary)
                 .padding(.vertical, 10)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityValue(isExpanded ? Text("On", bundle: .module) : Text("Off", bundle: .module))
 
-            if isExpanded {
-                VStack(spacing: 7) {
-                    ValueRow(Text("Battery Voltage", bundle: .module), value: DisplayFormat.volts(millivolts: snapshot.voltageMV, fractionLength: 2))
-                    ValueRow(Text("Battery Current", bundle: .module), value: DisplayFormat.amps(milliamps: snapshot.amperageMA))
-                    ValueRow(Text("Battery Power", bundle: .module), value: DisplayFormat.signedWatts(milliwatts: snapshot.batteryPowerMW))
-                    if isExternalPower {
-                        HairlineDivider()
-                        ValueRow(Text("Charger", bundle: .module), value: adapter)
-                            .help(Text(verbatim: adapterDescription))
-                        ValueRow(Text("Input Voltage · Current", bundle: .module), value: chargerInput)
-                    }
+            VStack(spacing: 7) {
+                ValueRow(Text("Battery Power", bundle: .module), value: DisplayFormat.signedWatts(milliwatts: snapshot.batteryPowerMW))
+                if isExternalPower {
+                    HairlineDivider()
+                    ValueRow(Text("Charger", bundle: .module), value: adapter)
+                        .help(Text(verbatim: adapterDescription))
+                    ValueRow(Text("Input Voltage · Current", bundle: .module), value: chargerInput)
                 }
-                .padding(.bottom, 12)
-                .transition(PanelMotion.transition(reduceMotion: reduceMotion))
             }
+            .padding(.bottom, 12)
         }
     }
 
@@ -1056,6 +983,7 @@ private struct PanelFooter: View {
     /// 没有电池读数时为 nil，不显示低电量模式。
     let lowPowerModeEnabled: Bool?
     let onOpenMainWindow: @MainActor () -> Void
+    let onOpenSettings: @MainActor () -> Void
     let onQuit: @MainActor () -> Void
 
     var body: some View {
@@ -1063,29 +991,23 @@ private struct PanelFooter: View {
             if let lowPowerModeEnabled {
                 LowPowerModeBadge(isEnabled: lowPowerModeEnabled)
             }
-            Button {
-                onOpenMainWindow()
-            } label: {
-                Label {
-                    Text("Open Main Window", bundle: .module)
-                } icon: {
-                    Image(systemName: "macwindow")
-                }
-                .frame(maxWidth: .infinity)
-            }
-            .panelGlassButtonStyle()
-            .controlSize(.large)
-            Button {
-                onQuit()
-            } label: {
-                Image(systemName: "power")
-            }
-            .panelGlassButtonStyle()
-            .controlSize(.large)
-            .buttonBorderShape(.circle)
-            .help(Text("Quit", bundle: .module))
-            .accessibilityLabel(Text("Quit", bundle: .module))
+            Spacer(minLength: 0)
+            actionButton("macwindow", title: Text("Open Main Window", bundle: .module), action: onOpenMainWindow)
+            actionButton("gearshape", title: Text("Settings", bundle: .module), action: onOpenSettings)
+            actionButton("power", title: Text("Quit", bundle: .module), action: onQuit)
         }
+    }
+
+    private func actionButton(_ symbol: String, title: Text, action: @escaping @MainActor () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .frame(width: 14, height: 14)
+        }
+        .panelGlassButtonStyle()
+        .controlSize(.large)
+        .buttonBorderShape(.circle)
+        .help(title)
+        .accessibilityLabel(title)
     }
 }
 
@@ -1205,6 +1127,7 @@ private struct PanelPreview: View {
             isFlowAnimating: true,
             onChangeChargeLimit: { _ in },
             onOpenMainWindow: {},
+            onOpenSettings: {},
             onQuit: {}
         )
         .panelGlass(in: RoundedRectangle(cornerRadius: 28, style: .continuous))

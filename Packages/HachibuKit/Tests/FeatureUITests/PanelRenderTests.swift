@@ -17,7 +17,6 @@ private let outputDirectory = ProcessInfo.processInfo.environment["HACHIBU_RENDE
         let reading: BatteryReading?
         var health: BatteryHealthInfo? = PanelPreviewData.health
         var isChargeControlAppRunning = false
-        var detailsExpanded = false
     }
 
     private static let samples: [Sample] = [
@@ -29,7 +28,7 @@ private let outputDirectory = ProcessInfo.processInfo.environment["HACHIBU_RENDE
             percent: 46, isCharging: true, batteryPowerMW: 42000, powerInMW: 58000, systemLoadMW: 16000,
             amperageMA: 3400, timeToFullMinutes: 48, temperatureCelsius: 41.2
         ))),
-        Sample(name: "Plugged In, Not Charging, Details", reading: .battery(PanelPreviewData.snapshot()), detailsExpanded: true),
+        Sample(name: "Plugged In, Not Charging", reading: .battery(PanelPreviewData.snapshot())),
         Sample(
             name: "Limit Off, AlDente Running",
             reading: .battery(PanelPreviewData.snapshot(isCharging: true, batteryPowerMW: 30000, chargeLimit: .off)),
@@ -48,6 +47,15 @@ private let outputDirectory = ProcessInfo.processInfo.environment["HACHIBU_RENDE
             let image = try #require(renderer.cgImage)
             let data = try #require(NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:]))
             try data.write(to: directory.appendingPathComponent("panel-\(scheme == .dark ? "dark" : "light").png"))
+            let detailRenderer = ImageRenderer(content: Self.panel(Self.samples[2], scheme: scheme)
+                .padding(24)
+                .background(Wallpaper(scheme: scheme))
+                .environment(\.colorScheme, scheme)
+                .environment(\.locale, Locale(identifier: "zh-Hans")))
+            detailRenderer.scale = 2
+            let detailImage = try #require(detailRenderer.cgImage)
+            let detailData = try #require(NSBitmapImageRep(cgImage: detailImage).representation(using: .png, properties: [:]))
+            try detailData.write(to: directory.appendingPathComponent("panel-detail-\(scheme == .dark ? "dark" : "light").png"))
         }
     }
 
@@ -66,6 +74,7 @@ private let outputDirectory = ProcessInfo.processInfo.environment["HACHIBU_RENDE
         .padding(32)
         .background(Wallpaper(scheme: scheme))
         .environment(\.colorScheme, scheme)
+        .environment(\.locale, Locale(identifier: "zh-Hans"))
     }
 
     private static func panel(_ sample: Sample, scheme: ColorScheme) -> some View {
@@ -74,8 +83,6 @@ private let outputDirectory = ProcessInfo.processInfo.environment["HACHIBU_RENDE
         } else {
             nil
         }
-        let defaults = UserDefaults(suiteName: "PanelRenderTests.\(sample.name)")!
-        defaults.set(sample.detailsExpanded, forKey: "panelDetailsExpanded")
         let shape = RoundedRectangle(cornerRadius: 28, style: .continuous)
         return PanelContent(
             reading: sample.reading,
@@ -86,9 +93,9 @@ private let outputDirectory = ProcessInfo.processInfo.environment["HACHIBU_RENDE
             flowFrozenTime: 1.3,
             onChangeChargeLimit: { _ in },
             onOpenMainWindow: {},
+            onOpenSettings: {},
             onQuit: {}
         )
-        .defaultAppStorage(defaults)
         .environment(\.rendersStaticControls, true)
         // 近似玻璃底板：半透明纯色加一道亮边。
         .background(scheme == .dark ? Color(white: 0.13).opacity(0.82) : Color(white: 0.96).opacity(0.78), in: shape)

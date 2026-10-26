@@ -9,6 +9,7 @@ import UniformTypeIdentifiers
 @MainActor
 final class MainWindowController: NSWindowController, NSWindowDelegate {
     private var history: HistoryModel?
+    private let navigation = MainWindowNavigation()
 
     convenience init(history: HistoryModel, monitor: BatteryMonitor, settings: AppSettings, alerts: AlertMonitor, updates: UpdateController) {
         let window = NSWindow(
@@ -32,6 +33,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
             history: history,
             settings: settings,
             alerts: alerts,
+            navigation: navigation,
             onExportDiagnostics: { [weak self] in
                 await self?.exportDiagnostics()
             },
@@ -56,6 +58,11 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         // 窗口留在其他应用后面。见 https://developer.apple.com/forums/thread/836619
         (NSApp as any LegacyActivation).activate(ignoringOtherApps: true)
         window?.makeKeyAndOrderFront(nil)
+    }
+
+    func showSettings() {
+        navigation.showSettings()
+        showAndActivate()
     }
 
     func windowWillClose(_ notification: Notification) {

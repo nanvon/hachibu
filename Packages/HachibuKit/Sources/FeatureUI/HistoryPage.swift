@@ -10,13 +10,7 @@ struct HistoryPage: View {
     var body: some View {
         if model.isAvailable {
             ScrollView {
-                VStack(alignment: .leading, spacing: 40) {
-                    RecentSection(model: model)
-                    LongTermSection(model: model)
-                }
-                .padding(.horizontal, 28)
-                .padding(.vertical, 20)
-                .frame(maxWidth: .infinity, alignment: .leading)
+                HistoryChartsContent(model: model)
             }
             .navigationSubtitle(lastUpdatedText)
         } else {
@@ -39,12 +33,28 @@ struct HistoryPage: View {
     }
 }
 
+/// 与页面共用的图表内容；渲染测试直接渲染内容，避开 ImageRenderer 无法绘制的 AppKit 滚动容器。
+struct HistoryChartsContent: View {
+    let model: HistoryModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 40) {
+            RecentSection(model: model)
+            LongTermSection(model: model)
+        }
+        .padding(.horizontal, 28)
+        .padding(.vertical, 20)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
 // MARK: - 近期
 
-/// 电量、电池温度、系统功率、电池功率、充电器输入功率、电池电压。
+/// 电量、电池温度。
 private struct RecentSection: View {
     let model: HistoryModel
     @State private var hoverDate: Date?
+    @Environment(\.rendersStaticControls) private var rendersStaticControls
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -57,16 +67,20 @@ private struct RecentSection: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
-                Picker(selection: Binding(get: { model.recentRange }, set: { model.setRecentRange($0) })) {
-                    ForEach(RecentRange.allCases, id: \.self) { range in
-                        Self.title(range).tag(range)
+                if rendersStaticControls {
+                    StaticHistoryRangePicker(options: RecentRange.allCases, selection: model.recentRange, title: Self.title)
+                } else {
+                    Picker(selection: Binding(get: { model.recentRange }, set: { model.setRecentRange($0) })) {
+                        ForEach(RecentRange.allCases, id: \.self) { range in
+                            Self.title(range).tag(range)
+                        }
+                    } label: {
+                        Text("Time Range", bundle: .module)
                     }
-                } label: {
-                    Text("Time Range", bundle: .module)
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .fixedSize()
                 }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .fixedSize()
             }
 
             if let data = model.recent {
@@ -77,18 +91,6 @@ private struct RecentSection: View {
                     }
                     chart(Text("Battery Temperature", bundle: .module), data.temperatureCelsius, data: data, style: .line(.red), formatDate: formatDate) {
                         DisplayFormat.celsius($0)
-                    }
-                    chart(Text("System Power", bundle: .module), data.systemPowerWatts, data: data, yScale: .automatic(includesZero: true), style: .line(.systemPower), formatDate: formatDate) {
-                        DisplayFormat.watts(milliwatts: Self.milliwatts($0))
-                    }
-                    chart(Text("Battery Power (Charging +, Draining −)", bundle: .module), data.batteryPowerWatts, data: data, yScale: .automatic(includesZero: true), style: .signed, formatDate: formatDate) {
-                        DisplayFormat.signedWatts(milliwatts: Self.milliwatts($0))
-                    }
-                    chart(Text("Charger Input Power", bundle: .module), data.powerInWatts, data: data, yScale: .automatic(includesZero: true), style: .line(.green), formatDate: formatDate) {
-                        DisplayFormat.watts(milliwatts: Self.milliwatts($0))
-                    }
-                    chart(Text("Battery Voltage", bundle: .module), data.voltageVolts, data: data, style: .line(.teal), formatDate: formatDate) {
-                        DisplayFormat.volts(millivolts: Int(($0 * 1000).rounded()), fractionLength: 2)
                     }
                 }
             } else {
@@ -121,10 +123,6 @@ private struct RecentSection: View {
         )
     }
 
-    private static func milliwatts(_ watts: Double) -> Int {
-        Int((watts * 1000).rounded())
-    }
-
     private static func title(_ range: RecentRange) -> Text {
         switch range {
         case .hour: Text("1 Hour", bundle: .module)
@@ -148,26 +146,30 @@ private struct RecentSection: View {
 private struct LongTermSection: View {
     let model: HistoryModel
     @State private var hoverDate: Date?
+    @Environment(\.rendersStaticControls) private var rendersStaticControls
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             SectionHeader(title: Text("Long Term", bundle: .module)) {
-                Picker(selection: Binding(get: { model.longTermRange }, set: { model.setLongTermRange($0) })) {
-                    ForEach(LongTermRange.allCases, id: \.self) { range in
-                        Self.title(range).tag(range)
+                if rendersStaticControls {
+                    StaticHistoryRangePicker(options: LongTermRange.allCases, selection: model.longTermRange, title: Self.title)
+                } else {
+                    Picker(selection: Binding(get: { model.longTermRange }, set: { model.setLongTermRange($0) })) {
+                        ForEach(LongTermRange.allCases, id: \.self) { range in
+                            Self.title(range).tag(range)
+                        }
+                    } label: {
+                        Text("Time Range", bundle: .module)
                     }
-                } label: {
-                    Text("Time Range", bundle: .module)
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .fixedSize()
                 }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .fixedSize()
             }
 
             if let data = model.longTerm {
                 ChartGrid {
-                    // 系统最大容量是整数百分比，和循环次数一样画阶梯线。stepEnd 在后一个点处跳变，台阶落在数值变化的那一天。
-                    chart(Text("Maximum Capacity (System)", bundle: .module), data.maximumCapacityPercent, data: data, interpolation: .stepEnd) {
+                    chart(Text("Maximum Capacity (System)", bundle: .module), data.maximumCapacityPercent, data: data) {
                         DisplayFormat.percent(Int($0.rounded()))
                     }
                     chart(Text("Full Charge / Design", bundle: .module), data.capacityRatioPercent, data: data) {
@@ -176,7 +178,7 @@ private struct LongTermSection: View {
                     chart(Text("Full Charge Capacity", bundle: .module), data.fullChargeCapacityMAh, data: data) {
                         "\(DisplayFormat.number(Int($0.rounded()))) mAh"
                     }
-                    chart(Text("Cycle Count", bundle: .module), data.cycleCount, data: data, interpolation: .stepEnd) {
+                    chart(Text("Cycle Count", bundle: .module), data.cycleCount, data: data) {
                         DisplayFormat.number(Int($0.rounded()))
                     }
                 }
@@ -190,7 +192,6 @@ private struct LongTermSection: View {
         _ title: Text,
         _ points: [ChartPoint],
         data: LongTermChartData,
-        interpolation: InterpolationMethod = .linear,
         formatValue: @escaping (Double) -> String
     ) -> MetricChart {
         MetricChart(
@@ -199,7 +200,6 @@ private struct LongTermSection: View {
             domain: data.domain,
             maxGap: data.maxGap,
             notRecorded: data.notRecorded,
-            interpolation: interpolation,
             style: .line(.brand),
             formatValue: formatValue,
             formatDate: { $0.formatted(.dateTime.year().month(.abbreviated).day()) },
@@ -217,6 +217,32 @@ private struct LongTermSection: View {
 }
 
 // MARK: - 通用
+
+/// ImageRenderer 无法绘制 AppKit 分段控件，出图时使用静态近似。
+private struct StaticHistoryRangePicker<Range: Hashable>: View {
+    let options: [Range]
+    let selection: Range
+    let title: (Range) -> Text
+
+    var body: some View {
+        HStack(spacing: 0) {
+            ForEach(options, id: \.self) { range in
+                title(range)
+                    .font(.system(size: 11, weight: range == selection ? .semibold : .regular))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .background {
+                        if range == selection {
+                            RoundedRectangle(cornerRadius: 5).fill(.background)
+                        }
+                    }
+            }
+        }
+        .padding(2)
+        .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 7))
+        .fixedSize()
+    }
+}
 
 /// 一行两张图。
 private struct ChartGrid<Content: View>: View {

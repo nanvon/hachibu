@@ -1,5 +1,19 @@
 import HistoryStore
+import Observation
 import SwiftUI
+
+/// App 层通过此对象定位设置页，窗口显示和激活仍由 MainWindowController 负责。
+@MainActor
+@Observable
+public final class MainWindowNavigation {
+    var selection: MainWindowPage? = .history
+
+    public init() {}
+
+    public func showSettings() {
+        selection = .settings
+    }
+}
 
 /// 主窗口的内容：侧栏切换历史曲线、通知、设置三页。窗口行为由 App 层的 MainWindowController 负责。
 public struct MainWindowRootView: View {
@@ -9,7 +23,7 @@ public struct MainWindowRootView: View {
     private let onExportDiagnostics: @MainActor () async -> Void
     private let onChooseImportFile: @MainActor () async -> URL?
     private let onCheckForUpdates: (@MainActor () -> Void)?
-    @State private var selection: MainWindowPage? = .history
+    @Bindable private var navigation: MainWindowNavigation
 
     /// `onExportDiagnostics` 由 App 层选择保存位置并写文件，完成后返回。
     /// `onChooseImportFile` 由 App 层选择要导入的历史数据文件，取消时返回 nil。
@@ -18,6 +32,7 @@ public struct MainWindowRootView: View {
         history: HistoryModel,
         settings: AppSettings,
         alerts: AlertMonitor,
+        navigation: MainWindowNavigation,
         onExportDiagnostics: @escaping @MainActor () async -> Void,
         onChooseImportFile: @escaping @MainActor () async -> URL?,
         onCheckForUpdates: (@MainActor () -> Void)?
@@ -25,6 +40,7 @@ public struct MainWindowRootView: View {
         self.history = history
         self.settings = settings
         self.alerts = alerts
+        self.navigation = navigation
         self.onExportDiagnostics = onExportDiagnostics
         self.onChooseImportFile = onChooseImportFile
         self.onCheckForUpdates = onCheckForUpdates
@@ -32,7 +48,7 @@ public struct MainWindowRootView: View {
 
     public var body: some View {
         NavigationSplitView {
-            List(MainWindowPage.allCases, selection: $selection) { page in
+            List(MainWindowPage.allCases, selection: $navigation.selection) { page in
                 Label {
                     page.title
                 } icon: {
@@ -47,7 +63,7 @@ public struct MainWindowRootView: View {
             }
             .navigationSplitViewColumnWidth(min: 200, ideal: 232, max: 280)
         } detail: {
-            let page = selection ?? .history
+            let page = navigation.selection ?? .history
             Group {
                 switch page {
                 case .history:

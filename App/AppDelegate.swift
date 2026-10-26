@@ -44,6 +44,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             onOpenMainWindow: { [weak self] in
                 self?.mainWindowController.showAndActivate()
             },
+            onOpenSettings: { [weak self] in
+                self?.mainWindowController.showSettings()
+            },
             onVisibilityChange: { [batteryMonitor] visible in
                 batteryMonitor.setPanelVisible(visible)
             }

@@ -23,6 +23,7 @@ final class PanelController: NSObject, NSWindowDelegate {
         monitor: BatteryMonitor,
         settings: AppSettings,
         onOpenMainWindow: @escaping @MainActor () -> Void,
+        onOpenSettings: @escaping @MainActor () -> Void,
         onVisibilityChange: @escaping @MainActor (Bool) -> Void
     ) {
         self.onVisibilityChange = onVisibilityChange
@@ -40,6 +41,10 @@ final class PanelController: NSObject, NSWindowDelegate {
             onOpenMainWindow: { [weak self] in
                 self?.close()
                 onOpenMainWindow()
+            },
+            onOpenSettings: { [weak self] in
+                self?.close()
+                onOpenSettings()
             },
             onQuit: { NSApp.terminate(nil) }
         ))
@@ -111,7 +116,7 @@ final class PanelController: NSObject, NSWindowDelegate {
     }
 
     /// 按内容的理想尺寸调整面板大小，保持顶边位置不变（面板挂在菜单栏下方）。
-    /// 面板显示时内容展开、收起（例如插拔电、展开健康详情）用动画跟随，见 docs/v1技术设计.md 第 19.7 节。
+    /// 面板显示时内容增减（例如插拔电、切换充电上限）用动画跟随，见 docs/v1技术设计.md 第 19.7 节。
     private func fitToContent(animated: Bool = false) {
         guard let size = content?.fittingSize, size != panel.frame.size else { return }
         var frame = panel.frame
