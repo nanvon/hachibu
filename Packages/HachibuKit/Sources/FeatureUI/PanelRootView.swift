@@ -39,20 +39,22 @@ public struct PanelRootView: View {
     }
 }
 
-/// 面板内容只依赖读数，预览时直接传入示例数据。
-private struct PanelContent: View {
+/// 面板内容只依赖读数，预览和渲染测试直接传入示例数据。
+struct PanelContent: View {
     let reading: BatteryReading?
     let health: BatteryHealthInfo?
     let highTemperatureCelsius: Int
     let chargeLimitControl: ChargeLimitControl?
     let isFlowAnimating: Bool
+    /// 渲染测试用：把功率流光点固定在这个时刻。
+    var flowFrozenTime: TimeInterval?
     let onChangeChargeLimit: @MainActor (ChargeLimitChange) -> Void
     let onOpenMainWindow: @MainActor () -> Void
     let onQuit: @MainActor () -> Void
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 10) {
             switch reading {
             case nil:
                 ProgressView()
@@ -69,6 +71,7 @@ private struct PanelContent: View {
                     highTemperatureCelsius: highTemperatureCelsius,
                     chargeLimitControl: chargeLimitControl,
                     isFlowAnimating: isFlowAnimating,
+                    flowFrozenTime: flowFrozenTime,
                     onChangeChargeLimit: onChangeChargeLimit
                 )
             }
@@ -93,23 +96,28 @@ private struct PanelContent: View {
     }
 }
 
-/// 从上到下：功率流、电量 / 温度 / 功率、系统充电上限、电池健康、详细数据。
+/// 从上到下：功率流、电量 / 温度 / 功率、系统充电上限、电池健康和详细数据。
 private struct BatteryPanelContent: View {
     let snapshot: BatterySnapshot
     let health: BatteryHealthInfo?
     let highTemperatureCelsius: Int
     let chargeLimitControl: ChargeLimitControl?
     let isFlowAnimating: Bool
+    let flowFrozenTime: TimeInterval?
     let onChangeChargeLimit: @MainActor (ChargeLimitChange) -> Void
 
     var body: some View {
-        PowerTile(snapshot: snapshot, isFlowAnimating: isFlowAnimating)
-        MetricsRow(snapshot: snapshot, highTemperatureCelsius: highTemperatureCelsius)
+        PowerTile(snapshot: snapshot, isFlowAnimating: isFlowAnimating, flowFrozenTime: flowFrozenTime)
+        MetricsRow(
+            snapshot: snapshot,
+            highTemperatureCelsius: highTemperatureCelsius,
+            isAnimating: isFlowAnimating,
+            frozenTime: flowFrozenTime
+        )
         if let chargeLimitControl {
             ChargeLimitTile(control: chargeLimitControl, onChange: onChangeChargeLimit)
         }
         HealthTile(snapshot: snapshot, health: health)
-        DetailsTile(snapshot: snapshot)
     }
 }
 
@@ -119,23 +127,76 @@ private struct BatteryPanelContent: View {
 private struct PowerTile: View {
     let snapshot: BatterySnapshot
     let isFlowAnimating: Bool
+    let flowFrozenTime: TimeInterval?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 8) {
-                StatusLabel(status: ChargeStatus(snapshot))
-                    .font(.system(size: 13, weight: .semibold))
-                    .layoutPriority(1)
-                Spacer(minLength: 8)
-                if let updatedAt = snapshot.telemetryUpdatedAt {
-                    UpdatedAgoText(date: updatedAt)
-                }
+        VStack(alignment: .leading, spacing: 8) {
+            // 状态文字较长时（例如“已达到充电上限”），更新时间改为图标加短写，仍放不下再缩小状态文字。
+            ViewThatFits(in: .horizontal) {
+                header(isCompact: false)
+                header(isCompact: true)
             }
             if let flow = PowerFlow(snapshot) {
-                PowerFlowView(flow: flow, isAnimating: isFlowAnimating)
+                PowerFlowView(flow: flow, isAnimating: isFlowAnimating, frozenTime: flowFrozenTime)
             }
         }
-        .panelTile()
+        .panelTile(padding: EdgeInsets(top: 11, leading: 14, bottom: 10, trailing: 14))
+    }
+
+    private func header(isCompact: Bool) -> some View {
+        HStack(spacing: 8) {
+            StatusHeader(status: ChargeStatus(snapshot), canShrink: isCompact)
+            Spacer(minLength: 6)
+            if let updatedAt = snapshot.telemetryUpdatedAt {
+                UpdatedAgoText(date: updatedAt, isCompact: isCompact)
+                    .fixedSize()
+            }
+        }
+    }
+}
+
+/// 面板里的状态行：图标放在同色的圆形底上。`canShrink` 为 false 时文字不缩小，供 `ViewThatFits` 判断是否放得下。
+private struct StatusHeader: View {
+    let status: ChargeStatus?
+    let canShrink: Bool
+
+    var body: some View {
+        HStack(spacing: 8) {
+            if let status {
+                TintedSymbol(name: StatusLabel.symbolName(status), tint: StatusLabel.tint(status), diameter: 24)
+            }
+            StatusLabel.text(status)
+                .font(.system(size: 13.5, weight: .semibold))
+                .minimumScaleFactor(canShrink ? 0.75 : 1)
+                .fixedSize(horizontal: !canShrink, vertical: false)
+        }
+    }
+}
+
+/// 圆形底上的图标。底色为图标颜色的浅色，上浅下深，带一道亮边。
+private struct TintedSymbol: View {
+    let name: String
+    let tint: Color
+    let diameter: CGFloat
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        let dark = colorScheme == .dark
+        Image(systemName: name)
+            .font(.system(size: diameter * 0.46, weight: .semibold))
+            .foregroundStyle(tint)
+            .frame(width: diameter, height: diameter)
+            .background {
+                Circle().fill(LinearGradient(
+                    colors: [tint.opacity(dark ? 0.3 : 0.16), tint.opacity(dark ? 0.18 : 0.24)],
+                    startPoint: .top,
+                    endPoint: .bottom
+                ))
+                Circle().strokeBorder(
+                    LinearGradient(colors: [.white.opacity(dark ? 0.25 : 0.8), .white.opacity(0)], startPoint: .top, endPoint: .bottom),
+                    lineWidth: 0.75
+                )
+            }
     }
 }
 
@@ -153,7 +214,7 @@ struct StatusLabel: View {
         }
     }
 
-    private static func symbolName(_ status: ChargeStatus) -> String {
+    static func symbolName(_ status: ChargeStatus) -> String {
         switch status {
         case .onBattery: "battery.75percent"
         case .charging: "bolt.fill"
@@ -161,7 +222,7 @@ struct StatusLabel: View {
         }
     }
 
-    private static func tint(_ status: ChargeStatus) -> Color {
+    static func tint(_ status: ChargeStatus) -> Color {
         switch status {
         case .charging, .fullyCharged, .chargeLimitReached: .green
         case .pluggedInDraining: .orange
@@ -169,7 +230,7 @@ struct StatusLabel: View {
         }
     }
 
-    private static func text(_ status: ChargeStatus?) -> Text {
+    static func text(_ status: ChargeStatus?) -> Text {
         switch status {
         case .onBattery: Text("On Battery", bundle: .module)
         case .charging: Text("Charging", bundle: .module)
@@ -182,115 +243,377 @@ struct StatusLabel: View {
     }
 }
 
-/// 功率遥测约每 60 秒刷新一次，标注距离 `UpdateTime` 的秒数。
+/// 功率遥测约每 60 秒刷新一次，标注距离 `UpdateTime` 的秒数。`isCompact` 为 true 时写成时钟图标加“12 秒”。
 private struct UpdatedAgoText: View {
     let date: Date
+    let isCompact: Bool
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 1)) { context in
             let seconds = max(0, Int(context.date.timeIntervalSince(date)))
-            Text("Updated \(seconds)s ago", bundle: .module)
-                .font(.system(size: 11.5))
-                .foregroundStyle(.tertiary)
+            Group {
+                if isCompact {
+                    HStack(spacing: 3) {
+                        Image(systemName: "clock")
+                        Text(verbatim: Duration.seconds(seconds).formatted(.units(allowed: [.seconds], width: .narrow)))
+                    }
+                } else {
+                    Text("Updated \(seconds)s ago", bundle: .module)
+                }
+            }
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
                 .monospacedDigit()
+                .padding(.horizontal, 8)
+                .padding(.vertical, 3)
+                .background(Color.primary.opacity(0.06), in: Capsule())
         }
     }
 }
 
 // MARK: - 电量、温度、功率
 
+/// 三张读数卡片等高。卡片里只写数值，指标名放在悬停提示和无障碍标签里。
 private struct MetricsRow: View {
+    static let cardHeight: CGFloat = 92
+    static let cardPadding = EdgeInsets(top: 9, leading: 12, bottom: 11, trailing: 11)
+
     let snapshot: BatterySnapshot
     /// 温度达到该值时显示“偏高”，即设置里的温度提醒阈值。
     let highTemperatureCelsius: Int
+    let isAnimating: Bool
+    let frozenTime: TimeInterval?
 
     var body: some View {
         HStack(spacing: 8) {
-            MetricCard(
-                symbol: "battery.75percent",
-                tint: .brand,
-                label: Text("Battery Level", bundle: .module),
-                value: DisplayFormat.percent(snapshot.percent),
-                detail: remainingText
-            )
-            MetricCard(
-                symbol: "thermometer.medium",
-                tint: .red,
-                label: Text("Temperature", bundle: .module),
-                value: DisplayFormat.celsius(snapshot.temperatureCelsius),
-                detail: Text("Battery", bundle: .module),
-                badge: isTemperatureHigh ? Text("High", bundle: .module) : nil
-            )
-            MetricCard(
-                symbol: "gauge.with.dots.needle.67percent",
-                tint: .systemPower,
-                label: Text("Power", bundle: .module),
-                value: DisplayFormat.watts(milliwatts: snapshot.systemLoadMW),
-                detail: Text("System", bundle: .module)
-            )
+            BatteryLevelCard(snapshot: snapshot, isAnimating: isAnimating, frozenTime: frozenTime)
+            TemperatureCard(celsius: snapshot.temperatureCelsius, highCelsius: highTemperatureCelsius)
+            SystemPowerCard(milliwatts: snapshot.systemLoadMW)
+        }
+    }
+}
+
+/// 电量卡片画成一杯水：水位等于电量，水面是两层错开的波浪，面板打开时缓慢流动，充电时流得快一些。
+/// 水是半透明的淡蓝，文字被水淹到的部分换成深品牌蓝（深色模式为亮蓝）。
+private struct BatteryLevelCard: View {
+    let snapshot: BatterySnapshot
+    let isAnimating: Bool
+    let frozenTime: TimeInterval?
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private var level: Double {
+        Double(min(100, max(0, snapshot.percent ?? 0))) / 100
+    }
+
+    private var isCharging: Bool {
+        if case .charging = ChargeStatus(snapshot) { true } else { false }
+    }
+
+    var body: some View {
+        let isLive = frozenTime == nil && isAnimating && !reduceMotion
+        TimelineView(.animation(minimumInterval: 1.0 / 30, paused: !isLive)) { context in
+            let time = frozenTime ?? (isLive ? context.date.timeIntervalSinceReferenceDate : 0)
+            let phase = time * (isCharging ? 2.2 : 0.8)
+            labels
+                .foregroundStyle(.primary)
+                .overlay {
+                    labels
+                        .foregroundStyle(underwaterText)
+                        .mask(Wave(level: level, phase: phase, amplitude: 2.4))
+                }
+                .panelTile(padding: EdgeInsets()) {
+                    water(phase: phase)
+                }
+        }
+        .animation(PanelMotion.animation(reduceMotion: reduceMotion), value: level)
+        .help(helpText)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text("Battery Level", bundle: .module))
+        .accessibilityValue(Text(verbatim: DisplayFormat.percent(snapshot.percent)) + Text(verbatim: ", ") + helpText)
+    }
+
+    /// 数值和剩余时间，铺满整张卡片，用来和水位对齐。
+    private var labels: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            MetricValue(text: DisplayFormat.percent(snapshot.percent))
+            MetricCaption {
+                switch snapshot.remainingTime {
+                case .untilEmpty(let minutes):
+                    Image(systemName: "hourglass")
+                    Text(verbatim: DisplayFormat.duration(minutes: minutes))
+                case .untilFull(let minutes):
+                    Image(systemName: "bolt.fill")
+                    Text(verbatim: DisplayFormat.duration(minutes: minutes))
+                case nil:
+                    // 没有剩余时间时（接电未充电等）显示状态图标。
+                    if let status = ChargeStatus(snapshot) {
+                        Image(systemName: StatusLabel.symbolName(status))
+                    }
+                }
+            }
+            .opacity(0.8)
+            Spacer(minLength: 0)
+        }
+        .padding(MetricsRow.cardPadding)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .frame(height: MetricsRow.cardHeight)
+    }
+
+    @ViewBuilder
+    private func water(phase: Double) -> some View {
+        let dark = colorScheme == .dark
+        ZStack {
+            // 后一层浪颜色淡、相位错开，让水面有前后层次。
+            Wave(level: level, phase: phase * 0.7 + 2.1, amplitude: 1.8)
+                .fill(Color.brand.opacity(dark ? 0.12 : 0.08))
+            // 上浅下深，透出卡片的玻璃底。
+            Wave(level: level, phase: phase, amplitude: 2.4)
+                .fill(LinearGradient(
+                    colors: [Color.brand.opacity(dark ? 0.2 : 0.14), Color.brand.opacity(dark ? 0.3 : 0.24)],
+                    startPoint: .top,
+                    endPoint: .bottom
+                ))
+            Wave(level: level, phase: phase, amplitude: 2.4, surfaceOnly: true)
+                .stroke(.white.opacity(dark ? 0.3 : 0.8), lineWidth: 1)
         }
     }
 
-    private var remainingText: Text {
+    /// 水下文字：浅色模式为深品牌蓝 `#13539A`，深色模式为亮蓝 `#8CC4FF`。
+    private var underwaterText: Color {
+        colorScheme == .dark ? Color(red: 0.55, green: 0.77, blue: 1) : Color(red: 0.075, green: 0.325, blue: 0.604)
+    }
+
+    private var helpText: Text {
         switch snapshot.remainingTime {
         case .untilEmpty(let minutes):
             Text("\(DisplayFormat.duration(minutes: minutes)) remaining", bundle: .module)
         case .untilFull(let minutes):
             Text("\(DisplayFormat.duration(minutes: minutes)) until full", bundle: .module)
         case nil:
-            Text(verbatim: DisplayFormat.missing)
+            Text("Battery Level", bundle: .module)
         }
-    }
-
-    private var isTemperatureHigh: Bool {
-        guard let temperature = snapshot.temperatureCelsius else { return false }
-        return temperature >= Double(highTemperatureCelsius)
     }
 }
 
-/// 一个读数卡片：图标和标签（右侧可带“偏高”标签），大号数值，下面一行小字说明。
-private struct MetricCard: View {
-    let symbol: String
+/// 水面：`level` 为水位（0–1，从底部算起），`phase` 让波浪左右移动。`surfaceOnly` 为 true 时只画水面线。
+/// 水位接近 0 或 1 时波幅收小，避免浪头超出卡片或在杯底露出空隙。
+private struct Wave: Shape {
+    var level: Double
+    var phase: Double
+    var amplitude: Double
+    var surfaceOnly = false
+
+    var animatableData: Double {
+        get { level }
+        set { level = newValue }
+    }
+
+    func path(in rect: CGRect) -> Path {
+        let damping = min(1, level * 12, (1 - level) * 12)
+        let height = amplitude * damping
+        let surface = rect.maxY - rect.height * level
+        let wavelength = rect.width * 0.85
+        var path = Path()
+        let steps = 48
+        for step in 0...steps {
+            let x = rect.minX + rect.width * Double(step) / Double(steps)
+            let y = surface + height * sin(x / wavelength * 2 * .pi + phase)
+            if step == 0 {
+                path.move(to: CGPoint(x: x, y: y))
+            } else {
+                path.addLine(to: CGPoint(x: x, y: y))
+            }
+        }
+        if !surfaceOnly {
+            path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
+            path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
+            path.closeSubpath()
+        }
+        return path
+    }
+}
+
+/// 温度卡片：数值下面是一条温度计刻度（15–50 °C），填充到当前温度，提醒阈值处有一道刻度。
+/// 达到阈值时数值变橙色，图标旁标“偏高”。
+private struct TemperatureCard: View {
+    static let range: ClosedRange<Double> = 15...50
+
+    let celsius: Double?
+    let highCelsius: Int
+
+    private var isHigh: Bool {
+        guard let celsius else { return false }
+        return celsius >= Double(highCelsius)
+    }
+
+    var body: some View {
+        MetricCardLayout(tint: .red) {
+            MetricValue(text: DisplayFormat.celsius(celsius))
+                .foregroundStyle(isHigh ? Color.orange : Color.primary)
+        } caption: {
+            Image(systemName: "thermometer.medium")
+                .foregroundStyle(.red)
+            if isHigh {
+                Text("High", bundle: .module)
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(.orange)
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 1)
+                    .background(Color.orange.opacity(0.18), in: Capsule())
+                    .fixedSize()
+            }
+        } meter: {
+            ThermometerTrack(
+                fraction: celsius.map { Self.fraction($0) },
+                thresholdFraction: Self.fraction(Double(highCelsius))
+            )
+        }
+        .help(Text("Temperature", bundle: .module))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text("Temperature", bundle: .module))
+        .accessibilityValue(Text(verbatim: DisplayFormat.celsius(celsius)))
+    }
+
+    private static func fraction(_ celsius: Double) -> Double {
+        min(1, max(0, (celsius - range.lowerBound) / (range.upperBound - range.lowerBound)))
+    }
+}
+
+/// 细胶囊轨道，从左填到当前温度，颜色由浅到深；末端一颗白色圆点。
+private struct ThermometerTrack: View {
+    let fraction: Double?
+    let thresholdFraction: Double
+
+    var body: some View {
+        GeometryReader { geometry in
+            let width = geometry.size.width
+            ZStack(alignment: .leading) {
+                Capsule()
+                    .fill(Color.primary.opacity(0.08))
+                    .frame(height: 5)
+                if let fraction {
+                    Capsule()
+                        .fill(LinearGradient(colors: [.orange.opacity(0.55), .red], startPoint: .leading, endPoint: .trailing))
+                        .frame(width: max(5, width * fraction), height: 5)
+                    Circle()
+                        .fill(.white)
+                        .frame(width: 9, height: 9)
+                        .shadow(color: .black.opacity(0.25), radius: 1.5, y: 0.5)
+                        .offset(x: min(width - 9, max(0, width * fraction - 4.5)))
+                }
+                Capsule()
+                    .fill(Color.primary.opacity(0.35))
+                    .frame(width: 1.5, height: 9)
+                    .offset(x: width * thresholdFraction - 0.75)
+            }
+            .frame(height: 9)
+            .frame(maxHeight: .infinity)
+        }
+        .frame(height: 10)
+    }
+}
+
+/// 系统功率卡片：数值下面是一排由矮到高的能量格，按 0–60 W 点亮。
+private struct SystemPowerCard: View {
+    static let fullScaleMW = 60_000
+    static let barCount = 10
+
+    let milliwatts: Int?
+
+    var body: some View {
+        MetricCardLayout(tint: .systemPower) {
+            MetricValue(text: DisplayFormat.watts(milliwatts: milliwatts))
+        } caption: {
+            Image(systemName: "cpu")
+                .foregroundStyle(Color.systemPower)
+        } meter: {
+            EnergyBars(count: Self.barCount, lit: litBars)
+        }
+        .help(Text("Power", bundle: .module))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text("Power", bundle: .module))
+        .accessibilityValue(Text(verbatim: DisplayFormat.watts(milliwatts: milliwatts)))
+    }
+
+    /// 有读数时至少点亮一格。
+    private var litBars: Int {
+        guard let milliwatts else { return 0 }
+        let fraction = Double(max(0, milliwatts)) / Double(Self.fullScaleMW)
+        return min(Self.barCount, max(1, Int((fraction * Double(Self.barCount)).rounded(.up))))
+    }
+}
+
+private struct EnergyBars: View {
+    let count: Int
+    let lit: Int
+
+    var body: some View {
+        HStack(alignment: .bottom, spacing: 2.5) {
+            ForEach(0..<count, id: \.self) { index in
+                Capsule()
+                    .fill(index < lit ? AnyShapeStyle(Color.systemPower.gradient) : AnyShapeStyle(Color.primary.opacity(0.08)))
+                    .frame(height: 5 + 8 * Double(index) / Double(count - 1))
+                    .frame(maxWidth: .infinity)
+            }
+        }
+        .frame(height: 13, alignment: .bottom)
+    }
+}
+
+/// 温度、功率卡片的共同布局：大号数值，下面一行小图标说明，底部一个小图形。左上角有一团指标颜色的光。
+private struct MetricCardLayout<Value: View, Caption: View, Meter: View>: View {
     let tint: Color
-    let label: Text
-    let value: String
-    let detail: Text
-    var badge: Text?
+    @ViewBuilder let value: Value
+    @ViewBuilder let caption: Caption
+    @ViewBuilder let meter: Meter
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 4) {
-                Image(systemName: symbol)
-                    .foregroundStyle(tint)
-                    .imageScale(.small)
-                label
-                    .foregroundStyle(.secondary)
-                Spacer(minLength: 0)
-                if let badge {
-                    badge
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(.orange)
-                        .padding(.horizontal, 5)
-                        .padding(.vertical, 1)
-                        .background(Color.orange.opacity(0.18), in: Capsule())
-                        .fixedSize()
-                }
-            }
-            .font(.system(size: 11.5))
-            Text(verbatim: value)
-                .font(.system(size: 22, weight: .semibold, design: .rounded))
-                .monospacedDigit()
-                .minimumScaleFactor(0.7)
-                .contentTransition(.numericText())
-                .padding(.top, 6)
-            detail
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
-                .monospacedDigit()
-                .minimumScaleFactor(0.8)
-                .padding(.top, 1)
+            value
+            MetricCaption { caption }
+            Spacer(minLength: 0)
+            meter
         }
-        .panelTile(padding: EdgeInsets(top: 10, leading: 12, bottom: 11, trailing: 12))
+        .padding(MetricsRow.cardPadding)
+        .frame(height: MetricsRow.cardHeight)
+        .panelTile(padding: EdgeInsets()) {
+            RadialGradient(
+                colors: [tint.opacity(colorScheme == .dark ? 0.22 : 0.16), tint.opacity(0)],
+                center: .topTrailing,
+                startRadius: 0,
+                endRadius: 90
+            )
+        }
+    }
+}
+
+/// 三张卡片的大号数值。
+private struct MetricValue: View {
+    let text: String
+
+    var body: some View {
+        Text(verbatim: text)
+            .font(.system(size: 24, weight: .semibold, design: .rounded))
+            .monospacedDigit()
+            .minimumScaleFactor(0.65)
+            .contentTransition(.numericText())
+    }
+}
+
+/// 数值下面的一行：小图标，可带一段短文字。
+private struct MetricCaption<Content: View>: View {
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        HStack(spacing: 4) {
+            content
+        }
+        .font(.system(size: 11, weight: .semibold))
+        .monospacedDigit()
+        .minimumScaleFactor(0.75)
+        .frame(height: 16)
     }
 }
 
@@ -301,20 +624,28 @@ private struct ChargeLimitTile: View {
     let control: ChargeLimitControl
     let onChange: @MainActor (ChargeLimitChange) -> Void
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.rendersStaticControls) private var rendersStaticControls
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack {
+            HStack(spacing: 8) {
+                TintedSymbol(name: "bolt.shield.fill", tint: .green, diameter: 24)
                 Text("System Charge Limit", bundle: .module)
-                    .font(.system(size: 13, weight: .medium))
+                    .font(.system(size: 13, weight: .semibold))
+                    .minimumScaleFactor(0.8)
                 Spacer(minLength: 8)
-                Toggle(isOn: Binding(get: { control.isEnabled }, set: { onChange($0 ? .enable : .disable) })) {
-                    Text("System Charge Limit", bundle: .module)
+                if rendersStaticControls {
+                    StaticSwitch(isOn: control.isEnabled)
+                        .opacity(control.isInteractive ? 1 : 0.5)
+                } else {
+                    Toggle(isOn: Binding(get: { control.isEnabled }, set: { onChange($0 ? .enable : .disable) })) {
+                        Text("System Charge Limit", bundle: .module)
+                    }
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
+                    .labelsHidden()
+                    .disabled(!control.isInteractive)
                 }
-                .toggleStyle(.switch)
-                .controlSize(.small)
-                .labelsHidden()
-                .disabled(!control.isInteractive)
             }
             if control.isEnabled {
                 LimitSegments(options: control.options, selection: control.percent) { onChange(.limit($0)) }
@@ -322,19 +653,39 @@ private struct ChargeLimitTile: View {
                     .transition(PanelMotion.transition(reduceMotion: reduceMotion))
             }
             ChargeLimitNote(control: control)
-                .font(.caption)
+                .font(.system(size: 11))
         }
         .panelTile()
     }
 }
 
+/// 渲染测试里代替系统开关的静态图形，尺寸接近 `.controlSize(.small)` 的开关。
+private struct StaticSwitch: View {
+    let isOn: Bool
+
+    var body: some View {
+        Capsule()
+            .fill(isOn ? Color.accentColor : Color.primary.opacity(0.15))
+            .frame(width: 32, height: 18)
+            .overlay(alignment: isOn ? .trailing : .leading) {
+                Circle()
+                    .fill(.white)
+                    .shadow(color: .black.opacity(0.2), radius: 1, y: 0.5)
+                    .padding(1.5)
+            }
+    }
+}
+
 /// 铺满宽度的分段档位。系统 `.segmented` 在 macOS 上按内容宽度显示，不能铺满，所以用按钮画。
+/// 选中块是一颗带亮边的胶囊，文字用品牌蓝，换档时用弹簧滑到新位置。
 private struct LimitSegments: View {
     let options: [Int]
     let selection: Int?
     let onSelect: @MainActor (Int) -> Void
+    @Namespace private var thumb
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.isEnabled) private var isEnabled
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         HStack(spacing: 0) {
@@ -342,12 +693,10 @@ private struct LimitSegments: View {
                 segment(percent, isSelected: percent == selection)
             }
         }
-        .padding(2)
-        .background(
-            Color.primary.opacity(colorScheme == .dark ? 0.12 : 0.07),
-            in: RoundedRectangle(cornerRadius: 9, style: .continuous)
-        )
+        .padding(2.5)
+        .background(Color.primary.opacity(colorScheme == .dark ? 0.14 : 0.06), in: Capsule())
         .opacity(isEnabled ? 1 : 0.5)
+        .animation(PanelMotion.animation(reduceMotion: reduceMotion), value: selection)
         .accessibilityElement(children: .contain)
         .accessibilityLabel(Text("Limit", bundle: .module))
     }
@@ -359,22 +708,37 @@ private struct LimitSegments: View {
             }
         } label: {
             Text(verbatim: DisplayFormat.percent(percent))
-                .font(.system(size: 12, weight: isSelected ? .semibold : .regular))
+                .font(.system(size: 12, weight: isSelected ? .semibold : .medium, design: .rounded))
                 .monospacedDigit()
-                .foregroundStyle(isSelected ? Color.primary : Color.secondary)
+                .foregroundStyle(isSelected ? Color.brand : Color.secondary)
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 4)
+                .padding(.vertical, 5)
                 .background {
                     if isSelected {
-                        RoundedRectangle(cornerRadius: 7, style: .continuous)
-                            .fill(colorScheme == .dark ? Color.white.opacity(0.2) : Color.white)
-                            .shadow(color: .black.opacity(0.12), radius: 1.5, y: 1)
+                        SegmentThumb()
+                            .matchedGeometryEffect(id: "thumb", in: thumb)
                     }
                 }
-                .contentShape(Rectangle())
+                .contentShape(Capsule())
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+}
+
+private struct SegmentThumb: View {
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        let dark = colorScheme == .dark
+        Capsule()
+            .fill(LinearGradient(
+                colors: dark ? [.white.opacity(0.3), .white.opacity(0.2)] : [.white, .white.opacity(0.9)],
+                startPoint: .top,
+                endPoint: .bottom
+            ))
+            .overlay(Capsule().strokeBorder(.white.opacity(dark ? 0.25 : 1), lineWidth: 0.75))
+            .shadow(color: .black.opacity(dark ? 0.3 : 0.12), radius: 3, y: 1.5)
     }
 }
 
@@ -397,45 +761,75 @@ struct ChargeLimitNote: View {
     }
 }
 
-// MARK: - 电池健康
+// MARK: - 电池健康和详细数据
 
-/// 一行三列：系统最大容量、满充容量、循环次数；健康状态在标题行右侧。
+/// 标题行右侧为健康状态；一行三列：系统最大容量、满充容量、循环次数；下面是可展开的详细数据。
 private struct HealthTile: View {
     let snapshot: BatterySnapshot
     let health: BatteryHealthInfo?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 8) {
+                TintedSymbol(name: "heart.fill", tint: .brand, diameter: 24)
                 Text("Battery Health", bundle: .module)
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 13, weight: .semibold))
                 Spacer(minLength: 8)
-                if let conditionText {
-                    conditionText
-                        .font(.system(size: 11.5))
-                        .foregroundStyle(.tertiary)
+                if let condition = health?.condition {
+                    ConditionBadge(condition: condition)
                 }
             }
-            HStack(alignment: .top, spacing: 10) {
-                HealthValue(label: Text("Maximum Capacity", bundle: .module), value: DisplayFormat.percent(health?.systemMaximumCapacityPercent))
+            HStack(alignment: .top, spacing: 0) {
+                HealthValue(
+                    label: Text("Maximum Capacity", bundle: .module),
+                    value: DisplayFormat.percent(health?.systemMaximumCapacityPercent),
+                    ring: health?.systemMaximumCapacityPercent.map { Double($0) / 100 }
+                )
+                ValueDivider()
                 HealthValue(
                     label: Text("Full Charge Capacity", bundle: .module),
                     value: DisplayFormat.number(snapshot.fullChargeCapacityMAh),
                     unit: snapshot.fullChargeCapacityMAh == nil ? nil : "mAh"
                 )
+                ValueDivider()
                 HealthValue(label: Text("Cycle Count", bundle: .module), value: DisplayFormat.number(snapshot.cycleCount))
             }
+            .padding(.top, 12)
+            HairlineDivider()
+                .padding(.top, 12)
+            DetailsSection(snapshot: snapshot)
         }
-        .panelTile()
+        .panelTile(padding: EdgeInsets(top: 12, leading: 14, bottom: 0, trailing: 14))
+    }
+}
+
+/// 健康状态胶囊：`"Good"` 为绿色本地化文字，其他值原样显示英文原文，用橙色。
+private struct ConditionBadge: View {
+    let condition: BatteryHealthCondition
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Circle()
+                .fill(tint)
+                .frame(width: 6, height: 6)
+            text
+        }
+        .font(.system(size: 11, weight: .semibold))
+        .foregroundStyle(tint)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 3)
+        .background(tint.opacity(0.14), in: Capsule())
+        .fixedSize()
     }
 
-    /// `"Good"` 显示为本地化文字，其他值原样显示英文原文。
-    private var conditionText: Text? {
-        switch health?.condition {
+    private var tint: Color {
+        if case .good = condition { .green } else { .orange }
+    }
+
+    private var text: Text {
+        switch condition {
         case .good: Text("Good", bundle: .module)
         case .other(let value): Text(verbatim: value)
-        case nil: nil
         }
     }
 }
@@ -444,34 +838,75 @@ private struct HealthValue: View {
     let label: Text
     let value: String
     var unit: String?
+    /// 数值前的小圆环，0–1。
+    var ring: Double?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
-            label
-                .font(.system(size: 11.5))
-                .foregroundStyle(.secondary)
-                .minimumScaleFactor(0.75)
             HStack(alignment: .firstTextBaseline, spacing: 2) {
+                if let ring {
+                    CapacityRing(fraction: ring)
+                        .alignmentGuide(.firstTextBaseline) { $0[.bottom] - 1 }
+                        .padding(.trailing, 3)
+                }
                 Text(verbatim: value)
                     .font(.system(size: 19, weight: .semibold, design: .rounded))
                     .monospacedDigit()
                     .contentTransition(.numericText())
                 if let unit {
                     Text(verbatim: unit)
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(.tertiary)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(.secondary)
                 }
             }
             .minimumScaleFactor(0.75)
+            label
+                .font(.system(size: 10.5))
+                .foregroundStyle(.secondary)
+                .minimumScaleFactor(0.75)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
-// MARK: - 详细数据
+/// 系统最大容量的小圆环：品牌蓝从顶部顺时针画到当前比例。
+private struct CapacityRing: View {
+    let fraction: Double
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .stroke(Color.primary.opacity(0.1), lineWidth: 2.5)
+            Circle()
+                .trim(from: 0, to: min(1, max(0, fraction)))
+                .stroke(Color.brand, style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
+                .rotationEffect(.degrees(-90))
+        }
+        .frame(width: 14, height: 14)
+    }
+}
+
+/// 健康读数之间的竖线。
+private struct ValueDivider: View {
+    var body: some View {
+        Rectangle()
+            .fill(Color.primary.opacity(0.08))
+            .frame(width: 1, height: 30)
+            .padding(.trailing, 10)
+            .padding(.top, 3)
+    }
+}
+
+private struct HairlineDivider: View {
+    var body: some View {
+        Rectangle()
+            .fill(Color.primary.opacity(0.08))
+            .frame(height: 1)
+    }
+}
 
 /// 电压、电流等不常看的读数，默认折叠，展开状态存 `UserDefaults`。接电时加上充电器信息。
-private struct DetailsTile: View {
+private struct DetailsSection: View {
     let snapshot: BatterySnapshot
     @AppStorage("panelDetailsExpanded") private var isExpanded = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -487,9 +922,9 @@ private struct DetailsTile: View {
                     isExpanded.toggle()
                 }
             } label: {
-                HStack(spacing: 4) {
+                HStack(spacing: 6) {
                     Text("Details", bundle: .module)
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(.secondary)
                     Spacer(minLength: 8)
                     if !isExpanded {
@@ -500,39 +935,39 @@ private struct DetailsTile: View {
                                 Text("Voltage, Current", bundle: .module)
                             }
                         }
-                        .font(.system(size: 12))
+                        .font(.system(size: 11.5))
                         .foregroundStyle(.tertiary)
                     }
                     Image(systemName: "chevron.down")
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(.system(size: 10, weight: .bold))
                         .foregroundStyle(.tertiary)
                         .rotationEffect(.degrees(isExpanded ? 180 : 0))
                 }
+                .padding(.vertical, 10)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .accessibilityValue(isExpanded ? Text("On", bundle: .module) : Text("Off", bundle: .module))
 
             if isExpanded {
-                VStack(spacing: 6) {
+                VStack(spacing: 7) {
                     ValueRow(Text("Battery Voltage", bundle: .module), value: DisplayFormat.volts(millivolts: snapshot.voltageMV, fractionLength: 2))
                     ValueRow(Text("Battery Current", bundle: .module), value: DisplayFormat.amps(milliamps: snapshot.amperageMA))
                     ValueRow(Text("Battery Power", bundle: .module), value: DisplayFormat.signedWatts(milliwatts: snapshot.batteryPowerMW))
-                    Divider()
+                    HairlineDivider()
                     ValueRow(Text("Design Capacity", bundle: .module), value: designCapacity)
                     ValueRow(Text("Capacity Ratio (Full Charge / Design)", bundle: .module), value: DisplayFormat.percent(ratio: snapshot.capacityRatio))
                     if isExternalPower {
-                        Divider()
+                        HairlineDivider()
                         ValueRow(Text("Charger", bundle: .module), value: adapter)
                             .help(Text(verbatim: adapterDescription))
                         ValueRow(Text("Input Voltage · Current", bundle: .module), value: chargerInput)
                     }
                 }
-                .padding(.top, 10)
+                .padding(.bottom, 12)
                 .transition(PanelMotion.transition(reduceMotion: reduceMotion))
             }
         }
-        .panelTile(padding: EdgeInsets(top: 10, leading: 14, bottom: 10, trailing: 14))
     }
 
     private var designCapacity: String {
@@ -592,8 +1027,12 @@ private struct PanelFooter: View {
             Button {
                 onOpenMainWindow()
             } label: {
-                Text("Open Main Window", bundle: .module)
-                    .frame(maxWidth: .infinity)
+                Label {
+                    Text("Open Main Window", bundle: .module)
+                } icon: {
+                    Image(systemName: "macwindow")
+                }
+                .frame(maxWidth: .infinity)
             }
             .panelGlassButtonStyle()
             .controlSize(.large)
@@ -611,7 +1050,7 @@ private struct PanelFooter: View {
     }
 }
 
-/// 低电量模式状态胶囊：开启时黄色（与系统电池图标一致），关闭时为浅色块、次要色。宽度不够时只显示图标和开关状态。
+/// 低电量模式状态胶囊：开启时黄色（与系统电池图标一致），关闭时与玻璃按钮同样的底色、次要色。宽度不够时只显示图标和开关状态。
 private struct LowPowerModeBadge: View {
     let isEnabled: Bool
     @Environment(\.colorScheme) private var colorScheme
@@ -630,6 +1069,7 @@ private struct LowPowerModeBadge: View {
     private func badge(showsTitle: Bool) -> some View {
         HStack(spacing: 4) {
             Image(systemName: "battery.50percent")
+                .foregroundStyle(isEnabled ? Color.yellow : Color.secondary)
             if showsTitle {
                 Text("Low Power Mode", bundle: .module)
             }
@@ -643,10 +1083,12 @@ private struct LowPowerModeBadge: View {
             if isEnabled {
                 Capsule().fill(Color.yellow.opacity(0.3))
             } else {
-                Capsule().fill(PanelTileStyle.fill(colorScheme))
-                Capsule().strokeBorder(PanelTileStyle.edge, lineWidth: 0.5)
+                Capsule().fill(PanelTileStyle.fillGradient(colorScheme))
             }
+            Capsule().strokeBorder(PanelTileStyle.rim(colorScheme), lineWidth: 1)
         }
+        .compositingGroup()
+        .shadow(color: PanelTileStyle.shadow(colorScheme), radius: 6, y: 2)
         .fixedSize()
     }
 
@@ -660,7 +1102,7 @@ private struct LowPowerModeBadge: View {
 
 #if DEBUG
 /// 面板各状态的示例数据，数值参考 docs/v1技术设计.md 第 5 节的本机实测值。
-private enum PanelPreviewData {
+enum PanelPreviewData {
     static let health = BatteryHealthInfo(systemMaximumCapacityPercent: 95, condition: .good)
     static let adapter = PowerAdapter(watts: 140, name: "140W USB-C Power Adapter", manufacturer: "Apple Inc.")
 
