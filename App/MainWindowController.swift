@@ -8,12 +8,13 @@ import UniformTypeIdentifiers
 /// 窗口显示期间历史数据每分钟刷新，关闭后停止。
 @MainActor
 final class MainWindowController: NSWindowController, NSWindowDelegate {
+    private static let defaultContentSize = NSSize(width: 1200, height: 840)
     private var history: HistoryModel?
     private let navigation = MainWindowNavigation()
 
     convenience init(history: HistoryModel, monitor: BatteryMonitor, settings: AppSettings, alerts: AlertMonitor, updates: UpdateController) {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 1200, height: 840),
+            contentRect: NSRect(origin: .zero, size: Self.defaultContentSize),
             styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
             backing: .buffered,
             defer: false
@@ -49,6 +50,9 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
 
     func showAndActivate() {
         NSApp.setActivationPolicy(.regular)
+        if let window, !window.isVisible, !window.isMiniaturized {
+            restoreDefaultSize(for: window)
+        }
         showWindow(nil)
         if window?.isMiniaturized == true {
             window?.deminiaturize(nil)
@@ -58,6 +62,25 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         (NSApp as any LegacyActivation).activate(ignoringOtherApps: true)
         window?.makeKeyAndOrderFront(nil)
         updateHistoryActivity()
+    }
+
+    private func restoreDefaultSize(for window: NSWindow) {
+        let previousFrame = window.frame
+        let defaultFrame = window.frameRect(forContentRect: NSRect(origin: .zero, size: Self.defaultContentSize))
+        var frame = NSRect(
+            x: previousFrame.minX,
+            y: previousFrame.maxY - defaultFrame.height,
+            width: defaultFrame.width,
+            height: defaultFrame.height
+        )
+        if let screen = window.screen ?? NSScreen.main {
+            let visibleFrame = screen.visibleFrame
+            frame.size.width = min(frame.width, visibleFrame.width)
+            frame.size.height = min(frame.height, visibleFrame.height)
+            frame.origin.x = min(max(frame.minX, visibleFrame.minX), visibleFrame.maxX - frame.width)
+            frame.origin.y = min(max(previousFrame.maxY - frame.height, visibleFrame.minY), visibleFrame.maxY - frame.height)
+        }
+        window.setFrame(frame, display: false)
     }
 
     func showSettings() {
