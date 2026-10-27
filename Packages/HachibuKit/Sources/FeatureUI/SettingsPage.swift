@@ -7,34 +7,59 @@ import SwiftUI
 
 private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Hachibu", category: "Settings")
 
-/// 设置页。设置项见 docs/v1技术设计.md 第 13 节。
+/// 设置页。两栏布局，设置项见 docs/v1技术设计.md 第 13 节，样式见 19.3。
 struct SettingsPage: View {
-    @Environment(BatteryMonitor.self) private var monitor
     @Bindable var settings: AppSettings
-    /// 数据库打不开时为 nil，不显示“历史数据”分区。
+    /// 数据库打不开时为 nil，不显示“历史数据”分组。
     var importer: HistoryImportModel?
     /// 由 App 层选择要导入的文件，取消时返回 nil。
     var onChooseImportFile: @MainActor () async -> URL? = { nil }
     let onExportDiagnostics: @MainActor () async -> Void
     /// 为 nil 时不显示“检查更新”。
     let onCheckForUpdates: (@MainActor () -> Void)?
+
+    var body: some View {
+        ScrollView {
+            SettingsPageContent(
+                settings: settings,
+                importer: importer,
+                onChooseImportFile: onChooseImportFile,
+                onExportDiagnostics: onExportDiagnostics,
+                onCheckForUpdates: onCheckForUpdates
+            )
+        }
+    }
+}
+
+/// 与页面共用的内容；渲染测试直接渲染内容，避开 ImageRenderer 无法绘制的 AppKit 滚动容器。
+struct SettingsPageContent: View {
+    @Environment(BatteryMonitor.self) private var monitor
+    @Bindable var settings: AppSettings
+    var importer: HistoryImportModel?
+    var onChooseImportFile: @MainActor () async -> URL? = { nil }
+    let onExportDiagnostics: @MainActor () async -> Void
+    let onCheckForUpdates: (@MainActor () -> Void)?
     @State private var loginItem = LoginItem()
     @State private var isExporting = false
     @State private var couldNotOpenBatterySettings = false
 
     var body: some View {
-        Form {
-            menuBarSection
-            generalSection
-            chargingSection
-            diagnosticsSection
-            aboutSection
-            // 历史数据导入用得少，放在最后。
+        // 充电上限最常用，放在最前；导入、诊断和关于用得少，放在后面。
+        SettingsColumns {
+            chargingGroup
+            SettingsGroupDivider()
+            menuBarGroup
+            SettingsGroupDivider()
+            generalGroup
             if let importer {
-                HistoryDataSection(importer: importer, onChooseFile: onChooseImportFile)
+                SettingsGroupDivider()
+                HistoryDataGroup(importer: importer, onChooseFile: onChooseImportFile)
             }
+            SettingsGroupDivider()
+            diagnosticsGroup
+            SettingsGroupDivider()
+            aboutGroup
         }
-        .formStyle(.grouped)
         .onAppear { loginItem.refresh() }
         // 用户可能在系统设置里批准或关闭登录项后切回来。
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
@@ -42,115 +67,70 @@ struct SettingsPage: View {
         }
     }
 
-    private var menuBarSection: some View {
-        Section {
-            Picker(selection: $settings.menuBarIconStyle) {
-                ForEach(MenuBarIconStyle.allCases, id: \.self) { style in
-                    style.title.tag(style)
-                }
-            } label: {
-                Text("Menu Bar Icon", bundle: .module)
-            }
-            Picker(selection: $settings.menuBarContent) {
-                ForEach(MenuBarContent.allCases, id: \.self) { content in
-                    content.title.tag(content)
-                }
-            } label: {
-                Text("Show in Menu Bar", bundle: .module)
-            }
-        } header: {
-            Text("Menu Bar", bundle: .module)
-        } footer: {
-            Text("Icons turn yellow in Low Power Mode. The iOS style shows the percentage inside the battery.", bundle: .module)
-        }
-    }
+    // MARK: 电池充电
 
-    private var generalSection: some View {
-        Section {
-            Toggle(isOn: Binding(get: { loginItem.isOn }, set: { loginItem.setEnabled($0) })) {
-                Text("Launch at Login", bundle: .module)
-                if let note = loginItem.statusNote {
-                    note
-                }
-            }
-            if loginItem.status == .requiresApproval {
-                Button {
-                    SMAppService.openSystemSettingsLoginItems()
-                } label: {
-                    Text("Open Login Items Settings…", bundle: .module)
-                }
-            }
-            if let errorMessage = loginItem.errorMessage {
-                Text(verbatim: errorMessage)
-                    .font(.callout)
-                    .foregroundStyle(.red)
-            }
-        } header: {
-            Text("General", bundle: .module)
-        }
-    }
-
-    private var chargingSection: some View {
-        Section {
+    private var chargingGroup: some View {
+        SettingsGroup(
+            Text("Battery Charging", bundle: .module),
+            description: chargeLimitControl != nil
+                ? Text("Changes the same setting as System Settings → Battery.", bundle: .module)
+                : Text("Change the charge limit in System Settings → Battery. Requires macOS 26.4 or later.", bundle: .module)
+        ) {
             switch monitor.reading {
             case nil:
-                ProgressView()
-                    .controlSize(.small)
+                SettingsRow(Text("System Charge Limit", bundle: .module)) {
+                    ProgressView()
+                        .controlSize(.small)
+                }
             case .noBattery:
-                Text("No Battery Detected", bundle: .module)
+                SettingsRow(Text("No Battery Detected", bundle: .module)) {
+                    EmptyView()
+                }
             case .battery(let snapshot):
                 if let control = chargeLimitControl {
                     ChargeLimitControlRows(control: control) { change in
                         Task { await monitor.setChargeLimit(change) }
                     }
                     if control.isEnabled {
-                        Picker(selection: $settings.chargeAboveLimitAction) {
-                            ForEach(ChargeAboveLimitAction.allCases, id: \.self) { action in
-                                action.title.tag(action)
-                            }
-                        } label: {
-                            Text("When Above Limit", bundle: .module)
-                            Text("Hold Current Charge temporarily sets the system limit to the current level (up to 99%) so the charger powers your Mac. Your limit is restored when you unplug, switch back, or quit Hachibu.", bundle: .module)
+                        SettingsRowDivider()
+                        SettingsRow(
+                            Text("When Above Limit", bundle: .module),
+                            subtitle: settings.chargeAboveLimitAction == .holdCurrentCharge
+                                ? Text("Hold Current Charge temporarily sets the system limit to the current level (up to 99%) so the charger powers your Mac. Your limit is restored when you unplug, switch back, or quit Hachibu.", bundle: .module)
+                                : nil
+                        ) {
+                            SettingsMenu(
+                                selection: $settings.chargeAboveLimitAction,
+                                options: ChargeAboveLimitAction.allCases,
+                                title: \.title,
+                                label: Text("When Above Limit", bundle: .module)
+                            )
+                            .disabled(control.isBlocked)
                         }
-                        .disabled(control.isBlocked)
                     }
                 } else {
-                    LabeledContent {
+                    SettingsRow(Text("System Charge Limit", bundle: .module)) {
                         ChargeLimitValue(setting: snapshot.chargeLimit)
-                            .monospacedDigit()
-                    } label: {
-                        Text("System Charge Limit", bundle: .module)
                     }
                 }
-                LabeledContent {
+                SettingsRowDivider()
+                SettingsRow(Text("Current Status", bundle: .module)) {
                     StatusLabel(status: ChargeStatus(snapshot))
-                } label: {
-                    Text("Current Status", bundle: .module)
                 }
             }
-            Button {
-                let url = URL(string: "x-apple.systempreferences:com.apple.preference.battery")
-                couldNotOpenBatterySettings = url.map { NSWorkspace.shared.open($0) } != true
-            } label: {
-                Text("Open Battery Settings…", bundle: .module)
+            SettingsRowDivider()
+            SettingsPanelFooter {
+                Button {
+                    let url = URL(string: "x-apple.systempreferences:com.apple.preference.battery")
+                    couldNotOpenBatterySettings = url.map { NSWorkspace.shared.open($0) } != true
+                } label: {
+                    Text("Open Battery Settings…", bundle: .module)
+                }
+                .settingsButtonStyle()
             }
             if couldNotOpenBatterySettings {
-                Text("Could not open Battery settings. Open System Settings → Battery manually.", bundle: .module)
-                    .font(.callout)
-                    .foregroundStyle(.red)
+                SettingsNote(text: Text("Could not open Battery settings. Open System Settings → Battery manually.", bundle: .module), isError: true)
             }
-        } header: {
-            Text("Battery Charging", bundle: .module)
-        } footer: {
-            Group {
-                if chargeLimitControl != nil {
-                    Text("Changes the same setting as System Settings → Battery.", bundle: .module)
-                } else {
-                    Text("Change the charge limit in System Settings → Battery. Requires macOS 26.4 or later.", bundle: .module)
-                }
-            }
-            .font(.callout)
-            .foregroundStyle(.secondary)
         }
     }
 
@@ -158,112 +138,229 @@ struct SettingsPage: View {
         ChargeLimitControl(monitor: monitor)
     }
 
-    private var diagnosticsSection: some View {
-        Section {
-            Button {
-                isExporting = true
-                Task {
-                    await onExportDiagnostics()
-                    isExporting = false
-                }
-            } label: {
-                Text("Export Diagnostic Data…", bundle: .module)
+    // MARK: 菜单栏
+
+    private var menuBarGroup: some View {
+        SettingsGroup(
+            Text("Menu Bar", bundle: .module),
+            description: Text("Icons turn yellow in Low Power Mode. The iOS style shows the percentage inside the battery.", bundle: .module)
+        ) {
+            SettingsRow(Text("Menu Bar Icon", bundle: .module)) {
+                MenuBarIconChoice(selection: $settings.menuBarIconStyle)
             }
-            .disabled(isExporting)
-        } header: {
-            Text("Diagnostics", bundle: .module)
-        } footer: {
-            Text("Saves the current battery readings as a JSON file you can attach to an issue. Serial numbers and UUIDs are removed.", bundle: .module)
-                .font(.callout)
-                .foregroundStyle(.secondary)
+            SettingsRowDivider()
+            SettingsRow(Text("Show in Menu Bar", bundle: .module)) {
+                SettingsMenu(
+                    selection: $settings.menuBarContent,
+                    options: MenuBarContent.allCases,
+                    title: \.title,
+                    label: Text("Show in Menu Bar", bundle: .module)
+                )
+            }
         }
     }
 
-    private var aboutSection: some View {
-        Section {
+    // MARK: 通用
+
+    private var generalGroup: some View {
+        SettingsGroup(
+            Text("General", bundle: .module),
+            description: Text("After you close this window, Hachibu stays in the menu bar and keeps recording.", bundle: .module)
+        ) {
+            SettingsRow(Text("Launch at Login", bundle: .module), subtitle: loginItem.statusNote) {
+                SettingsSwitch(
+                    isOn: Binding(get: { loginItem.isOn }, set: { loginItem.setEnabled($0) }),
+                    label: Text("Launch at Login", bundle: .module)
+                )
+            }
+            if loginItem.status == .requiresApproval {
+                SettingsRowDivider()
+                SettingsPanelFooter {
+                    Button {
+                        SMAppService.openSystemSettingsLoginItems()
+                    } label: {
+                        Text("Open Login Items Settings…", bundle: .module)
+                    }
+                    .settingsButtonStyle()
+                }
+            }
+            if let errorMessage = loginItem.errorMessage {
+                SettingsNote(text: Text(verbatim: errorMessage), isError: true)
+            }
+        }
+    }
+
+    // MARK: 诊断、关于
+
+    private var diagnosticsGroup: some View {
+        SettingsGroup(
+            Text("Diagnostics", bundle: .module),
+            description: Text("Saves the current battery readings as a JSON file you can attach to an issue. Serial numbers and UUIDs are removed.", bundle: .module)
+        ) {
+            SettingsRow(Text("Diagnostic Data", bundle: .module)) {
+                Button {
+                    isExporting = true
+                    Task {
+                        await onExportDiagnostics()
+                        isExporting = false
+                    }
+                } label: {
+                    Text("Export…", bundle: .module)
+                }
+                .settingsButtonStyle()
+                .disabled(isExporting)
+            }
+        }
+    }
+
+    private var aboutGroup: some View {
+        SettingsGroup(Text("About", bundle: .module)) {
             Image("BrandLogo", bundle: .module)
                 .resizable()
                 .scaledToFit()
-                .frame(width: 220, height: 53)
+                .frame(width: 180, height: 43, alignment: .leading)
                 .accessibilityLabel(Text(verbatim: "Hachibu"))
-                .padding(.vertical, 8)
-            LabeledContent {
-                Text(verbatim: AboutInfo.version)
-                    .textSelection(.enabled)
-            } label: {
-                Text("Version", bundle: .module)
-            }
-            LabeledContent {
-                Link(destination: AboutInfo.repositoryURL) {
-                    Text(verbatim: AboutInfo.repositoryDisplayName)
+        } panel: {
+            SettingsRow(Text("Version", bundle: .module)) {
+                HStack(spacing: 10) {
+                    Text(verbatim: AboutInfo.version)
+                        .textSelection(.enabled)
+                    if let onCheckForUpdates {
+                        Button {
+                            onCheckForUpdates()
+                        } label: {
+                            Text("Check for Updates…", bundle: .module)
+                        }
+                        .settingsButtonStyle()
+                    }
                 }
-            } label: {
-                Text("Source Code", bundle: .module)
+            }
+            SettingsRowDivider()
+            SettingsRow(Text("Source Code", bundle: .module)) {
+                SettingsLink(destination: AboutInfo.repositoryURL, text: AboutInfo.repositoryDisplayName)
             }
             if let license = AboutInfo.license {
-                LabeledContent {
-                    Link(destination: AboutInfo.licenseURL) {
-                        Text(verbatim: license)
-                    }
-                } label: {
-                    Text("License", bundle: .module)
+                SettingsRowDivider()
+                SettingsRow(Text("License", bundle: .module)) {
+                    SettingsLink(destination: AboutInfo.licenseURL, text: license)
                 }
             }
-            if let onCheckForUpdates {
-                Button {
-                    onCheckForUpdates()
-                } label: {
-                    Text("Check for Updates…", bundle: .module)
-                }
-            }
-        } header: {
-            Text("About", bundle: .module)
         }
     }
 }
 
+/// 菜单栏图标的两种样式，各画一个示意图标，选中的有品牌蓝描边。
+private struct MenuBarIconChoice: View {
+    @Binding var selection: MenuBarIconStyle
+
+    var body: some View {
+        HStack(spacing: 6) {
+            ForEach(MenuBarIconStyle.allCases, id: \.self) { style in
+                let isSelected = style == selection
+                Button {
+                    selection = style
+                } label: {
+                    HStack(spacing: 7) {
+                        MenuBarIconSample(style: style)
+                        style.title
+                    }
+                    .font(.system(size: 12.5))
+                    .padding(.horizontal, 10)
+                    .frame(height: 26)
+                    .background {
+                        RoundedRectangle(cornerRadius: 7, style: .continuous)
+                            .fill(Color.primary.opacity(isSelected ? 0 : 0.04))
+                        RoundedRectangle(cornerRadius: 7, style: .continuous)
+                            .strokeBorder(isSelected ? Color.brand : Color.primary.opacity(0.15), lineWidth: isSelected ? 1.5 : 0.5)
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(isSelected ? .isSelected : [])
+            }
+        }
+    }
+}
+
+/// 设置页里的菜单栏图标示意：macOS 样式为描边电池加填充，iOS 样式为实心电池内写电量。
+/// 只用于选择，不与菜单栏的实际绘制（App 层的 BatteryIconDrawing）逐像素一致。
+private struct MenuBarIconSample: View {
+    let style: MenuBarIconStyle
+
+    var body: some View {
+        HStack(spacing: 1) {
+            switch style {
+            case .battery:
+                RoundedRectangle(cornerRadius: 3, style: .continuous)
+                    .strokeBorder(Color.primary, lineWidth: 1)
+                    .frame(width: 22, height: 11)
+                    .overlay(alignment: .leading) {
+                        RoundedRectangle(cornerRadius: 1.5, style: .continuous)
+                            .fill(Color.primary)
+                            .frame(width: 13, height: 6)
+                            .padding(.leading, 2.5)
+                    }
+            case .ios:
+                RoundedRectangle(cornerRadius: 3.5, style: .continuous)
+                    .fill(Color.primary)
+                    .frame(width: 22, height: 11)
+                    .overlay {
+                        Text(verbatim: "80")
+                            .font(.system(size: 8, weight: .bold))
+                            .foregroundStyle(.background)
+                    }
+            }
+            Capsule()
+                .fill(Color.primary.opacity(0.6))
+                .frame(width: 1.5, height: 4)
+        }
+        .accessibilityHidden(true)
+    }
+}
+
 /// 导入历史数据，列出和删除已导入的来源。见 docs/v1技术设计.md 20.6。
-private struct HistoryDataSection: View {
+private struct HistoryDataGroup: View {
     let importer: HistoryImportModel
     let onChooseFile: @MainActor () async -> URL?
     @State private var pendingDeletion: ImportedSource?
 
     var body: some View {
-        Section {
+        SettingsGroup(
+            Text("History Data", bundle: .module),
+            description: Text("Imports daily full charge capacity, cycle count and maximum capacity from a file in the Hachibu import format. Imported data stays on this Mac and is not included in diagnostic data.", bundle: .module)
+        ) {
             ForEach(importer.sources) { source in
-                LabeledContent {
+                SettingsRow(
+                    Text(verbatim: Self.name(source)),
+                    subtitle: Text("\(Self.dayRange(first: source.firstDay, last: source.lastDay)) · \(source.dayCount) days · Imported \(source.importedAt.formatted(date: .abbreviated, time: .omitted))", bundle: .module)
+                ) {
                     Button(role: .destructive) {
                         pendingDeletion = source
                     } label: {
                         Text("Delete…", bundle: .module)
+                            .foregroundStyle(.red)
                     }
+                    .settingsButtonStyle()
                     .disabled(importer.isWorking)
-                } label: {
-                    Text(verbatim: Self.name(source))
-                    Text("\(Self.dayRange(first: source.firstDay, last: source.lastDay)) · \(source.dayCount) days · Imported \(source.importedAt.formatted(date: .abbreviated, time: .omitted))", bundle: .module)
                 }
+                SettingsRowDivider()
             }
-            Button {
-                Task {
-                    if let url = await onChooseFile() {
-                        await importer.prepare(fileURL: url)
+            SettingsPanelFooter {
+                Button {
+                    Task {
+                        if let url = await onChooseFile() {
+                            await importer.prepare(fileURL: url)
+                        }
                     }
+                } label: {
+                    Text("Import History…", bundle: .module)
                 }
-            } label: {
-                Text("Import History…", bundle: .module)
+                .settingsButtonStyle()
+                .disabled(importer.isWorking)
             }
-            .disabled(importer.isWorking)
             if let failure = importer.failure {
-                Self.message(failure)
-                    .font(.callout)
-                    .foregroundStyle(.red)
+                SettingsNote(text: Self.message(failure), isError: true)
             }
-        } header: {
-            Text("History Data", bundle: .module)
-        } footer: {
-            Text("Imports daily full charge capacity, cycle count and maximum capacity from a file in the Hachibu import format. Imported data stays on this Mac and is not included in diagnostic data.", bundle: .module)
-                .font(.callout)
-                .foregroundStyle(.secondary)
         }
         .task { await importer.loadSources() }
         .alert(
@@ -349,29 +446,29 @@ private struct HistoryDataSection: View {
     }
 }
 
-/// 系统充电上限的开关和档位。开启时才显示档位。
+/// 系统充电上限的开关和档位：开关一行，开启时下方为铺满宽度的档位（与面板相同的 `LimitSegments`）。
 private struct ChargeLimitControlRows: View {
     let control: ChargeLimitControl
     let onChange: @MainActor (ChargeLimitChange) -> Void
 
     var body: some View {
-        Toggle(isOn: Binding(get: { control.isEnabled }, set: { onChange($0 ? .enable : .disable) })) {
-            Text("System Charge Limit", bundle: .module)
-        }
-        .disabled(!control.isInteractive)
-        if control.isEnabled {
-            Picker(selection: Binding(get: { control.percent ?? 0 }, set: { onChange(.limit($0)) })) {
-                ForEach(control.options, id: \.self) { percent in
-                    Text(verbatim: DisplayFormat.percent(percent)).tag(percent)
-                }
-            } label: {
-                Text("Limit", bundle: .module)
-            }
+        SettingsRow(Text("System Charge Limit", bundle: .module)) {
+            SettingsSwitch(
+                isOn: Binding(get: { control.isEnabled }, set: { onChange($0 ? .enable : .disable) }),
+                label: Text("System Charge Limit", bundle: .module)
+            )
             .disabled(!control.isInteractive)
+        }
+        if control.isEnabled {
+            LimitSegments(options: control.options, selection: control.percent) { onChange(.limit($0)) }
+                .disabled(!control.isInteractive)
+                .padding(.bottom, 10)
         }
         if control.isBlocked || control.writeFailed {
             ChargeLimitNote(control: control)
-                .font(.callout)
+                .font(.system(size: 11.5))
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.bottom, 10)
         }
     }
 }

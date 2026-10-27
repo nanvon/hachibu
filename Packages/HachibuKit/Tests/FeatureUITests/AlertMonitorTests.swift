@@ -99,44 +99,13 @@ private actor FakeNotifier: AlertNotifier {
         }
     }
 
-    @Test func healthAlertFollowsThreshold() async {
+    @Test func legacyHealthReadingDoesNotSendAlert() async {
         await withDefaults { defaults in
             let settings = AppSettings(defaults: defaults)
             let notifier = FakeNotifier(status: .allowed)
             let monitor = AlertMonitor(settings: settings, notifier: notifier, defaults: defaults)
-
             await monitor.handleHealth(BatteryHealthInfo(systemMaximumCapacityPercent: 79, condition: nil))
-            #expect(await notifier.firstDelivered() == .lowHealth(maximumCapacityPercent: 79, threshold: 80))
-            #expect(monitor.healthStatus == .alerted)
-
-            settings.healthAlertThreshold = 75
-            #expect(monitor.healthStatus == .waiting)
-
-            let reloaded = AlertMonitor(settings: settings, notifier: notifier, defaults: defaults)
-            settings.healthAlertThreshold = 80
-            #expect(reloaded.healthStatus == .alerted)
-        }
-    }
-
-    @Test func failedHealthDeliveryIsRetriedAndOnlySuccessIsPersisted() async {
-        await withDefaults { defaults in
-            let settings = AppSettings(defaults: defaults)
-            let notifier = FakeNotifier(status: .allowed)
-            await notifier.failNextDelivery()
-            let monitor = AlertMonitor(settings: settings, notifier: notifier, defaults: defaults)
-            let health = BatteryHealthInfo(systemMaximumCapacityPercent: 79, condition: nil)
-
-            await monitor.handleHealth(health)
-            #expect(monitor.healthStatus == .waiting)
-            #expect(defaults.object(forKey: "healthAlertedThreshold") == nil)
-            #expect(await notifier.attempts.count == 1)
-            let reloaded = AlertMonitor(settings: settings, notifier: notifier, defaults: defaults)
-            #expect(reloaded.healthStatus == .waiting)
-
-            await reloaded.handleHealth(health)
-            #expect(reloaded.healthStatus == .alerted)
-            #expect(defaults.integer(forKey: "healthAlertedThreshold") == 80)
-            #expect(await notifier.attempts.count == 2)
+            #expect(await notifier.attempts.isEmpty)
         }
     }
 
@@ -176,51 +145,5 @@ private actor FakeNotifier: AlertNotifier {
             await monitor.handleReading(.battery(BatterySnapshot(temperatureCelsius: 41)), at: start.addingTimeInterval(360))
             #expect(monitor.temperatureStatus == .alerted)
         }
-    }
-}
-
-/// 由测试明确完成发送，检查等待期间不会提前持久化或重复发送。
-private actor PausedNotifier: AlertNotifier {
-    private let started: AsyncStream<Void>
-    private let continuation: AsyncStream<Void>.Continuation
-    private var completion: CheckedContinuation<Void, Never>?
-    private(set) var attempts = 0
-
-    init() { (started, continuation) = AsyncStream.makeStream() }
-    func authorization() async -> NotificationAuthorization { .allowed }
-    func requestAuthorization() async -> NotificationAuthorization { .allowed }
-    func deliver(_ alert: BatteryAlert) async {
-        attempts += 1
-        await withCheckedContinuation { completion in
-            self.completion = completion
-            continuation.yield(())
-        }
-    }
-    func waitUntilStarted() async {
-        for await _ in started { return }
-    }
-    func accept() { completion?.resume(); completion = nil }
-}
-
-@MainActor
-@Suite struct PendingAlertDeliveryTests {
-    @Test func concurrentHealthReadingsWaitForOneAcceptedDelivery() async {
-        let suite = "PendingAlertDeliveryTests.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suite)!
-        defer { defaults.removePersistentDomain(forName: suite) }
-        let settings = AppSettings(defaults: defaults)
-        let notifier = PausedNotifier()
-        let monitor = AlertMonitor(settings: settings, notifier: notifier, defaults: defaults)
-        let health = BatteryHealthInfo(systemMaximumCapacityPercent: 79, condition: nil)
-        let sending = Task { await monitor.handleHealth(health) }
-        await notifier.waitUntilStarted()
-        #expect(monitor.healthStatus == .waiting)
-        #expect(defaults.object(forKey: "healthAlertedThreshold") == nil)
-        await monitor.handleHealth(health)
-        #expect(await notifier.attempts == 1)
-        await notifier.accept()
-        await sending.value
-        #expect(monitor.healthStatus == .alerted)
-        #expect(defaults.integer(forKey: "healthAlertedThreshold") == 80)
     }
 }

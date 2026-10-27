@@ -103,28 +103,3 @@ import Testing
         #expect(!rule.hasAlerted)
     }
 }
-
-@Suite struct HealthAlertRuleTests {
-    @Test func alertsOnceBelowThreshold() {
-        var rule = HealthAlertRule()
-        let results = [80, 79, 78].map { rule.update(maximumCapacity: $0, threshold: 80) }
-        #expect(results == [false, true, false])
-        #expect(rule.hasAlerted(threshold: 80))
-    }
-
-    @Test func missingCapacityDoesNotAlert() {
-        var rule = HealthAlertRule()
-        let alerted = rule.update(maximumCapacity: nil, threshold: 80)
-        #expect(!alerted)
-        #expect(rule.alertedThreshold == nil)
-    }
-
-    @Test func changedThresholdAllowsAnotherAlert() {
-        var rule = HealthAlertRule(alertedThreshold: 80)
-        let sameThreshold = rule.update(maximumCapacity: 79, threshold: 80)
-        let newThreshold = rule.update(maximumCapacity: 79, threshold: 85)
-        #expect(!sameThreshold)
-        #expect(newThreshold)
-        #expect(rule.alertedThreshold == 85)
-    }
-}

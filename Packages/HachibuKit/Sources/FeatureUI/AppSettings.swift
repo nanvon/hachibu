@@ -7,6 +7,7 @@ import Observation
 @Observable
 public final class AppSettings {
     public static let temperatureThresholdRange = 30...50
+    /// 保留旧接口；最大容量提醒已移除。
     public static let healthThresholdRange = 50...95
 
     public var menuBarContent: MenuBarContent {
@@ -22,10 +23,11 @@ public final class AppSettings {
     public var temperatureAlertThreshold: Int {
         didSet { defaults.set(temperatureAlertThreshold, forKey: Key.temperatureAlertThreshold) }
     }
+    /// 保留旧设置，不再控制提醒。
     public var healthAlertEnabled: Bool {
         didSet { defaults.set(healthAlertEnabled, forKey: Key.healthAlertEnabled) }
     }
-    /// 健康度提醒阈值（%），与系统最大容量比较。
+    /// 保留旧设置，不再控制提醒。
     public var healthAlertThreshold: Int {
         didSet { defaults.set(healthAlertThreshold, forKey: Key.healthAlertThreshold) }
     }

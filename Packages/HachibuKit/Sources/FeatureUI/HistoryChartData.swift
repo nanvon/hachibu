@@ -56,6 +56,20 @@ struct RecentChartData: Equatable, Sendable {
     var batteryPowerWatts: ChartSeries
     var powerInWatts: ChartSeries
     var voltageVolts: ChartSeries
+    /// 系统充电上限（关闭时为 100），阶梯线的转折点；没有记录时为空。
+    var chargeLimitPercent: ChartSeries
+    var stats: RecentStats
+}
+
+/// 近期组图下方的统计。每条分钟样本计 1 分钟。
+struct RecentStats: Equatable, Sendable {
+    var pluggedInMinutes: Int
+    var chargingMinutes: Int
+    /// 48 小时里没有分钟样本的时间，包括休眠和“未记录”区间。
+    var notRecordedMinutes: Int
+    var highestTemperature: ChartPoint?
+    var lowestTemperature: ChartPoint?
+    var averageTemperature: Double?
 }
 
 /// 长期组四条曲线的数据。
@@ -69,7 +83,27 @@ struct LongTermChartData: Equatable, Sendable {
     /// 容量比：满充容量 / 设计容量，百分数。两者任一缺失时该天没有点。
     var capacityRatioPercent: ChartSeries
     var fullChargeCapacityMAh: ChartSeries
+    /// 满充容量的 14 天滑动平均，作为满充容量图的主线。
+    var fullChargeTrend: ChartSeries
     var cycleCount: ChartSeries
+    /// 最近一天的设计容量，用于满充容量图的最小纵轴跨度。
+    var designCapacityMAh: Int?
+    /// 记录满 60 天后的变化趋势，不足时为 nil。
+    var trend: HealthTrend?
+    /// 平均每月循环次数，记录不足 30 天时为 nil。
+    var cyclesPerMonth: Double?
+}
+
+/// 电池健康块标题下的结论：最早 30 天和最近 30 天满充容量平均值的变化，以及循环次数的起止值。
+struct HealthTrend: Equatable, Sendable {
+    var months: Int
+    var earlyFullChargeMAh: Double
+    var lateFullChargeMAh: Double
+    var firstCycleCount: Int?
+    var lastCycleCount: Int?
+
+    var fullChargeChangeMAh: Int { Int(lateFullChargeMAh.rounded()) - Int(earlyFullChargeMAh.rounded()) }
+    var fullChargeChangeRatio: Double { (lateFullChargeMAh - earlyFullChargeMAh) / earlyFullChargeMAh }
 }
 
 /// 把数据库记录转换成曲线数据。规则见 docs/v1技术设计.md 第 11 节。
@@ -89,12 +123,19 @@ enum HistoryChartBuilder {
         var temperatureCelsius: Double?
         var voltageMV: Double?
         var isExternalPower: Bool
+        var isCharging: Bool
     }
 
     // MARK: - 近期
 
     /// 固定最近 48 小时：分钟原始点。`firstRecordedAt` 晚于范围起点时，之前的区间标“未记录”。
-    static func recent(minuteSamples: [MinuteSample], now: Date, firstRecordedAt: Date?) -> RecentChartData {
+    /// `chargeLimitEvents` 为全部 `charge_limit` 事件，按时间排序。
+    static func recent(
+        minuteSamples: [MinuteSample],
+        chargeLimitEvents: [BatteryEvent] = [],
+        now: Date,
+        firstRecordedAt: Date?
+    ) -> RecentChartData {
         let rows = minuteSamples.map { sample in
             RecentRow(
                 date: sample.timestamp,
@@ -104,16 +145,26 @@ enum HistoryChartBuilder {
                 powerInMW: sample.powerInMW.map(Double.init),
                 temperatureCelsius: sample.temperatureCelsius,
                 voltageMV: sample.voltageMV.map(Double.init),
-                isExternalPower: sample.isExternalPower == true
+                isExternalPower: sample.isExternalPower == true,
+                isCharging: sample.isCharging == true
             )
         }
-        return recent(rows: rows, now: now, firstRecordedAt: firstRecordedAt)
+        return recent(rows: rows, chargeLimitEvents: chargeLimitEvents, now: now, firstRecordedAt: firstRecordedAt)
     }
 
-    private static func recent(rows: [RecentRow], now: Date, firstRecordedAt: Date?) -> RecentChartData {
+    private static func recent(rows: [RecentRow], chargeLimitEvents: [BatteryEvent], now: Date, firstRecordedAt: Date?) -> RecentChartData {
         let domain = now.addingTimeInterval(-recentDuration)...now
         let rows = rows.filter { domain.contains($0.date) }
         let maxGap = sampleInterval * maxGapIntervals
+        let temperatures = rows.compactMap { row in row.temperatureCelsius.map { ChartPoint(date: row.date, value: $0, segment: 0) } }
+        let stats = RecentStats(
+            pluggedInMinutes: rows.count { $0.isExternalPower },
+            chargingMinutes: rows.count { $0.isCharging },
+            notRecordedMinutes: max(0, Int(recentDuration / sampleInterval) - rows.count),
+            highestTemperature: temperatures.max { $0.value < $1.value },
+            lowestTemperature: temperatures.min { $0.value < $1.value },
+            averageTemperature: temperatures.isEmpty ? nil : temperatures.reduce(0) { $0 + $1.value } / Double(temperatures.count)
+        )
         return RecentChartData(
             hoverPoints: rows.map { ChartPoint(date: $0.date, value: 0, segment: 0) },
             domain: domain,
@@ -130,8 +181,27 @@ enum HistoryChartBuilder {
             systemPowerWatts: ChartSeries(segmented(rows.map { ($0.date, $0.systemLoadMW.map { $0 / 1000 }) }, maxGap: maxGap)),
             batteryPowerWatts: ChartSeries(segmented(rows.map { ($0.date, $0.batteryPowerMW.map { $0 / 1000 }) }, maxGap: maxGap)),
             powerInWatts: ChartSeries(segmented(rows.map { ($0.date, $0.powerInMW.map { $0 / 1000 }) }, maxGap: maxGap)),
-            voltageVolts: ChartSeries(segmented(rows.map { ($0.date, $0.voltageMV.map { $0 / 1000 }) }, maxGap: maxGap))
+            voltageVolts: ChartSeries(segmented(rows.map { ($0.date, $0.voltageMV.map { $0 / 1000 }) }, maxGap: maxGap)),
+            chargeLimitPercent: ChartSeries(chargeLimitSteps(chargeLimitEvents, in: domain)),
+            stats: stats
         )
+    }
+
+    /// 充电上限阶梯线的转折点：范围起点取起点之前最后一条事件的值，之后每条事件一个点，最后补到范围终点。
+    /// 范围内外都没有事件时为空。
+    static func chargeLimitSteps(_ events: [BatteryEvent], in domain: ClosedRange<Date>) -> [ChartPoint] {
+        var points: [ChartPoint] = []
+        if let initial = events.last(where: { $0.date <= domain.lowerBound })?.value {
+            points.append(ChartPoint(date: domain.lowerBound, value: Double(initial), segment: 0))
+        }
+        for event in events where event.date > domain.lowerBound && event.date <= domain.upperBound {
+            guard let value = event.value else { continue }
+            points.append(ChartPoint(date: event.date, value: Double(value), segment: 0))
+        }
+        if let last = points.last, last.date < domain.upperBound {
+            points.append(ChartPoint(date: domain.upperBound, value: last.value, segment: 0))
+        }
+        return points
     }
 
     // MARK: - 长期
@@ -158,6 +228,8 @@ enum HistoryChartBuilder {
 
         // 夏令时切换的日子不是 24 小时，留 1 小时余量。
         let maxGap = 24 * 3600 * maxGapIntervals + 3600
+        let fullCharge = segmented(days.map { ($0.date, $0.sample.fullChargeCapacityMAh.map(Double.init)) }, maxGap: maxGap)
+        let cycles = segmented(days.map { ($0.date, $0.sample.cycleCount.map(Double.init)) }, maxGap: maxGap)
         return LongTermChartData(
             hoverPoints: days.map { ChartPoint(date: $0.date, value: 0, segment: 0) },
             domain: domain,
@@ -165,9 +237,62 @@ enum HistoryChartBuilder {
             notRecorded: notRecordedRange(in: domain, recordStart: firstRecordedStart),
             maximumCapacityPercent: ChartSeries(segmented(days.map { ($0.date, $0.sample.systemMaxCapacityPercent.map(Double.init)) }, maxGap: maxGap)),
             capacityRatioPercent: ChartSeries(segmented(days.map { ($0.date, capacityRatioPercent($0.sample)) }, maxGap: maxGap)),
-            fullChargeCapacityMAh: ChartSeries(segmented(days.map { ($0.date, $0.sample.fullChargeCapacityMAh.map(Double.init)) }, maxGap: maxGap)),
-            cycleCount: ChartSeries(segmented(days.map { ($0.date, $0.sample.cycleCount.map(Double.init)) }, maxGap: maxGap))
+            fullChargeCapacityMAh: ChartSeries(fullCharge),
+            fullChargeTrend: ChartSeries(rollingAverage(fullCharge)),
+            cycleCount: ChartSeries(cycles),
+            designCapacityMAh: days.last { $0.sample.designCapacityMAh != nil }?.sample.designCapacityMAh,
+            trend: healthTrend(fullCharge: fullCharge, cycles: cycles),
+            cyclesPerMonth: cyclesPerMonth(cycles)
         )
+    }
+
+    static let trendWindow: TimeInterval = 14 * 86400
+    static let trendMinimumPoints = 5
+    static let comparisonWindow: TimeInterval = 30 * 86400
+    static let averageMonth: TimeInterval = 30.44 * 86400
+
+    /// 14 天滑动平均：每个点取它之前 14 天内（含当天）的读数，少于 5 个时不画。保留原来的分段。
+    static func rollingAverage(_ points: [ChartPoint]) -> [ChartPoint] {
+        var result: [ChartPoint] = []
+        var lower = 0
+        var sum = 0.0
+        for (index, point) in points.enumerated() {
+            sum += point.value
+            while point.date.timeIntervalSince(points[lower].date) >= trendWindow {
+                sum -= points[lower].value
+                lower += 1
+            }
+            let count = index - lower + 1
+            if count >= trendMinimumPoints {
+                result.append(ChartPoint(date: point.date, value: sum / Double(count), segment: point.segment))
+            }
+        }
+        return result
+    }
+
+    /// 最早 30 天和最近 30 天的满充容量平均值。首尾相隔不足 60 天、或任一窗口少于 5 个读数时为 nil。
+    static func healthTrend(fullCharge: [ChartPoint], cycles: [ChartPoint]) -> HealthTrend? {
+        guard let first = fullCharge.first?.date, let last = fullCharge.last?.date,
+              last.timeIntervalSince(first) >= 2 * comparisonWindow
+        else { return nil }
+        let early = fullCharge.filter { $0.date.timeIntervalSince(first) < comparisonWindow }.map(\.value)
+        let late = fullCharge.filter { last.timeIntervalSince($0.date) < comparisonWindow }.map(\.value)
+        guard early.count >= trendMinimumPoints, late.count >= trendMinimumPoints else { return nil }
+        return HealthTrend(
+            months: Int((last.timeIntervalSince(first) / averageMonth).rounded()),
+            earlyFullChargeMAh: early.reduce(0, +) / Double(early.count),
+            lateFullChargeMAh: late.reduce(0, +) / Double(late.count),
+            firstCycleCount: cycles.first.map { Int($0.value) },
+            lastCycleCount: cycles.last.map { Int($0.value) }
+        )
+    }
+
+    /// 首尾两天的循环次数之差按月折算。相隔不足 30 天或次数减少（换过电池）时为 nil。
+    static func cyclesPerMonth(_ cycles: [ChartPoint]) -> Double? {
+        guard let first = cycles.first, let last = cycles.last, last.value >= first.value else { return nil }
+        let span = last.date.timeIntervalSince(first.date)
+        guard span >= comparisonWindow else { return nil }
+        return (last.value - first.value) / (span / averageMonth)
     }
 
     private static func capacityRatioPercent(_ sample: DailyHealth) -> Double? {

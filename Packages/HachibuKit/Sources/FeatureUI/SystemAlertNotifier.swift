@@ -41,13 +41,9 @@ public final class SystemAlertNotifier: NSObject, AlertNotifier, UNUserNotificat
                 localized: "The battery has stayed above \(threshold) °C for 3 minutes. Current temperature: \(DisplayFormat.celsius(celsius)).",
                 bundle: .module
             )
-        case let .lowHealth(maximumCapacityPercent, threshold):
-            identifier = "lowHealth"
-            content.title = String(localized: "Maximum Capacity Low", bundle: .module)
-            content.body = String(
-                localized: "Maximum capacity is \(maximumCapacityPercent)%, below your threshold of \(threshold)%.",
-                bundle: .module
-            )
+        case .lowHealth:
+            // 保留旧接口，但不再发送最大容量提醒。
+            return
         }
         content.sound = .default
 

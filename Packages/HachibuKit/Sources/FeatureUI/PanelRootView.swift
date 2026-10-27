@@ -624,7 +624,7 @@ private struct ChargeLimitTile: View {
 }
 
 /// 渲染测试里代替系统开关的静态图形，尺寸接近 `.controlSize(.small)` 的开关。
-private struct StaticSwitch: View {
+struct StaticSwitch: View {
     let isOn: Bool
 
     var body: some View {
@@ -642,7 +642,7 @@ private struct StaticSwitch: View {
 
 /// 铺满宽度的分段档位。系统 `.segmented` 在 macOS 上按内容宽度显示，不能铺满，所以用按钮画。
 /// 选中块是一颗带亮边的胶囊，文字用品牌蓝，换档时用弹簧滑到新位置。
-private struct LimitSegments: View {
+struct LimitSegments: View {
     let options: [Int]
     let selection: Int?
     let onSelect: @MainActor (Int) -> Void

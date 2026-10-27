@@ -80,27 +80,3 @@ struct TemperatureAlertRule: Equatable {
         return false
     }
 }
-
-/// 健康度低提醒的判定：系统最大容量低于阈值时提醒一次。
-/// 记下提醒时的阈值，用户把阈值改成别的值后才会再次提醒。
-struct HealthAlertRule: Equatable {
-    /// 上次提醒时的阈值。由调用方持久化。
-    private(set) var alertedThreshold: Int?
-
-    init(alertedThreshold: Int? = nil) {
-        self.alertedThreshold = alertedThreshold
-    }
-
-    func hasAlerted(threshold: Int) -> Bool {
-        alertedThreshold == threshold
-    }
-
-    /// 处理一次健康度读数。返回 true 表示这次应当发出提醒。
-    mutating func update(maximumCapacity: Int?, threshold: Int) -> Bool {
-        guard !hasAlerted(threshold: threshold), let maximumCapacity, maximumCapacity < threshold else {
-            return false
-        }
-        alertedThreshold = threshold
-        return true
-    }
-}

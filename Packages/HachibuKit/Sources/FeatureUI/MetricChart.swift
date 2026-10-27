@@ -8,10 +8,12 @@ struct MetricChart: View {
     enum YScale: Equatable {
         case fixed(ClosedRange<Double>)
         case automatic(includesZero: Bool)
+        /// 纵轴跨度不小于 `span`，不足时在数据两侧补齐，不超过 `upperLimit`。避免小幅波动被放大成剧烈起伏。
+        case minimumSpan(Double, upperLimit: Double?)
     }
 
     enum Style: Equatable {
-        /// 单色曲线加同色渐变面积。
+        /// 单色曲线。
         case line(Color)
         /// 正值绿色、负值橙色，面积以 0 为基线。用于电池功率。
         case signed
@@ -20,40 +22,28 @@ struct MetricChart: View {
     let title: Text
     let series: ChartSeries
     var hoverPoints: [ChartPoint] = []
-    private var points: [ChartPoint] { series.points }
     let domain: ClosedRange<Date>
     /// 悬停时只取这个距离内的点。
     let maxGap: TimeInterval
     var bands: [Range<Date>] = []
     var notRecorded: Range<Date>?
+    var threshold: Double?
     var yScale: YScale = .automatic(includesZero: false)
     let style: Style
     let formatValue: (Double) -> String
     let formatDate: (Date) -> String
+    var chartHeight: CGFloat = 200
     @Binding var hoverDate: Date?
-
-    private static let chartHeight: CGFloat = 200
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             header
                 .padding(.horizontal, 4)
-            MetricPlot(series: series, domain: domain, bands: bands, notRecorded: notRecorded, yScale: yScale, style: style)
-                .equatable()
-                .chartOverlay { proxy in
-                    MetricChartInteraction(
-                        proxy: proxy, points: points, hoverPoints: hoverPoints.isEmpty ? points : hoverPoints,
-                        maxGap: maxGap, style: style, hoverDate: $hoverDate
-                    )
-                }
-                .frame(height: Self.chartHeight)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 12)
-                .background {
-                    let shape = RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    shape.fill(.background.opacity(0.7))
-                    shape.strokeBorder(Color.primary.opacity(0.06), lineWidth: 0.5)
-                }
+            MetricChartCard(
+                series: series, threshold: threshold, hoverPoints: hoverPoints,
+                domain: domain, maxGap: maxGap, bands: bands, notRecorded: notRecorded,
+                yScale: yScale, style: style, height: chartHeight, hoverDate: $hoverDate
+            )
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -115,41 +105,94 @@ struct MetricChart: View {
     }
 }
 
+/// 曲线卡片：曲线、悬停叠层和底色。电池健康块直接使用，读数由外部显示。
+struct MetricChartCard: View {
+    let series: ChartSeries
+    /// 有值时它是主线，`series` 画成细线作为每日读数。
+    var trend: ChartSeries?
+    /// 虚线水平参考线，用于温度提醒阈值。
+    var threshold: Double?
+    var hoverPoints: [ChartPoint] = []
+    let domain: ClosedRange<Date>
+    let maxGap: TimeInterval
+    var bands: [Range<Date>] = []
+    var notRecorded: Range<Date>?
+    var yScale: MetricChart.YScale = .automatic(includesZero: false)
+    var integerYTicks = false
+    let style: MetricChart.Style
+    var height: CGFloat = 200
+    @Binding var hoverDate: Date?
+
+    var body: some View {
+        MetricPlot(
+            series: series, trend: trend, threshold: threshold, domain: domain,
+            bands: bands, notRecorded: notRecorded, yScale: yScale, integerYTicks: integerYTicks, style: style
+        )
+        .equatable()
+        .chartOverlay { proxy in
+            MetricChartInteraction(
+                proxy: proxy, points: series.points, hoverPoints: hoverPoints.isEmpty ? series.points : hoverPoints,
+                maxGap: maxGap, style: style, hoverDate: $hoverDate
+            )
+        }
+        .frame(height: height)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 12)
+        .background {
+            let shape = RoundedRectangle(cornerRadius: 16, style: .continuous)
+            shape.fill(.background.opacity(0.7))
+            shape.strokeBorder(Color.primary.opacity(0.06), lineWidth: 0.5)
+        }
+    }
+}
+
 /// 曲线不读取悬停状态，只在数据、刻度或样式变化时重新构造 Charts 内容。
 private struct MetricPlot: View, Equatable {
     let series: ChartSeries
+    let trend: ChartSeries?
+    let threshold: Double?
     let domain: ClosedRange<Date>
     let bands: [Range<Date>]
     let notRecorded: Range<Date>?
     let yScale: MetricChart.YScale
+    let integerYTicks: Bool
     let style: MetricChart.Style
     private let interpolation: InterpolationMethod = .monotone
-    private static let bandColor = Color.green.opacity(0.09)
+    private static let bandColor = Color.green.opacity(0.05)
     private static let lineWidth: CGFloat = 2
+    /// 有趋势线时，每日读数画成细线。
+    private static let dailyLineWidth: CGFloat = 1
+    private static let dailyLineOpacity = 0.35
+    private static let referenceDash: [CGFloat] = [4, 3]
     private static let notRecordedLabelMinFraction = 0.12
 
     nonisolated static func == (lhs: Self, rhs: Self) -> Bool {
-        lhs.series.plotID == rhs.series.plotID && lhs.domain == rhs.domain
-            && lhs.bands == rhs.bands && lhs.notRecorded == rhs.notRecorded
-            && lhs.yScale == rhs.yScale && lhs.style == rhs.style
+        lhs.series.plotID == rhs.series.plotID && lhs.trend?.plotID == rhs.trend?.plotID
+            && lhs.threshold == rhs.threshold
+            && lhs.domain == rhs.domain && lhs.bands == rhs.bands && lhs.notRecorded == rhs.notRecorded
+            && lhs.yScale == rhs.yScale && lhs.integerYTicks == rhs.integerYTicks && lhs.style == rhs.style
     }
 
     var body: some View { scaledChart }
 
-    /// 面积填充的下边界：固定刻度取下限，自动刻度取数据最小值（包含 0 时取 0）。
-    /// 不用 AreaMark 默认的 0 基线，以免把不含 0 的纵轴撑到 0。
-    private var areaBaseline: Double {
-        switch yScale {
-        case .fixed(let range):
-            return range.lowerBound
-        case .automatic(let includesZero):
-            let minValue = series.plotPoints.lazy.map(\.value).min() ?? 0
-            return includesZero ? min(0, minValue) : minValue
-        }
+    /// 参与纵轴范围的点：曲线和趋势线。
+    private var valueRange: ClosedRange<Double>? {
+        let values = series.plotPoints.map(\.value) + (trend?.plotPoints.map(\.value) ?? [])
+        guard let low = values.min(), let high = values.max() else { return nil }
+        return low...high
     }
 
-    private static func areaGradient(_ color: Color) -> LinearGradient {
-        LinearGradient(colors: [color.opacity(0.28), color.opacity(0)], startPoint: .top, endPoint: .bottom)
+    /// `minimumSpan` 补齐后的纵轴范围：先向两侧平均扩展，超过上限的部分移到下侧。
+    private func paddedRange(span: Double, upperLimit: Double?) -> ClosedRange<Double>? {
+        guard let range = valueRange else { return nil }
+        let padding = max(0, span - (range.upperBound - range.lowerBound)) / 2
+        var low = range.lowerBound - padding
+        var high = range.upperBound + padding
+        if let upperLimit, high > upperLimit, range.upperBound <= upperLimit {
+            low -= high - upperLimit
+            high = upperLimit
+        }
+        return low...high
     }
 
     @ViewBuilder
@@ -157,6 +200,12 @@ private struct MetricPlot: View, Equatable {
         switch yScale {
         case .fixed(let range):
             chart.chartYScale(domain: range)
+        case .minimumSpan(let span, let upperLimit):
+            if let range = paddedRange(span: span, upperLimit: upperLimit) {
+                chart.chartYScale(domain: range)
+            } else {
+                chart
+            }
         case .automatic(let includesZero):
             chart.chartYScale(domain: .automatic(includesZero: includesZero))
         }
@@ -179,20 +228,55 @@ private struct MetricPlot: View, Equatable {
                         }
                     }
             }
+            if let threshold {
+                RuleMark(y: .value("Threshold", threshold))
+                    .foregroundStyle(Color.orange.opacity(0.8))
+                    .lineStyle(StrokeStyle(lineWidth: 1, dash: Self.referenceDash))
+            }
             switch style {
             case .line(let color):
-                lineMarks(series.plotPoints, series: { "\($0.segment)" }, baseline: areaBaseline, color: color)
+                if let trend {
+                    ForEach(series.plotPoints) { point in
+                        LineMark(x: .value("Time", point.date), y: .value("Value", point.value), series: .value("Segment", "d\(point.segment)"))
+                            .interpolationMethod(interpolation)
+                            .lineStyle(StrokeStyle(lineWidth: Self.dailyLineWidth, lineCap: .round, lineJoin: .round))
+                            .foregroundStyle(color.opacity(Self.dailyLineOpacity))
+                    }
+                    lineMarks(trend.plotPoints, series: { "t\($0.segment)" }, color: color)
+                } else {
+                    lineMarks(series.plotPoints, series: { "\($0.segment)" }, color: color)
+                }
             case .signed:
                 RuleMark(y: .value("Zero", 0.0))
                     .foregroundStyle(Color.primary.opacity(0.25))
                     .lineStyle(StrokeStyle(lineWidth: 1))
                 ForEach(HistoryChartBuilder.signedRuns(series.plotPoints)) { run in
-                    lineMarks(run.points, series: { _ in "\(run.id)" }, baseline: 0, color: run.isPositive ? .green : .orange)
+                    lineMarks(run.points, series: { _ in "\(run.id)" }, color: run.isPositive ? .green : .orange)
                 }
             }
 
         }
         .chartXScale(domain: domain)
+        .chartXAxis {
+            AxisMarks(values: .automatic(desiredCount: 3)) { _ in
+                AxisValueLabel(anchor: .center)
+            }
+        }
+        .chartYAxis {
+            if integerYTicks {
+                AxisMarks(values: .stride(by: max(1, ceil((valueRange.map { $0.upperBound - $0.lowerBound } ?? 0) / 4)))) { value in
+                    AxisGridLine().foregroundStyle(Color.primary.opacity(0.1))
+                    if let number = value.as(Double.self) {
+                        AxisValueLabel(anchor: .leading) { Text(number.formatted(.number.precision(.fractionLength(0)))) }
+                    }
+                }
+            } else {
+                AxisMarks { _ in
+                    AxisGridLine().foregroundStyle(Color.primary.opacity(0.1))
+                    AxisValueLabel(anchor: .leading)
+                }
+            }
+        }
         .overlay {
             if series.points.isEmpty {
                 Text("No Data", bundle: .module)
@@ -206,19 +290,8 @@ private struct MetricPlot: View, Equatable {
     private func lineMarks(
         _ points: [ChartPoint],
         series: @escaping (ChartPoint) -> String,
-        baseline: Double,
         color: Color
     ) -> some ChartContent {
-        ForEach(points) { point in
-            AreaMark(
-                x: .value("Time", point.date),
-                yStart: .value("Baseline", baseline),
-                yEnd: .value("Value", point.value),
-                series: .value("Segment", series(point))
-            )
-            .interpolationMethod(interpolation)
-            .foregroundStyle(Self.areaGradient(color))
-        }
         ForEach(points) { point in
             LineMark(
                 x: .value("Time", point.date),

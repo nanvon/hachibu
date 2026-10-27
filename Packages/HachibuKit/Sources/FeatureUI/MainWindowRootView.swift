@@ -67,9 +67,9 @@ public struct MainWindowRootView: View {
             Group {
                 switch page {
                 case .history:
-                    HistoryPage(model: history)
+                    HistoryPage(model: history, temperatureThreshold: settings.temperatureAlertThreshold)
                 case .notifications:
-                    NotificationsPage(settings: settings, alerts: alerts)
+                    NotificationsPage(settings: settings, alerts: alerts, history: history)
                 case .settings:
                     SettingsPage(
                         settings: settings,

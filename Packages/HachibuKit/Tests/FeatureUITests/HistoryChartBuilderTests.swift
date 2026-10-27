@@ -92,6 +92,71 @@ private let utc: Calendar = {
         let noRecord = HistoryChartBuilder.recent(minuteSamples: [], now: now, firstRecordedAt: nil)
         #expect(noRecord.notRecorded == nil)
     }
+
+    @Test func statsCountMinutesAndTemperatureExtremes() {
+        let now = minute(48 * 60)
+        let samples = [
+            MinuteSample(timestamp: minute(10), isExternalPower: true, isCharging: true, temperatureCelsius: 30),
+            MinuteSample(timestamp: minute(11), isExternalPower: true, isCharging: false, temperatureCelsius: 34),
+            MinuteSample(timestamp: minute(12), isExternalPower: false, temperatureCelsius: nil),
+            MinuteSample(timestamp: minute(13), isExternalPower: false, temperatureCelsius: 29),
+        ]
+        let stats = HistoryChartBuilder.recent(minuteSamples: samples, now: now, firstRecordedAt: minute(10)).stats
+        #expect(stats.pluggedInMinutes == 2)
+        #expect(stats.chargingMinutes == 1)
+        #expect(stats.notRecordedMinutes == 48 * 60 - 4)
+        #expect(stats.highestTemperature == ChartPoint(date: minute(11), value: 34, segment: 0))
+        #expect(stats.lowestTemperature == ChartPoint(date: minute(13), value: 29, segment: 0))
+        #expect(stats.averageTemperature == 31)
+    }
+
+    @Test func chargeLimitStepsStartFromValueBeforeDomain() {
+        let domain = minute(100)...minute(200)
+        let events = [
+            BatteryEvent(date: minute(10), kind: .chargeLimit, value: 80),
+            BatteryEvent(date: minute(150), kind: .chargeLimit, value: 100),
+            BatteryEvent(date: minute(300), kind: .chargeLimit, value: 90),
+        ]
+        let steps = HistoryChartBuilder.chargeLimitSteps(events, in: domain)
+        #expect(steps.map(\.date) == [minute(100), minute(150), minute(200)])
+        #expect(steps.map(\.value) == [80, 100, 100])
+        // 范围内外都没有事件时不画。
+        #expect(HistoryChartBuilder.chargeLimitSteps([events[2]], in: domain).isEmpty)
+    }
+}
+
+@Suite struct HealthTrendTests {
+    private func day(_ offset: Int) -> Date {
+        base.addingTimeInterval(TimeInterval(offset) * 86400)
+    }
+
+    @Test func rollingAverageNeedsFivePointsWithinFourteenDays() {
+        let points = (0..<20).map { ChartPoint(date: day($0), value: Double($0), segment: 0) }
+        let average = HistoryChartBuilder.rollingAverage(points)
+        // 第 5 天（下标 4）起才有 5 个读数。
+        #expect(average.first == ChartPoint(date: day(4), value: 2, segment: 0))
+        // 下标 19 的窗口是 6...19 共 14 天。
+        #expect(average.last?.value == 12.5)
+    }
+
+    @Test func trendComparesFirstAndLastThirtyDays() throws {
+        let fullCharge = (0..<90).map { ChartPoint(date: day($0), value: $0 < 30 ? 8000 : $0 >= 60 ? 7900 : 7950, segment: 0) }
+        let cycles = [ChartPoint(date: day(0), value: 30, segment: 0), ChartPoint(date: day(89), value: 40, segment: 0)]
+        let trend = try #require(HistoryChartBuilder.healthTrend(fullCharge: fullCharge, cycles: cycles))
+        #expect(trend.months == 3)
+        #expect(trend.fullChargeChangeMAh == -100)
+        #expect(trend.firstCycleCount == 30)
+        #expect(trend.lastCycleCount == 40)
+        #expect(HistoryChartBuilder.cyclesPerMonth(cycles).map { ($0 * 10).rounded() / 10 } == 3.4)
+    }
+
+    @Test func trendNeedsSixtyDays() {
+        let fullCharge = (0..<59).map { ChartPoint(date: day($0), value: 8000, segment: 0) }
+        #expect(HistoryChartBuilder.healthTrend(fullCharge: fullCharge, cycles: []) == nil)
+        // 循环次数减少（换过电池）时不折算每月次数。
+        let cycles = [ChartPoint(date: day(0), value: 300, segment: 0), ChartPoint(date: day(60), value: 5, segment: 0)]
+        #expect(HistoryChartBuilder.cyclesPerMonth(cycles) == nil)
+    }
 }
 
 @Suite struct LongTermTests {

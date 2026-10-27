@@ -29,6 +29,36 @@
         }
       }
     },
+    "%@ %@" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@%2$@"
+          }
+        }
+      }
+    },
+    "%@ cycles per month on average" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "平均每月 %@ 次"
+          }
+        }
+      }
+    },
+    "%@ of design capacity" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "设计容量的 %@"
+          }
+        }
+      }
+    },
     "%@ remaining" : {
       "localizations" : {
         "zh-Hans" : {
@@ -166,6 +196,16 @@
         }
       }
     },
+    "14-Day Average" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "14 天平均"
+          }
+        }
+      }
+    },
     "24 Hours" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -184,16 +224,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "30 天"
-          }
-        }
-      }
-    },
-    "48 Hours" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "最近 48 小时"
           }
         }
       }
@@ -218,6 +248,36 @@
         }
       }
     },
+    "After you close this window, Hachibu stays in the menu bar and keeps recording." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "关闭窗口后，Hachibu 留在菜单栏里继续记录。"
+          }
+        }
+      }
+    },
+    "Alert" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "提醒"
+          }
+        }
+      }
+    },
+    "Alert Threshold" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "提醒阈值"
+          }
+        }
+      }
+    },
     "Alerted" : {
       "localizations" : {
         "zh-Hans" : {
@@ -238,22 +298,12 @@
         }
       }
     },
-    "Alerts once after the temperature stays above %lld °C for 3 minutes." : {
+    "Alerts once after the temperature stays above %lld °C for 3 minutes. Can alert again after the temperature stays below %lld °C for 5 minutes. The panel marks the temperature as High at or above the threshold." : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "温度连续 3 分钟高于 %lld °C 时提醒一次。"
-          }
-        }
-      }
-    },
-    "All" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "全部"
+            "value" : "温度连续 3 分钟高于 %1$lld °C 时提醒一次；连续 5 分钟低于 %2$lld °C 后可再次提醒。达到阈值时，面板把温度标为“偏高”。"
           }
         }
       }
@@ -278,16 +328,6 @@
         }
       }
     },
-    "Already alerted at this threshold. Alerts again only after you change the threshold." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已按当前阈值提醒过，修改阈值后才会再次提醒。"
-          }
-        }
-      }
-    },
     "Another charge control app is running. Quit it to change the charge limit here." : {
       "localizations" : {
         "zh-Hans" : {
@@ -298,8 +338,25 @@
         }
       }
     },
-    "Baseline" : {
-
+    "Average" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "平均"
+          }
+        }
+      }
+    },
+    "Banners and Sounds" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通知样式、声音"
+          }
+        }
+      }
     },
     "Battery" : {
       "localizations" : {
@@ -404,16 +461,6 @@
         }
       }
     },
-    "Can alert again after the temperature stays below %lld °C for 5 minutes." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "温度连续 5 分钟低于 %lld °C 后，可再次提醒。"
-          }
-        }
-      }
-    },
     "Cancel" : {
       "localizations" : {
         "zh-Hans" : {
@@ -440,6 +487,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "修改的是“系统设置 → 电池”中的同一项设置。"
+          }
+        }
+      }
+    },
+    "Charge Limit" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "充电上限"
           }
         }
       }
@@ -495,16 +553,6 @@
         }
       }
     },
-    "Checked hourly against the maximum capacity reported by the system. Alerts once." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "每小时用系统报告的最大容量检查一次，只提醒一次。"
-          }
-        }
-      }
-    },
     "Could not change the charge limit." : {
       "localizations" : {
         "zh-Hans" : {
@@ -545,16 +593,6 @@
         }
       }
     },
-    "Current Maximum Capacity" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "当前最大容量"
-          }
-        }
-      }
-    },
     "Current Status" : {
       "localizations" : {
         "zh-Hans" : {
@@ -581,6 +619,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "循环次数"
+          }
+        }
+      }
+    },
+    "Cycle count went from %lld to %lld." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "循环次数从 %1$lld 增加到 %2$lld。"
+          }
+        }
+      }
+    },
+    "Daily" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "每日"
           }
         }
       }
@@ -625,6 +683,16 @@
         }
       }
     },
+    "Diagnostic Data" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "诊断数据"
+          }
+        }
+      }
+    },
     "Diagnostics" : {
       "localizations" : {
         "zh-Hans" : {
@@ -655,22 +723,12 @@
         }
       }
     },
-    "Export Diagnostic Data…" : {
+    "Export…" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "导出诊断数据…"
-          }
-        }
-      }
-    },
-    "Full Charge / Design" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "满充容量 / 设计容量"
+            "value" : "导出…"
           }
         }
       }
@@ -741,6 +799,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "电池温度过高"
+          }
+        }
+      }
+    },
+    "Highest" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最高"
+          }
+        }
+      }
+    },
+    "Highest in Last 48 Hours" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最近 48 小时最高"
           }
         }
       }
@@ -885,6 +963,16 @@
         }
       }
     },
+    "Last 48 Hours" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最近 48 小时"
+          }
+        }
+      }
+    },
     "Last updated %@" : {
       "localizations" : {
         "zh-Hans" : {
@@ -925,26 +1013,6 @@
         }
       }
     },
-    "Long Term" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "长期"
-          }
-        }
-      }
-    },
-    "Low Maximum Capacity" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "最大容量偏低"
-          }
-        }
-      }
-    },
     "Low Power Mode" : {
       "localizations" : {
         "zh-Hans" : {
@@ -955,12 +1023,32 @@
         }
       }
     },
+    "Lowest" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最低"
+          }
+        }
+      }
+    },
     "macOS" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "macOS"
+          }
+        }
+      }
+    },
+    "Matches System Settings" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "与“系统设置”中的一致"
           }
         }
       }
@@ -985,36 +1073,6 @@
         }
       }
     },
-    "Maximum capacity below %lld%%" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "最大容量低于 %lld%%"
-          }
-        }
-      }
-    },
-    "Maximum capacity is %lld%%, below your threshold of %lld%%." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "最大容量为 %lld%%，低于设定的 %lld%%。"
-          }
-        }
-      }
-    },
-    "Maximum Capacity Low" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "最大容量偏低"
-          }
-        }
-      }
-    },
     "Menu Bar" : {
       "localizations" : {
         "zh-Hans" : {
@@ -1031,6 +1089,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "菜单栏图标"
+          }
+        }
+      }
+    },
+    "Monitoring" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "监测中"
           }
         }
       }
@@ -1101,6 +1169,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "通知"
+          }
+        }
+      }
+    },
+    "Of Which Charging" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "其中充电"
           }
         }
       }
@@ -1208,6 +1286,36 @@
         }
       }
     },
+    "Over %lld months, the 30-day average full charge capacity fell by %@ (%@)." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld 个月里，满充容量的 30 天平均下降了 %2$@（%3$@）。"
+          }
+        }
+      }
+    },
+    "Over %lld months, the 30-day average full charge capacity held steady." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 个月里，满充容量的 30 天平均基本没有变化。"
+          }
+        }
+      }
+    },
+    "Over %lld months, the 30-day average full charge capacity rose by %@ (%@)." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld 个月里，满充容量的 30 天平均上升了 %2$@（%3$@）。"
+          }
+        }
+      }
+    },
     "Plugged In" : {
       "localizations" : {
         "zh-Hans" : {
@@ -1254,16 +1362,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "退出"
-          }
-        }
-      }
-    },
-    "Recent" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "近期"
           }
         }
       }
@@ -1418,16 +1516,6 @@
         }
       }
     },
-    "Temperature above %lld °C" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "温度高于 %lld °C"
-          }
-        }
-      }
-    },
     "The %lld days imported from %@ will be removed from the history charts." : {
       "localizations" : {
         "en" : {
@@ -1536,16 +1624,6 @@
         }
       }
     },
-    "The panel marks the temperature as High at or above the temperature threshold." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "温度达到温度提醒阈值时，面板会标记为“偏高”。"
-          }
-        }
-      }
-    },
     "The system could not find this login item." : {
       "localizations" : {
         "zh-Hans" : {
@@ -1576,6 +1654,16 @@
         }
       }
     },
+    "Threshold" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "阈值"
+          }
+        }
+      }
+    },
     "Time" : {
       "localizations" : {
         "zh-Hans" : {
@@ -1593,6 +1681,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "时间范围"
+          }
+        }
+      }
+    },
+    "Trends appear after 60 days of records." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "记录满 60 天后显示变化趋势。"
           }
         }
       }
@@ -1646,16 +1744,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "电压、电流、充电器"
-          }
-        }
-      }
-    },
-    "Waiting" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "等待中"
           }
         }
       }

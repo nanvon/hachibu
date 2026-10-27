@@ -19,6 +19,8 @@ public final class HistoryModel {
     /// 最近一次分钟采样的时间。
     private(set) var lastUpdated: Date?
     private(set) var summary: RecordingSummary?
+    /// 最近 48 小时的最高电池温度，见 `loadHighestRecentTemperature()`。
+    private(set) var highestRecentTemperature: ChartPoint?
     /// 导入历史数据。数据库打不开时为 nil。
     let importer: HistoryImportModel?
     /// 最早一条分钟或小时数据的时间，用于近期曲线的“未记录”区间。
@@ -84,6 +86,23 @@ public final class HistoryModel {
 
     // MARK: - 查询
 
+    /// 最近 48 小时的最高电池温度，通知页用。单独查询，不依赖历史页的定时刷新。数据库不可用或没有读数时为 nil。
+    func loadHighestRecentTemperature() async {
+        guard let store else { return }
+        let now = Date()
+        do {
+            let highest = try await Task.detached(priority: .utility) {
+                let samples = try await store.minuteSamples(from: now.addingTimeInterval(-HistoryChartBuilder.recentDuration), to: now)
+                return HistoryChartBuilder.recent(minuteSamples: samples, now: now, firstRecordedAt: nil).stats.highestTemperature
+            }.value
+            if highest != highestRecentTemperature {
+                highestRecentTemperature = highest
+            }
+        } catch {
+            logger.error("Failed to load recent temperature: \(String(describing: error), privacy: .public)")
+        }
+    }
+
     func reloadAll() async {
         // 近期的“未记录”区间要用最早记录时间，先查。
         await loadSummary()
@@ -120,7 +139,10 @@ public final class HistoryModel {
             // 查询和点集转换均在后台执行，主线程只发布最终结果。
             let data = try await Task.detached(priority: .utility) {
                 let samples = try await store.minuteSamples(from: now.addingTimeInterval(-HistoryChartBuilder.recentDuration), to: now)
-                return HistoryChartBuilder.recent(minuteSamples: samples, now: now, firstRecordedAt: firstRecordedAt)
+                let chargeLimits = try await store.events(.chargeLimit)
+                return HistoryChartBuilder.recent(
+                    minuteSamples: samples, chargeLimitEvents: chargeLimits, now: now, firstRecordedAt: firstRecordedAt
+                )
             }.value
             guard !Task.isCancelled, generation == recentGeneration else { return }
             recent = data
