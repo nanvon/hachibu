@@ -50,7 +50,7 @@ FeatureUI 的 BrandLogo 放在包自己的资源集中，通过 `Bundle.module` 
 
 - GitHub 分享 PNG 为 1280 × 640，应小于 1 MB。在 GitHub 仓库 Settings → Social preview 手动上传 `docs/assets/promo/github-social-preview.png`。提交图片不会自动设置社交封面。
 - DMG 背景和坐标见 `packaging/dmg/README.md`。`scripts/package-dmg.sh` 只组合素材，签名由 `scripts/build.sh` 完成。
-- 真实应用截图还没有制作，规范见 `docs/assets/screenshots/README.md`。README 不引用尚不存在的截图。
+- README 的面板和主窗口界面图来自渲染测试，规范和重新生成方法见 `docs/assets/screenshots/README.md`。
 - 宣传文案只描述 v1 的电池监控，充电控制属于 v2。界面内的通用图标仍使用 SF Symbols，曲线和流向图仍由代码绘制。
 
 ## 检查范围

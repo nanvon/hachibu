@@ -36,15 +36,23 @@
 
 For a laptop that stays plugged in most of the time, keeping the charge around 80% slows down battery capacity loss. Hachibu takes its name and its approach from this Japanese saying: it records live battery readings and long-term health data, and can also change the system charge limit directly.
 
+<p align="center">
+  <img src="docs/assets/screenshots/en/panel-light.png" alt="Menu bar panel in light appearance" width="360">
+  <img src="docs/assets/screenshots/en/panel-dark.png" alt="Menu bar panel in dark appearance" width="360">
+  <br>
+  <sub>Menu bar panel: power flow, battery level, temperature, system charge limit, and battery health (light on the left, dark on the right)</sub>
+</p>
+
 ## Features
 
 ### Menu Bar and Panel
 
 - **Menu bar** — A battery icon in macOS or iOS style, optionally followed by battery level (%), system power (W), or battery temperature (°C). Click to open the panel.
 - **Charging status** — Distinguishes On Battery, Charging, Fully Charged, Charge Limit Reached, Above Charge Limit, Holding at the current level, Plugged In Not Charging, and Plugged In Draining, with time remaining or time until full.
-- **Power flow** — Input power, system power, and battery power between the charger, the computer, and the battery. While the panel is open, the SMC is read every 5 seconds, and every second after you change the charge limit or plug in or unplug the charger. If the SMC can't be read, Hachibu falls back to IORegistry, which updates about every 60 seconds.
+- **Power flow** — Input power, system power, and battery power between the charger, the computer, and the battery. While the panel is open, the SMC is read every 2.5 seconds, and every second after you change the charge limit or plug in or unplug the charger. If the SMC can't be read, Hachibu falls back to IORegistry, which updates about every 60 seconds.
 - **Reading cards** — Battery level, battery temperature (marked "High" at the alert threshold), and system power.
-- **Battery health** — Maximum capacity reported by macOS and health status, cycle count, and full charge capacity as a ratio of design capacity; battery power and Low Power Mode. While plugged in, shows the charger's name and input voltage and current.
+- **Battery health** — Maximum capacity reported by macOS and health status, cycle count, and full charge capacity as a ratio of design capacity. While plugged in, shows the charger's name and input voltage and current.
+- **Low Power Mode** — Marked at the bottom of the panel when it's on. Regular apps can't switch Low Power Mode, so Hachibu only shows its state.
 
 ### System Charge Limit
 
@@ -58,16 +66,36 @@ Limits below 80%, pausing charging while the battery is below the limit, and for
 
 ### History
 
-- **Recent charts** — Recorded every minute. Shows battery level and battery temperature for the last 48 hours, with plugged-in periods shaded.
-- **Long-term charts** — Recorded once a day. Shows maximum capacity, full charge / design, full charge capacity, and cycle count for all recorded history.
+Shown on the History page of the main window. Hover over a chart to see the readings at that moment.
+
+<p align="center">
+  <img src="docs/assets/screenshots/en/history.png" alt="History page of the main window">
+  <br>
+  <sub>History: battery health for all recorded history (including data imported from AlDente) at the top, the last 48 hours below; gaps are periods when the Mac was asleep or Hachibu wasn't running</sub>
+</p>
+
+- **Battery health** — Recorded once a day. Shows full charge capacity (daily values and a 14-day average), maximum capacity reported by macOS, and cycle count for all recorded history. After 60 days of records, it also summarizes how full charge capacity and cycle count have changed.
+- **Last 48 hours** — Recorded every minute. Shows battery level and battery temperature, with plugged-in periods shaded and the alert threshold drawn when the temperature gets close to it. Below the charts: time plugged in, time charging, and time not recorded, plus the highest, average, and lowest temperature.
 - **History import** — In Settings → History Data → Import History…, import daily full charge capacity, cycle count, and maximum capacity from a JSON file in the Hachibu import format. Imported data stays on your Mac.
 
 ### Background and Alerts
 
 - **Launch at login** — Off by default; turn it on in Settings → General. Keeps recording in the background without preventing the Mac from sleeping.
-- **Notifications** — Alerts when battery temperature stays above a threshold for 3 minutes (40°C by default), or when maximum capacity drops below a threshold (80% by default). Both alerts and their thresholds are set on the Notifications page.
+- **Temperature alert** — Sends a notification when battery temperature stays above a threshold for 3 minutes (40°C by default), and can alert again after the temperature drops. Turn it on or off and set the threshold on the Notifications page.
 - **Diagnostics export** — Exports raw battery readings as JSON. Serial numbers, UUIDs, and other device identifiers are removed before export.
 - **Languages** — English and Simplified Chinese.
+
+<p align="center">
+  <img src="docs/assets/screenshots/en/notifications.png" alt="Notifications page of the main window">
+  <br>
+  <sub>Notifications: permission status, temperature alert threshold, current temperature, and the highest temperature in the last 48 hours</sub>
+</p>
+
+<p align="center">
+  <img src="docs/assets/screenshots/en/settings.png" alt="Settings page of the main window">
+  <br>
+  <sub>Settings: system charge limit, menu bar, launch at login, and imported history</sub>
+</p>
 
 ## Installation
 
