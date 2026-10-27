@@ -160,6 +160,12 @@ xcodebuild -project Hachibu.xcodeproj -scheme Hachibu -configuration Debug build
 
 打包 DMG 使用 `scripts/build.sh`，需要提供 Sparkle 公钥，流程见 [docs/打包发布.md](docs/打包发布.md)。
 
+## 致谢
+
+感谢 [AlDente](https://apphousekitchen.com/) 为本项目的功能设计提供参考。
+
+感谢 [LINUX DO](https://linux.do/) 社区的交流与反馈。
+
 ## 许可证
 
 本项目按 [GNU 通用公共许可证第 3 版](LICENSE)发布，仅限第 3 版（GPL-3.0-only）。
