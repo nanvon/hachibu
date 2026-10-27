@@ -317,10 +317,8 @@ private struct BatteryLevelCard: View {
                     Image(systemName: "bolt.fill")
                     Text(verbatim: DisplayFormat.duration(minutes: minutes))
                 case nil:
-                    // 没有剩余时间时（插电未充电等）显示状态图标。
-                    if let status = ChargeStatus(snapshot) {
-                        Image(systemName: StatusLabel.symbolName(status))
-                    }
+                    // 没有剩余时间时（插电未充电等）留空，状态已写在面板顶部的状态行。
+                    EmptyView()
                 }
             }
             .opacity(0.8)
@@ -352,7 +350,7 @@ private struct BatteryLevelCard: View {
 
     /// 水下文字：浅色模式为深品牌蓝 `#13539A`，深色模式为亮蓝 `#8CC4FF`。
     private var underwaterText: Color {
-        colorScheme == .dark ? Color(red: 0.55, green: 0.77, blue: 1) : Color(red: 0.075, green: 0.325, blue: 0.604)
+        colorScheme == .dark ? Color.brandOnDark : Color(red: 0.075, green: 0.325, blue: 0.604)
     }
 
     private var helpText: Text {
@@ -406,7 +404,7 @@ private struct Wave: Shape {
 }
 
 /// 温度卡片：数值下面是一条温度计刻度（15–50 °C），填充到当前温度，提醒阈值处有一道刻度。
-/// 达到阈值时数值变橙色，图标旁标“偏高”。
+/// 正常时图标和刻度为中性色；达到阈值时数值、图标和刻度变橙色，图标旁标“偏高”。
 private struct TemperatureCard: View {
     static let range: ClosedRange<Double> = 15...50
 
@@ -424,7 +422,7 @@ private struct TemperatureCard: View {
                 .foregroundStyle(isHigh ? Color.orange : Color.primary)
         } caption: {
             Image(systemName: "thermometer.medium")
-                .foregroundStyle(.red)
+                .foregroundStyle(isHigh ? Color.orange : Color.secondary)
             if isHigh {
                 Text("High", bundle: .module)
                     .font(.system(size: 10, weight: .semibold))
@@ -441,10 +439,15 @@ private struct TemperatureCard: View {
                 isHigh: isHigh
             )
         }
-        .help(Text("Temperature", bundle: .module))
+        .help(Text("Temperature · Alert at \(highCelsius) °C", bundle: .module))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text("Temperature", bundle: .module))
-        .accessibilityValue(Text(verbatim: DisplayFormat.celsius(celsius)))
+        .accessibilityValue(accessibilityValue)
+    }
+
+    private var accessibilityValue: Text {
+        let value = Text(verbatim: DisplayFormat.celsius(celsius))
+        return isHigh ? value + Text(verbatim: ", ") + Text("High", bundle: .module) : value
     }
 
     private static func fraction(_ celsius: Double) -> Double {
@@ -452,7 +455,7 @@ private struct TemperatureCard: View {
     }
 }
 
-/// 细胶囊轨道，从左填到当前温度，单色：正常为红色，达到提醒阈值为橙色；末端一颗白色圆点。
+/// 细胶囊轨道，从左填到当前温度，单色：正常为中性灰，达到提醒阈值为橙色；末端一颗白色圆点。
 private struct ThermometerTrack: View {
     let fraction: Double?
     let thresholdFraction: Double
@@ -467,7 +470,7 @@ private struct ThermometerTrack: View {
                     .frame(height: 5)
                 if let fraction {
                     Capsule()
-                        .fill(isHigh ? Color.orange : Color.red)
+                        .fill(isHigh ? Color.orange : Color.primary.opacity(0.4))
                         .frame(width: max(5, width * fraction), height: 5)
                     Circle()
                         .fill(.white)
@@ -641,7 +644,7 @@ struct StaticSwitch: View {
 }
 
 /// 铺满宽度的分段档位。系统 `.segmented` 在 macOS 上按内容宽度显示，不能铺满，所以用按钮画。
-/// 选中块是一颗带亮边的胶囊，文字用品牌蓝，换档时用弹簧滑到新位置。
+/// 选中块是一颗带亮边的胶囊，文字用品牌蓝（深色模式为亮蓝），换档时滑到新位置；未选中的档位悬停时加浅底，按下时略微缩小。
 struct LimitSegments: View {
     let options: [Int]
     let selection: Int?
@@ -674,7 +677,7 @@ struct LimitSegments: View {
             Text(verbatim: DisplayFormat.percent(percent))
                 .font(.system(size: 12, weight: isSelected ? .semibold : .medium, design: .rounded))
                 .monospacedDigit()
-                .foregroundStyle(isSelected ? Color.brand : Color.secondary)
+                .foregroundStyle(isSelected ? selectedText : Color.secondary)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 5)
                 .background {
@@ -685,8 +688,43 @@ struct LimitSegments: View {
                 }
                 .contentShape(Capsule())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(SegmentButtonStyle(isSelected: isSelected))
         .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+
+    /// 深色模式的品牌蓝在选中块的浅灰底上对比不足，改用亮蓝。
+    private var selectedText: Color {
+        colorScheme == .dark ? Color.brandOnDark : Color.brand
+    }
+}
+
+/// 档位按钮的悬停和按压反馈。
+private struct SegmentButtonStyle: ButtonStyle {
+    let isSelected: Bool
+
+    func makeBody(configuration: Configuration) -> some View {
+        SegmentButtonBody(configuration: configuration, isSelected: isSelected)
+    }
+}
+
+private struct SegmentButtonBody: View {
+    let configuration: ButtonStyleConfiguration
+    let isSelected: Bool
+    @State private var isHovered = false
+    @Environment(\.isEnabled) private var isEnabled
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        configuration.label
+            .background {
+                if isHovered, isEnabled, !isSelected {
+                    Capsule().fill(Color.primary.opacity(colorScheme == .dark ? 0.08 : 0.05))
+                }
+            }
+            .scaleEffect(configuration.isPressed && isEnabled ? 0.97 : 1)
+            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
+            .animation(.easeOut(duration: 0.12), value: isHovered)
+            .onHover { isHovered = $0 }
     }
 }
 
@@ -727,7 +765,7 @@ struct ChargeLimitNote: View {
 
 // MARK: - 电池健康和详细数据
 
-/// 标题行右侧为健康状态；一行两列：系统最大容量、循环次数；下面是满充容量对比条和常驻的详细数据。
+/// 标题行右侧为健康状态；一行两列：系统最大容量、循环次数；下面是满充容量对比条，插电时再加一道分隔线和充电器信息。
 private struct HealthTile: View {
     let snapshot: BatterySnapshot
     let health: BatteryHealthInfo?
@@ -761,11 +799,14 @@ private struct HealthTile: View {
             )
             .help(Text("Full charge capacity estimated by the battery, and its percentage of the design capacity.", bundle: .module))
             .padding(.top, 14)
-            HairlineDivider()
-                .padding(.top, 12)
-            DetailsSection(snapshot: snapshot)
+            if snapshot.isExternalPower == true {
+                HairlineDivider()
+                    .padding(.top, 12)
+                ChargerDetails(snapshot: snapshot)
+                    .padding(.top, 12)
+            }
         }
-        .panelTile(padding: EdgeInsets(top: 12, leading: 14, bottom: 0, trailing: 14))
+        .panelTile()
     }
 }
 
@@ -915,31 +956,15 @@ private struct HairlineDivider: View {
     }
 }
 
-/// 详细数据始终显示；电压、电流只保留充电器输入端，插电时显示。
-private struct DetailsSection: View {
+/// 插电时的充电器信息：名称和输入电压 · 电流。电池功率已在功率流向图里，不重复显示。
+private struct ChargerDetails: View {
     let snapshot: BatterySnapshot
 
-    private var isExternalPower: Bool {
-        snapshot.isExternalPower == true
-    }
-
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text("Details", bundle: .module)
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(.secondary)
-                .padding(.vertical, 10)
-
-            VStack(spacing: 7) {
-                ValueRow(Text("Battery Power", bundle: .module), value: DisplayFormat.signedWatts(milliwatts: snapshot.batteryPowerMW))
-                if isExternalPower {
-                    HairlineDivider()
-                    ValueRow(Text("Charger", bundle: .module), value: adapter)
-                        .help(Text(verbatim: adapterDescription))
-                    ValueRow(Text("Input Voltage · Current", bundle: .module), value: chargerInput)
-                }
-            }
-            .padding(.bottom, 12)
+        VStack(spacing: 7) {
+            ValueRow(Text("Charger", bundle: .module), value: adapter)
+                .help(Text(verbatim: adapterDescription))
+            ValueRow(Text("Input Voltage · Current", bundle: .module), value: chargerInput)
         }
     }
 
@@ -983,7 +1008,7 @@ private struct ValueRow: View {
 // MARK: - 底部
 
 private struct PanelFooter: View {
-    /// 没有电池读数时为 nil，不显示低电量模式。
+    /// 低电量模式开启时才显示标记；没有电池读数时为 nil。
     let lowPowerModeEnabled: Bool?
     let onOpenMainWindow: @MainActor () -> Void
     let onOpenSettings: @MainActor () -> Void
@@ -991,8 +1016,8 @@ private struct PanelFooter: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            if let lowPowerModeEnabled {
-                LowPowerModeBadge(isEnabled: lowPowerModeEnabled)
+            if lowPowerModeEnabled == true {
+                LowPowerModeBadge()
             }
             Spacer(minLength: 0)
             actionButton("macwindow", title: Text("Open Main Window", bundle: .module), action: onOpenMainWindow)
@@ -1014,51 +1039,21 @@ private struct PanelFooter: View {
     }
 }
 
-/// 低电量模式状态胶囊：开启时黄色（与系统电池图标一致），关闭时与玻璃按钮同样的底色、次要色。宽度不够时只显示图标和开关状态。
+/// 低电量模式开启时的状态标记：黄色图标（与系统电池图标一致）加淡黄底。只表示状态，不能点击，
+/// 所以不用玻璃按钮的底色、亮边和阴影，与旁边的按钮区分开。
 private struct LowPowerModeBadge: View {
-    let isEnabled: Bool
-    @Environment(\.colorScheme) private var colorScheme
-
     var body: some View {
-        ViewThatFits(in: .horizontal) {
-            badge(showsTitle: true)
-            badge(showsTitle: false)
-        }
-        .help(Text("Low Power Mode", bundle: .module))
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text("Low Power Mode", bundle: .module))
-        .accessibilityValue(stateText)
-    }
-
-    private func badge(showsTitle: Bool) -> some View {
         HStack(spacing: 4) {
             Image(systemName: "battery.50percent")
-                .foregroundStyle(isEnabled ? Color.yellow : Color.secondary)
-            if showsTitle {
-                Text("Low Power Mode", bundle: .module)
-            }
-            stateText
+                .foregroundStyle(.yellow)
+            Text("Low Power Mode", bundle: .module)
         }
-        .font(.system(size: 11.5))
-        .foregroundStyle(isEnabled ? Color.primary : Color.secondary)
-        .padding(.horizontal, 10)
-        .frame(height: 32)
-        .background {
-            if isEnabled {
-                Capsule().fill(Color.yellow.opacity(0.3))
-            } else {
-                Capsule().fill(PanelTileStyle.fillGradient(colorScheme))
-            }
-            Capsule().strokeBorder(PanelTileStyle.rim(colorScheme), lineWidth: 1)
-        }
-        .compositingGroup()
-        .shadow(color: PanelTileStyle.shadow(colorScheme), radius: 6, y: 2)
+        .font(.system(size: 11.5, weight: .medium))
+        .padding(.horizontal, 9)
+        .padding(.vertical, 4)
+        .background(Color.yellow.opacity(0.18), in: Capsule())
         .fixedSize()
-    }
-
-    /// 短写的“开 / 关”，与其他地方的“开启 / 关闭”分开。
-    private var stateText: Text {
-        isEnabled ? Text("On (Short)", bundle: .module) : Text("Off (Short)", bundle: .module)
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -1074,6 +1069,16 @@ enum PanelPreviewData {
     static var holdingSnapshot: BatterySnapshot {
         var snapshot = snapshot(percent: 87, chargeLimit: .on(percent: 87))
         snapshot.chargeLimitHold = ChargeLimitHold(userLimit: 80, heldLimit: 87)
+        return snapshot
+    }
+
+    /// 使用电池且开启低电量模式。
+    static var lowPowerModeSnapshot: BatterySnapshot {
+        var snapshot = snapshot(
+            percent: 18, isExternalPower: false, batteryPowerMW: -6200, systemLoadMW: 6200,
+            amperageMA: -520, timeToEmptyMinutes: 96
+        )
+        snapshot.lowPowerModeEnabled = true
         return snapshot
     }
 
@@ -1200,6 +1205,10 @@ private struct PanelPreview: View {
         systemLoadMW: 25980,
         amperageMA: -2100
     )))
+}
+
+#Preview("Low Power Mode") {
+    PanelPreview(reading: .battery(PanelPreviewData.lowPowerModeSnapshot))
 }
 
 #Preview("Plugged In, Not Charging") {

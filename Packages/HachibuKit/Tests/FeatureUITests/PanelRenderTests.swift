@@ -24,6 +24,7 @@ private let outputDirectory = ProcessInfo.processInfo.environment["HACHIBU_RENDE
             percent: 64, isExternalPower: false, batteryPowerMW: -9800, systemLoadMW: 9800,
             amperageMA: -820, timeToEmptyMinutes: 312
         ))),
+        Sample(name: "Low Power Mode", reading: .battery(PanelPreviewData.lowPowerModeSnapshot)),
         Sample(name: "Charging, High Temperature", reading: .battery(PanelPreviewData.snapshot(
             percent: 46, isCharging: true, batteryPowerMW: 42000, powerInMW: 58000, systemLoadMW: 16000,
             amperageMA: 3400, timeToFullMinutes: 48, temperatureCelsius: 41.2
@@ -57,7 +58,7 @@ private let outputDirectory = ProcessInfo.processInfo.environment["HACHIBU_RENDE
             let image = try #require(renderer.cgImage)
             let data = try #require(NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:]))
             try data.write(to: directory.appendingPathComponent("panel-\(variant.suffix).png"))
-            let detailRenderer = ImageRenderer(content: Self.panel(Self.samples[2], scheme: variant.scheme)
+            let detailRenderer = ImageRenderer(content: Self.panel(Self.samples[3], scheme: variant.scheme)
                 .padding(24)
                 .background(variant.backdrop.view(scheme: variant.scheme))
                 .environment(\.colorScheme, variant.scheme)

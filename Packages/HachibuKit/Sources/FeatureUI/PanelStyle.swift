@@ -4,18 +4,25 @@ import SwiftUI
 extension Color {
     /// 品牌蓝 `#287DD0`，深色模式下调亮，定义在 Asset Catalog。
     static let brand = Color("BrandBlue", bundle: .module)
+    /// 深色底上的亮蓝 `#8CC4FF`：电量卡片里被水淹到的文字、深色模式下充电上限选中档位的文字。
+    static let brandOnDark = Color(red: 0.55, green: 0.77, blue: 1)
     /// 系统功率：流向图中流向系统的流带、面板功率卡片的图标。
     static let systemPower = Color.indigo
 }
 
 enum PanelMotion {
-    /// 系统开启“减弱动态效果”时，弹簧改为淡入淡出。
+    /// 结构变化的时长和曲线（强 ease-out，不回弹）。App 层 PanelController 缩放窗口用同样的数值，内容和窗口边缘同步。
+    static let duration = 0.3
+    static let curve = (0.23, 1.0, 0.32, 1.0)
+
+    /// 系统开启“减弱动态效果”时改为淡入淡出。
     static func animation(reduceMotion: Bool) -> Animation {
-        reduceMotion ? .easeInOut(duration: 0.2) : .spring(duration: 0.45, bounce: 0.2)
+        reduceMotion ? .easeInOut(duration: 0.2) : .timingCurve(curve.0, curve.1, curve.2, curve.3, duration: duration)
     }
 
+    /// 出现时从上方 6pt 处淡入；减弱动态效果时只淡入淡出。
     static func transition(reduceMotion: Bool) -> AnyTransition {
-        reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .top))
+        reduceMotion ? .opacity : .opacity.combined(with: .offset(y: -6))
     }
 }
 

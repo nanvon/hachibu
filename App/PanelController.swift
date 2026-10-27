@@ -9,7 +9,7 @@ final class PanelController: NSObject {
     private static let cornerRadius: CGFloat = 28
     private static let gapBelowMenuBar: CGFloat = 6
     private static let screenMargin: CGFloat = 8
-    /// 与 FeatureUI 中内容展开、收起的动画时长接近。
+    /// 与 FeatureUI 中内容展开、收起的动画（`PanelMotion.duration`）相同。
     private static let resizeDuration: TimeInterval = 0.3
 
     private let panel: StatusPanel
@@ -125,7 +125,8 @@ final class PanelController: NSObject {
         }
         NSAnimationContext.runAnimationGroup { context in
             context.duration = Self.resizeDuration
-            context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            // 与面板内容的 PanelMotion 同样的强 ease-out 曲线和时长，窗口边缘和内容同步。
+            context.timingFunction = CAMediaTimingFunction(controlPoints: 0.23, 1, 0.32, 1)
             panel.animator().setFrame(frame, display: true)
         } completionHandler: { [weak self] in
             Task { @MainActor [weak self] in
