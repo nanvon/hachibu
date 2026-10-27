@@ -58,15 +58,18 @@ private let outputDirectory = ProcessInfo.processInfo.environment["HACHIBU_RENDE
             let image = try #require(renderer.cgImage)
             let data = try #require(NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:]))
             try data.write(to: directory.appendingPathComponent("panel-\(variant.suffix).png"))
-            let detailRenderer = ImageRenderer(content: Self.panel(Self.samples[3], scheme: variant.scheme)
-                .padding(24)
-                .background(variant.backdrop.view(scheme: variant.scheme))
-                .environment(\.colorScheme, variant.scheme)
-                .environment(\.locale, Locale(identifier: "zh-Hans")))
-            detailRenderer.scale = 2
-            let detailImage = try #require(detailRenderer.cgImage)
-            let detailData = try #require(NSBitmapImageRep(cgImage: detailImage).representation(using: .png, properties: [:]))
-            try detailData.write(to: directory.appendingPathComponent("panel-detail-\(variant.suffix).png"))
+            // 单张面板另出英文版，供英文 README 使用。
+            for (locale, localeSuffix) in [("zh-Hans", ""), ("en", "-en")] {
+                let detailRenderer = ImageRenderer(content: Self.panel(Self.samples[3], scheme: variant.scheme)
+                    .padding(24)
+                    .background(variant.backdrop.view(scheme: variant.scheme))
+                    .environment(\.colorScheme, variant.scheme)
+                    .environment(\.locale, Locale(identifier: locale)))
+                detailRenderer.scale = 2
+                let detailImage = try #require(detailRenderer.cgImage)
+                let detailData = try #require(NSBitmapImageRep(cgImage: detailImage).representation(using: .png, properties: [:]))
+                try detailData.write(to: directory.appendingPathComponent("panel-detail-\(variant.suffix)\(localeSuffix).png"))
+            }
         }
     }
 
