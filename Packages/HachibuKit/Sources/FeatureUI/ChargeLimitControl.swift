@@ -4,8 +4,9 @@ import BatteryCore
 /// 为 nil 时不提供控制，只读显示上限。
 struct ChargeLimitControl: Equatable {
     var isEnabled: Bool
-    /// 开启时的上限（%），关闭时为 nil。
-    var percent: Int?
+    /// 选中的档位（%）。上限关闭时为 100：PowerUI 设置 100% 即关闭上限，界面不单独提供开关。
+    var percent: Int
+    /// 可选档位，总是包含 100。
     var options: [Int]
     /// AlDente 等充电控制工具正在运行，控制不可用。
     var isBlocked: Bool
@@ -28,11 +29,11 @@ struct ChargeLimitControl: Equatable {
             self.percent = snapshot.chargeLimitHold?.userLimit ?? percent
         case .off:
             isEnabled = false
-            percent = nil
+            percent = 100
         case .unsupported, nil:
             return nil
         }
-        self.options = options
+        self.options = options.contains(100) ? options : options + [100]
         self.isBlocked = isBlocked
         self.isWriting = isWriting
         self.writeFailed = writeFailed

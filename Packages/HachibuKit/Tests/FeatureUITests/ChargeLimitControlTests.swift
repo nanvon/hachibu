@@ -19,7 +19,15 @@ import Testing
 
         let off = try #require(ChargeLimitControl(snapshot: snapshot(.off), canWrite: true, isBlocked: false))
         #expect(!off.isEnabled)
-        #expect(off.percent == nil)
+        #expect(off.percent == 100)
+    }
+
+    @Test func optionsAlwaysIncludeFullCharge() throws {
+        let control = try #require(ChargeLimitControl(
+            snapshot: snapshot(.off, options: [80, 85, 90]), canWrite: true, isBlocked: false
+        ))
+        #expect(control.options == [80, 85, 90, 100])
+        #expect(control.percent == 100)
     }
 
     @Test func unavailableWithoutWriterOptionsOrKnownSetting() {

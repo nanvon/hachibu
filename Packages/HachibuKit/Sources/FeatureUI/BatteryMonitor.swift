@@ -392,7 +392,8 @@ public final class BatteryMonitor {
     }
 
     /// 修改系统充电上限，完成后立即用读回的值刷新。上一次修改未完成时忽略。
-    /// 保持当前电量期间：改成低于临时值的档位只更新保存的用户上限；关闭前先写回用户上限。
+    /// 保持当前电量期间：改成低于临时值的档位只更新保存的用户上限；关闭（含选 100%）前先写回用户上限。
+    /// 上限关闭时选低于 100% 的档位：先开启再写入档位，`setMCLLimit:error:` 只在已开启时调用。
     public func setChargeLimit(_ change: ChargeLimitChange) async {
         guard !isWritingChargeLimit else { return }
         var changes = [change]
@@ -402,12 +403,15 @@ public final class BatteryMonitor {
                 setChargeLimitHold(ChargeLimitHold(userLimit: percent, heldLimit: hold.heldLimit))
                 publish()
                 return
-            case .disable:
+            case .disable, .limit(100):
                 // 系统重新开启时恢复关闭前的值，不能让它记住临时值。
-                changes = [.limit(hold.userLimit), .disable]
+                changes = [.limit(hold.userLimit), change]
             default:
                 break
             }
+        } else if case .limit(let percent) = change, percent < 100,
+                  case .battery(let snapshot)? = reading, snapshot.chargeLimit == .off {
+            changes = [.enable, change]
         }
         isWritingChargeLimit = true
         _ = await runChargeLimitWrites(changes)

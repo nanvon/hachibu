@@ -446,24 +446,18 @@ private struct HistoryDataGroup: View {
     }
 }
 
-/// 系统充电上限的开关和档位：开关一行，开启时下方为铺满宽度的档位（与面板相同的 `LimitSegments`）。
+/// 系统充电上限的档位：标题一行，下方为铺满宽度的档位（与面板相同的 `LimitSegments`），选 100% 即关闭上限。
 private struct ChargeLimitControlRows: View {
     let control: ChargeLimitControl
     let onChange: @MainActor (ChargeLimitChange) -> Void
 
     var body: some View {
         SettingsRow(Text("System Charge Limit", bundle: .module)) {
-            SettingsSwitch(
-                isOn: Binding(get: { control.isEnabled }, set: { onChange($0 ? .enable : .disable) }),
-                label: Text("System Charge Limit", bundle: .module)
-            )
+            EmptyView()
+        }
+        LimitSegments(options: control.options, selection: control.percent) { onChange(.limit($0)) }
             .disabled(!control.isInteractive)
-        }
-        if control.isEnabled {
-            LimitSegments(options: control.options, selection: control.percent) { onChange(.limit($0)) }
-                .disabled(!control.isInteractive)
-                .padding(.bottom, 10)
-        }
+            .padding(.bottom, 10)
         if control.isBlocked || control.writeFailed {
             ChargeLimitNote(control: control)
                 .font(.system(size: 11.5))
@@ -620,7 +614,7 @@ private final class PreviewBatterySystem: BatteryDataSource, ChargeLimitWriter, 
         lock.withLock {
             switch change {
             case .enable: isEnabled = true
-            case .disable: isEnabled = false
+            case .disable, .limit(100): isEnabled = false
             case .limit(let percent): limit = percent
             }
         }

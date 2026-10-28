@@ -586,12 +586,10 @@ private struct MetricCaption<Content: View>: View {
 
 // MARK: - 充电上限
 
-/// 系统充电上限：标题行右侧为开关，开启时下方为档位。AlDente 运行时禁用并说明原因。
+/// 系统充电上限：标题行下方为档位，选 100% 即关闭上限，不单独提供开关。AlDente 运行时禁用并说明原因。
 private struct ChargeLimitTile: View {
     let control: ChargeLimitControl
     let onChange: @MainActor (ChargeLimitChange) -> Void
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(\.rendersStaticControls) private var rendersStaticControls
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -600,25 +598,9 @@ private struct ChargeLimitTile: View {
                 Text("System Charge Limit", bundle: .module)
                     .font(.system(size: 13, weight: .semibold))
                     .minimumScaleFactor(0.8)
-                Spacer(minLength: 8)
-                if rendersStaticControls {
-                    StaticSwitch(isOn: control.isEnabled)
-                        .opacity(control.isInteractive ? 1 : 0.5)
-                } else {
-                    Toggle(isOn: Binding(get: { control.isEnabled }, set: { onChange($0 ? .enable : .disable) })) {
-                        Text("System Charge Limit", bundle: .module)
-                    }
-                    .toggleStyle(.switch)
-                    .controlSize(.small)
-                    .labelsHidden()
-                    .disabled(!control.isInteractive)
-                }
             }
-            if control.isEnabled {
-                LimitSegments(options: control.options, selection: control.percent) { onChange(.limit($0)) }
-                    .disabled(!control.isInteractive)
-                    .transition(PanelMotion.transition(reduceMotion: reduceMotion))
-            }
+            LimitSegments(options: control.options, selection: control.percent) { onChange(.limit($0)) }
+                .disabled(!control.isInteractive)
             ChargeLimitNote(control: control)
                 .font(.system(size: 11))
         }

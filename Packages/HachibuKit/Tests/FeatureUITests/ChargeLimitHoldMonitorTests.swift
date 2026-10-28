@@ -188,6 +188,27 @@ private struct NoProfiler: SystemProfilerSource {
         #expect(savedHold == nil)
     }
 
+    @Test func fullLimitWhileHoldingRestoresUserLimitFirst() async {
+        let monitor = makeMonitor()
+        await monitor.read()
+        await settle(monitor)
+        await monitor.setChargeLimit(.limit(100))
+        await settle(monitor)
+        #expect(system.writes == [.limit(90), .limit(80), .limit(100)])
+        #expect(system.limit == .off)
+        #expect(savedHold == nil)
+    }
+
+    @Test func limitWhileOffEnablesFirst() async {
+        let monitor = makeMonitor(holds: false)
+        await monitor.read()
+        await monitor.setChargeLimit(.limit(100))
+        #expect(system.limit == .off)
+        await monitor.setChargeLimit(.limit(85))
+        #expect(system.writes == [.limit(100), .enable, .limit(85)])
+        #expect(system.limit == .on(percent: 85))
+    }
+
     @Test func exitRestoresSynchronously() async {
         let monitor = makeMonitor()
         await monitor.read()
