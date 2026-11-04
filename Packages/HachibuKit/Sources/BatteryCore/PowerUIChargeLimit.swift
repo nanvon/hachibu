@@ -13,12 +13,41 @@ public struct PowerUIChargeLimit: Sendable, Equatable, Codable {
     public var limit: Int?
     /// `availableChargeLimitsWithError:`（%），出错时为 nil。
     public var availableLimits: [Int]?
+    /// `smartChargingUIState:chargeLimit:chargingOverrideAllowed:withError:` 的状态值，方法不可用或出错时为 nil。
+    public var uiState: Int?
 
-    public init(isSupported: Bool, isEnabled: Bool? = nil, limit: Int? = nil, availableLimits: [Int]? = nil) {
+    public init(
+        isSupported: Bool,
+        isEnabled: Bool? = nil,
+        limit: Int? = nil,
+        availableLimits: [Int]? = nil,
+        uiState: Int? = nil
+    ) {
         self.isSupported = isSupported
         self.isEnabled = isEnabled
         self.limit = limit
         self.availableLimits = availableLimits
+        self.uiState = uiState
+    }
+}
+
+/// 系统自己改变充电行为的原因，只包含面板要说明的状态。
+/// 状态值和名称来自 `+[PowerUISmartChargeUtilities stringForSmartChargingUIState:]`（2026-11-04 本机实测）。
+public enum SystemChargeState: Sendable, Equatable {
+    /// 18 `ChargingUpForGauging`：校准电池，暂时忽略充电上限。
+    case calibrating
+    /// 3 `ChargingToFullDueToUserOverride`：用户选择临时充满。
+    case temporaryFullCharge
+    /// 6 `PausedForOBC`、10 `PausedForOptimzedLimit`：优化充电暂停。
+    case optimizedChargingPaused
+
+    init?(uiState: Int) {
+        switch uiState {
+        case 18: self = .calibrating
+        case 3: self = .temporaryFullCharge
+        case 6, 10: self = .optimizedChargingPaused
+        default: return nil
+        }
     }
 }
 
@@ -42,12 +71,20 @@ enum PowerUIClient {
         "disableMCL:": "B24@0:8^@16",
     ]
 
+    /// 只用于判断 `SystemChargeState`。类型编码不一致时 `uiState` 为 nil，其他读写不受影响。
+    private static let uiStateMethodName = "smartChargingUIState:chargeLimit:chargingOverrideAllowed:withError:"
+    private static let uiStateEncoding = "B48@0:8^Q16^Q24^B32^@40"
+
     private typealias BoolMethod = @convention(c) (AnyObject, Selector) -> Bool
     private typealias UInt8ErrorMethod = @convention(c) (AnyObject, Selector, AutoreleasingUnsafeMutablePointer<NSError?>?) -> UInt8
     private typealias UInt64ErrorMethod = @convention(c) (AnyObject, Selector, AutoreleasingUnsafeMutablePointer<NSError?>?) -> UInt64
     private typealias ObjectErrorMethod = @convention(c) (AnyObject, Selector, AutoreleasingUnsafeMutablePointer<NSError?>?) -> Unmanaged<AnyObject>?
     private typealias BoolErrorMethod = @convention(c) (AnyObject, Selector, AutoreleasingUnsafeMutablePointer<NSError?>?) -> Bool
     private typealias SetLimitMethod = @convention(c) (AnyObject, Selector, UInt8, AutoreleasingUnsafeMutablePointer<NSError?>?) -> Bool
+    private typealias UIStateMethod = @convention(c) (
+        AnyObject, Selector, UnsafeMutablePointer<UInt64>, UnsafeMutablePointer<UInt64>, UnsafeMutablePointer<Bool>,
+        AutoreleasingUnsafeMutablePointer<NSError?>?
+    ) -> Bool
 
     private static let operations = PowerUIOperationQueue()
     private static let writeReadback = WriteReadback()
@@ -159,8 +196,25 @@ enum PowerUIClient {
         let availableLimits = error == nil ? (available as? [NSNumber])?.map(\.intValue) : nil
 
         return PowerUIChargeLimit(
-            isSupported: true, isEnabled: isEnabled, limit: limitValue, availableLimits: availableLimits
+            isSupported: true, isEnabled: isEnabled, limit: limitValue, availableLimits: availableLimits,
+            uiState: readUIState(client)
         )
+    }
+
+    private static func readUIState(_ client: NSObject) -> Int? {
+        let selector = NSSelectorFromString(uiStateMethodName)
+        guard class_getInstanceMethod(type(of: client), selector)
+            .flatMap(method_getTypeEncoding)
+            .map({ String(cString: $0) }) == uiStateEncoding
+        else { return nil }
+        var state: UInt64 = 0
+        var chargeLimit: UInt64 = 0
+        var overrideAllowed = false
+        var error: NSError?
+        let succeeded = unsafeBitCast(client.method(for: selector), to: UIStateMethod.self)(
+            client, selector, &state, &chargeLimit, &overrideAllowed, &error
+        )
+        return succeeded && error == nil ? Int(exactly: state) : nil
     }
 
     private static func loadClientClass() -> AnyClass? {

@@ -490,9 +490,10 @@ public final class BatteryMonitor {
     }
 
     /// 应用退出前同步写回用户设置的上限。系统上限已不是临时值时只丢弃保存的值；
-    /// 写入失败（如 PowerUI 正忙）时保留，下次启动时恢复。
+    /// 写入失败（如 PowerUI 正忙）时保留，下次启动时恢复。临时充满期间不写入，也保留到下次启动。
     public func restoreChargeLimitBeforeExit() {
         guard let hold = chargeLimitHold, case .battery(let snapshot)? = reading, let limit = snapshot.chargeLimit else { return }
+        if snapshot.systemChargeState == .temporaryFullCharge { return }
         if limit == .on(percent: hold.heldLimit) {
             guard sampler.writeChargeLimitImmediately(.limit(hold.userLimit)) else { return }
         }

@@ -238,16 +238,6 @@
         }
       }
     },
-    "Above Charge Limit, Using Battery to %lld%%" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "高于充电上限，使用电池至 %lld%%"
-          }
-        }
-      }
-    },
     "After you close this window, Hachibu stays in the menu bar and keeps recording." : {
       "localizations" : {
         "zh-Hans" : {
@@ -503,16 +493,6 @@
         }
       }
     },
-    "Charge Limit Reached (%lld%%)" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已达到充电上限（%lld%%）"
-          }
-        }
-      }
-    },
     "Charger" : {
       "localizations" : {
         "zh-Hans" : {
@@ -711,6 +691,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "放电到上限"
+          }
+        }
+      }
+    },
+    "Discharging to %lld%%" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "放电至 %lld%%"
           }
         }
       }
@@ -1015,6 +1005,16 @@
         }
       }
     },
+    "Limit Reached (%lld%%)" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已达上限 %lld%%"
+          }
+        }
+      }
+    },
     "Low Power Mode" : {
       "localizations" : {
         "zh-Hans" : {
@@ -1290,6 +1290,16 @@
         }
       }
     },
+    "Optimized Charging Paused" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "优化充电暂停"
+          }
+        }
+      }
+    },
     "Over %lld months, the 30-day average full charge capacity fell by %@ (%@)." : {
       "localizations" : {
         "zh-Hans" : {
@@ -1335,7 +1345,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "已接通电源，电量仍在下降"
+            "value" : "插电，电量下降"
           }
         }
       }
@@ -1345,7 +1355,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "已接通电源，未充电"
+            "value" : "插电，未充电"
           }
         }
       }
@@ -1480,6 +1490,16 @@
         }
       }
     },
+    "System Calibrating Battery" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "系统正在校准电池"
+          }
+        }
+      }
+    },
     "System Charge Limit" : {
       "localizations" : {
         "zh-Hans" : {
@@ -1526,6 +1546,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "温度 · 提醒阈值 %lld °C"
+          }
+        }
+      }
+    },
+    "Temporary Full Charge" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "临时充满"
           }
         }
       }

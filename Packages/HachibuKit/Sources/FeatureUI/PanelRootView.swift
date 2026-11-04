@@ -222,15 +222,18 @@ struct StatusLabel: View {
     static func symbolName(_ status: ChargeStatus) -> String {
         switch status {
         case .onBattery: "battery.75percent"
-        case .charging: "bolt.fill"
-        case .aboveChargeLimit, .pluggedInDraining, .holdingCharge, .fullyCharged, .chargeLimitReached, .pluggedInNotCharging:
+        case .charging, .calibrating, .temporaryFullCharge: "bolt.fill"
+        case .aboveChargeLimit, .pluggedInDraining, .holdingCharge, .fullyCharged, .chargeLimitReached,
+             .optimizedChargingPaused, .pluggedInNotCharging:
             "powerplug.fill"
         }
     }
 
     static func tint(_ status: ChargeStatus) -> Color {
         switch status {
-        case .charging, .holdingCharge, .fullyCharged, .chargeLimitReached: .green
+        case .charging, .calibrating, .temporaryFullCharge, .holdingCharge, .fullyCharged, .chargeLimitReached,
+             .optimizedChargingPaused:
+            .green
         case .aboveChargeLimit, .pluggedInDraining: .orange
         case .onBattery, .pluggedInNotCharging: .secondary
         }
@@ -240,11 +243,14 @@ struct StatusLabel: View {
         switch status {
         case .onBattery: Text("On Battery", bundle: .module)
         case .charging: Text("Charging", bundle: .module)
-        case .aboveChargeLimit(let limit): Text("Above Charge Limit, Using Battery to \(limit)%", bundle: .module)
+        case .calibrating: Text("System Calibrating Battery", bundle: .module)
+        case .temporaryFullCharge: Text("Temporary Full Charge", bundle: .module)
+        case .aboveChargeLimit(let limit): Text("Discharging to \(limit)%", bundle: .module)
         case .pluggedInDraining: Text("Plugged In, Draining", bundle: .module)
         case .holdingCharge(let percent): Text("Holding at \(percent)%", bundle: .module)
         case .fullyCharged: Text("Fully Charged", bundle: .module)
-        case .chargeLimitReached(let limit): Text("Charge Limit Reached (\(limit)%)", bundle: .module)
+        case .chargeLimitReached(let limit): Text("Limit Reached (\(limit)%)", bundle: .module)
+        case .optimizedChargingPaused: Text("Optimized Charging Paused", bundle: .module)
         case .pluggedInNotCharging: Text("Plugged In, Not Charging", bundle: .module)
         case nil: Text(verbatim: DisplayFormat.missing)
         }
@@ -1054,6 +1060,33 @@ enum PanelPreviewData {
         return snapshot
     }
 
+    /// 系统校准电池：电量已超过 80% 的上限，仍在充电。
+    static var calibratingSnapshot: BatterySnapshot {
+        var snapshot = snapshot(
+            percent: 94, isCharging: true, batteryPowerMW: 36900, powerInMW: 61572, systemLoadMW: 24672,
+            amperageMA: 2844, timeToFullMinutes: 26
+        )
+        snapshot.systemChargeState = .calibrating
+        return snapshot
+    }
+
+    /// 用户选择临时充满：系统上限读数为 100，电量已超过用户设置的 80%。
+    static var temporaryFullChargeSnapshot: BatterySnapshot {
+        var snapshot = snapshot(
+            percent: 86, isCharging: true, batteryPowerMW: 41000, powerInMW: 62000, systemLoadMW: 21000,
+            amperageMA: 3200, timeToFullMinutes: 34, chargeLimit: .on(percent: 100)
+        )
+        snapshot.systemChargeState = .temporaryFullCharge
+        return snapshot
+    }
+
+    /// 优化电池充电暂停：电量低于 90% 的上限，由充电器供电。
+    static var optimizedChargingPausedSnapshot: BatterySnapshot {
+        var snapshot = snapshot(percent: 72, chargeLimit: .on(percent: 90))
+        snapshot.systemChargeState = .optimizedChargingPaused
+        return snapshot
+    }
+
     /// 使用电池且开启低电量模式。
     static var lowPowerModeSnapshot: BatterySnapshot {
         var snapshot = snapshot(
@@ -1199,6 +1232,18 @@ private struct PanelPreview: View {
 
 #Preview("Holding Current Charge") {
     PanelPreview(reading: .battery(PanelPreviewData.holdingSnapshot))
+}
+
+#Preview("System Calibrating") {
+    PanelPreview(reading: .battery(PanelPreviewData.calibratingSnapshot))
+}
+
+#Preview("Temporary Full Charge") {
+    PanelPreview(reading: .battery(PanelPreviewData.temporaryFullChargeSnapshot))
+}
+
+#Preview("Optimized Charging Paused") {
+    PanelPreview(reading: .battery(PanelPreviewData.optimizedChargingPausedSnapshot))
 }
 
 #Preview("Charge Limit Off, AlDente Running") {

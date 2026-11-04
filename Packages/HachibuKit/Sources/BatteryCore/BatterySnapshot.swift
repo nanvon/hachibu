@@ -64,6 +64,8 @@ public struct BatterySnapshot: Sendable, Equatable {
     public var chargeLimit: ChargeLimitSetting?
     /// 系统充电上限的可选值（%，升序），来自 PowerUI 的 `availableChargeLimitsWithError:`。读不到时为 nil。
     public var chargeLimitOptions: [Int]?
+    /// PowerUI 报告的系统充电状态，只记录面板要说明的几种，其他情况或读不到时为 nil。
+    public var systemChargeState: SystemChargeState?
     /// 本次插电期间电量已在未充电时到达当前充电上限。不是读数，由 `ChargeLimitHoldTracker` 根据连续读数推导，解析结果为 false。
     public var hasReachedChargeLimit: Bool
     /// 正在“保持当前电量”时为保存的上限，此时 `chargeLimit` 是系统实际的临时值。不是读数，由 BatteryMonitor 写入，解析结果为 nil。
@@ -73,6 +75,13 @@ public struct BatterySnapshot: Sendable, Equatable {
     public var chargeLimitPercent: Int? {
         guard case .on(let percent) = chargeLimit else { return nil }
         return percent
+    }
+
+    /// 系统因校准电池忽略充电上限：PowerUI 报告校准，且正在充电、电量已达到上限。
+    /// 这个状态值在未插电时就可能出现（本机早于充电约 15 小时），所以同时看实际行为。
+    public var isCalibratingPastChargeLimit: Bool {
+        guard systemChargeState == .calibrating, isCharging == true, let limit = chargeLimitPercent, let percent else { return false }
+        return percent >= limit
     }
 
     /// 容量比：满充容量 ÷ 设计容量（0–1）。
@@ -105,6 +114,7 @@ public struct BatterySnapshot: Sendable, Equatable {
         lowPowerModeEnabled: Bool = false,
         chargeLimit: ChargeLimitSetting? = nil,
         chargeLimitOptions: [Int]? = nil,
+        systemChargeState: SystemChargeState? = nil,
         hasReachedChargeLimit: Bool = false,
         chargeLimitHold: ChargeLimitHold? = nil
     ) {
@@ -131,6 +141,7 @@ public struct BatterySnapshot: Sendable, Equatable {
         self.lowPowerModeEnabled = lowPowerModeEnabled
         self.chargeLimit = chargeLimit
         self.chargeLimitOptions = chargeLimitOptions
+        self.systemChargeState = systemChargeState
         self.hasReachedChargeLimit = hasReachedChargeLimit
         self.chargeLimitHold = chargeLimitHold
     }
@@ -194,7 +205,8 @@ extension BatterySnapshot {
             },
             lowPowerModeEnabled: raw.lowPowerModeEnabled,
             chargeLimit: ChargeLimitSetting.resolve(powerUI: raw.powerUIChargeLimit, archive: raw.chargeLimitArchive),
-            chargeLimitOptions: Self.chargeLimitOptions(raw.powerUIChargeLimit)
+            chargeLimitOptions: Self.chargeLimitOptions(raw.powerUIChargeLimit),
+            systemChargeState: raw.powerUIChargeLimit?.uiState.flatMap(SystemChargeState.init(uiState:))
         )
     }
 

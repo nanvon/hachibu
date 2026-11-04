@@ -116,7 +116,7 @@ Hachibu 每天检查一次更新，有新版本时提示安装；也可以在「
 >    xattr -dr com.apple.quarantine /Applications/Hachibu.app
 >    ```
 
-第三方充电控制工具会改变充电行为。同时运行时，Hachibu 显示的是这些工具控制之后的实际状态，例如「已接通电源，未充电」。没有内置电池的 Mac（如 Mac mini、Mac Studio）只显示「未检测到电池」，不记录数据。
+第三方充电控制工具会改变充电行为。同时运行时，Hachibu 显示的是这些工具控制之后的实际状态，例如「插电，未充电」。没有内置电池的 Mac（如 Mac mini、Mac Studio）只显示「未检测到电池」，不记录数据。
 
 ## 数据与隐私
 

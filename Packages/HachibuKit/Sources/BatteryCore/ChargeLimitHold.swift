@@ -36,13 +36,18 @@ public struct ChargeLimitHold: Sendable, Equatable, Codable {
         isEnabled: Bool,
         restoresFirst: Bool = false
     ) -> Action {
+        // 临时充满期间系统上限读数为 100，不是被别处改过。不写入，以免打断充满，也不丢弃保存的值。
+        if snapshot.systemChargeState == .temporaryFullCharge { return .none }
+
         if let current {
             switch snapshot.chargeLimit {
             case nil:
                 // 读不到系统上限时等待，不写入。
                 return .none
             case .on(let percent)? where percent == current.heldLimit:
-                if restoresFirst || !isEnabled || snapshot.isExternalPower == false {
+                // 校准期间系统忽略上限，先写回用户的上限，校准结束后按当时的电量重新保持。
+                if restoresFirst || !isEnabled || snapshot.isExternalPower == false
+                    || snapshot.isCalibratingPastChargeLimit {
                     return .restore(current)
                 }
                 return .none
@@ -51,7 +56,8 @@ public struct ChargeLimitHold: Sendable, Equatable, Codable {
             }
         }
 
-        guard isEnabled, snapshot.isExternalPower == true,
+        // 还在充电时不开始保持：保持值不跟随电量变化，等充电停止后再取当时的电量。
+        guard isEnabled, snapshot.isExternalPower == true, snapshot.isCharging != true,
               case .on(let limit)? = snapshot.chargeLimit, let percent = snapshot.percent
         else { return .none }
         let held = min(percent, maximumHeldLimit)

@@ -2,6 +2,10 @@
 public enum ChargeStatus: Sendable, Equatable {
     case onBattery
     case charging
+    /// 系统正在校准电池，暂时忽略充电上限，继续充电。
+    case calibrating
+    /// 用户选择了临时充满，暂时不受充电上限限制。
+    case temporaryFullCharge
     /// 电量高于系统充电上限，系统不用充电器、由电池供电，放到上限后恢复。
     case aboveChargeLimit(limit: Int)
     case pluggedInDraining
@@ -9,6 +13,8 @@ public enum ChargeStatus: Sendable, Equatable {
     case holdingCharge(percent: Int)
     case fullyCharged
     case chargeLimitReached(limit: Int)
+    /// 优化电池充电让电量停在上限以下，等到预计使用时间再充。
+    case optimizedChargingPaused
     case pluggedInNotCharging
 
     /// Apple 文档 102338：达到充电上限后，电量下降超过 5% 才恢复充电。
@@ -23,7 +29,13 @@ public enum ChargeStatus: Sendable, Equatable {
         if !isExternalPower {
             self = .onBattery
         } else if snapshot.isCharging == true {
-            self = .charging
+            if snapshot.isCalibratingPastChargeLimit {
+                self = .calibrating
+            } else if snapshot.systemChargeState == .temporaryFullCharge {
+                self = .temporaryFullCharge
+            } else {
+                self = .charging
+            }
         } else if let batteryPower = snapshot.batteryPowerMW, batteryPower < -BatterySnapshot.batteryPowerDeadbandMW {
             // 充电器功率不够时也会放电，这时输入功率不为 0，不归为高于上限。
             if let limit = snapshot.chargeLimitPercent, let percent = snapshot.percent, percent > limit,
@@ -32,7 +44,7 @@ public enum ChargeStatus: Sendable, Equatable {
             } else {
                 self = .pluggedInDraining
             }
-        } else if let hold = snapshot.chargeLimitHold {
+        } else if let hold = snapshot.chargeLimitHold, snapshot.systemChargeState != .temporaryFullCharge {
             self = .holdingCharge(percent: hold.heldLimit)
         } else if snapshot.percent == 100 {
             self = .fullyCharged
@@ -40,6 +52,8 @@ public enum ChargeStatus: Sendable, Equatable {
                   percent >= limit
                     || (snapshot.hasReachedChargeLimit && percent >= limit - Self.chargeLimitResumeMargin) {
             self = .chargeLimitReached(limit: limit)
+        } else if snapshot.systemChargeState == .optimizedChargingPaused {
+            self = .optimizedChargingPaused
         } else {
             self = .pluggedInNotCharging
         }
@@ -81,7 +95,7 @@ extension BatterySnapshot {
     public var remainingTime: RemainingTime? {
         switch ChargeStatus(self) {
         case .onBattery: timeToEmptyMinutes.map { .untilEmpty(minutes: $0) }
-        case .charging: timeToFullMinutes.map { .untilFull(minutes: $0) }
+        case .charging, .calibrating, .temporaryFullCharge: timeToFullMinutes.map { .untilFull(minutes: $0) }
         default: nil
         }
     }
