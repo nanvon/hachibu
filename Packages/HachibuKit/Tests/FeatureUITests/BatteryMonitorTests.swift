@@ -33,7 +33,7 @@ private final class BlockedChargeLimitWriter: ChargeLimitWriter, @unchecked Send
     func write(_ change: ChargeLimitChange) throws {
         lock.withLock { blocked = true }
         continuation.yield(())
-        _ = gate.wait(timeout: .now() + 5)
+        gate.wait()
         lock.withLock { blocked = false }
     }
 
@@ -41,30 +41,41 @@ private final class BlockedChargeLimitWriter: ChargeLimitWriter, @unchecked Send
 }
 
 @Suite struct BatterySamplerConcurrencyTests {
-    @Test func samplingAndMinuteStorageContinueWhileChargeWriteWaits() async throws {
+    @Test(.timeLimit(.minutes(1)))
+    func samplingAndMinuteStorageContinueWhileChargeWriteWaits() async throws {
         let writer = BlockedChargeLimitWriter()
-        defer { writer.release() }
         let store = try HistoryStore.inMemory()
         let sampler = BatterySampler(
             dataSource: FixedBatterySource(raw: rawPower(external: true)),
             systemProfiler: UnusedProfiler(), chargeLimitWriter: writer, store: store
         )
-        let write = Task { await sampler.writeChargeLimit(.enable) }
-        var started = writer.started.makeAsyncIterator()
-        _ = await started.next()
-        let reading = await sampler.read()
-        let date = Date()
-        await sampler.writeMinuteSample(at: date)
-        let samples = try await store.minuteSamples(from: date.addingTimeInterval(-60), to: date.addingTimeInterval(60))
-        #expect(writer.isBlocked)
-        guard case .battery(let snapshot)? = reading.reading else {
-            Issue.record("Battery missing")
-            return
+        try await withTaskCancellationHandler {
+            async let write = sampler.writeChargeLimit(.enable)
+            do {
+                defer { writer.release() }
+                var started = writer.started.makeAsyncIterator()
+                _ = await started.next()
+                try Task.checkCancellation()
+
+                let reading = await sampler.read()
+                let date = Date()
+                await sampler.writeMinuteSample(at: date)
+                let samples = try await store.minuteSamples(from: date.addingTimeInterval(-60), to: date.addingTimeInterval(60))
+                try Task.checkCancellation()
+
+                #expect(writer.isBlocked)
+                guard case .battery(let snapshot)? = reading.reading else {
+                    Issue.record("Battery missing")
+                    return
+                }
+                #expect(snapshot.systemLoadMW == 12000)
+                #expect(samples.count == 1)
+            }
+            _ = await write
+        } onCancel: {
+            // 测试超时时也释放同步写入，让采样任务退出。
+            writer.release()
         }
-        #expect(snapshot.systemLoadMW == 12000)
-        #expect(samples.count == 1)
-        writer.release()
-        _ = await write.value
     }
 }
 
