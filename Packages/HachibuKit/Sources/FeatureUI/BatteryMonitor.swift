@@ -433,10 +433,12 @@ public final class BatteryMonitor {
         if !applied {
             chargeLimitHoldPausedUntil = Date().addingTimeInterval(Self.chargeLimitHoldRetryDelay)
         }
-        isWritingChargeLimit = false
         // 充电器 1–3 秒内开始或停止充电，IOPS / IORegistry 要等约一分钟才报告，这段时间加快读 SMC。
         startStateChangeBoost()
         await refreshSMC(.display)
+        // 刷新期间仍视为写入中，刷新后连续完成状态清理或启动下一次自动写入。
+        isWritingChargeLimit = false
+        evaluateChargeLimitHold()
         return applied
     }
 

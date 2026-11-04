@@ -163,7 +163,7 @@ public final class HistoryStore: Sendable {
             let rows = try Row.fetchAll(
                 db,
                 sql: """
-                    SELECT d.*, b.design_mah AS battery_design_mah
+                    SELECT d.*, COALESCE(d.design_mah, b.design_mah) AS effective_design_mah
                     FROM daily_health d
                     LEFT JOIN batteries b ON b.id = d.battery_id
                     WHERE ? IS NULL OR d.day >= ?
@@ -208,7 +208,7 @@ public final class HistoryStore: Sendable {
             var health = DailyHealth(day: day)
             if let row = group.first(where: { ($0["full_charge_mah"] as Int?) != nil }) {
                 health.fullChargeCapacityMAh = row["full_charge_mah"]
-                health.designCapacityMAh = row["design_mah"] ?? row["battery_design_mah"]
+                health.designCapacityMAh = row["effective_design_mah"]
                 if row["source_id"] != nativeSourceID {
                     usedImport = true
                 }

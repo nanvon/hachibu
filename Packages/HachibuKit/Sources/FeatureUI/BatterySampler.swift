@@ -53,10 +53,12 @@ public actor BatterySampler {
         var written = false
         if let chargeLimitWriter {
             do {
-                // 写入等待系统服务时让出采样 actor，分钟记录和实时读取仍能继续。
-                try await Task.detached(priority: .userInitiated) {
-                    try chargeLimitWriter.write(change)
-                }.value
+                // 同步等待系统服务的写入交给 Dispatch，避免占住 Swift 并发线程。
+                try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                    DispatchQueue.global(qos: .userInitiated).async {
+                        continuation.resume(with: Result { try chargeLimitWriter.write(change) })
+                    }
+                }
                 written = true
             } catch let error as ChargeLimitWriteError {
                 logger.error("Failed to write charge limit: \(error.message, privacy: .public)")
