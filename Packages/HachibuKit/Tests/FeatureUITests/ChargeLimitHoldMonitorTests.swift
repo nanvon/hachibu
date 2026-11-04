@@ -112,9 +112,9 @@ private struct NoProfiler: SystemProfilerSource {
         #expect(system.writes == [.limit(90)])
         #expect(system.limit == .on(percent: 90))
         #expect(savedHold == ChargeLimitHold(userLimit: 80, heldLimit: 90))
-        let snapshot = try #require(snapshot(monitor))
-        #expect(ChargeStatus(snapshot) == .holdingCharge(percent: 90))
-        let control = try #require(ChargeLimitControl(snapshot: snapshot, canWrite: true, isBlocked: false))
+        let batterySnapshot = try #require(snapshot(monitor))
+        #expect(ChargeStatus(batterySnapshot) == .holdingCharge(percent: 90))
+        let control = try #require(ChargeLimitControl(snapshot: batterySnapshot, canWrite: true, isBlocked: false))
         #expect(control.percent == 80)
     }
 
@@ -278,8 +278,8 @@ private struct NoProfiler: SystemProfilerSource {
         await monitor.setChargeLimit(.limit(85))
         #expect(system.writes == [.limit(90)])
         #expect(savedHold == ChargeLimitHold(userLimit: 85, heldLimit: 90))
-        let snapshot = try #require(snapshot(monitor))
-        #expect(ChargeLimitControl(snapshot: snapshot, canWrite: true, isBlocked: false)?.percent == 85)
+        let batterySnapshot = try #require(snapshot(monitor))
+        #expect(ChargeLimitControl(snapshot: batterySnapshot, canWrite: true, isBlocked: false)?.percent == 85)
 
         await monitor.setChargeLimit(.limit(95))
         await settle(monitor)
