@@ -1,11 +1,10 @@
 import Foundation
 import HistoryStore
 
-/// 曲线上的一个点。`segment` 相同的点连成一条线，遇到缺失值或缺口时换新的一段。
+/// 曲线上的一个点。所有点连成一条线，缺失值和缺口处直接连到下一个点。
 struct ChartPoint: Identifiable, Equatable, Sendable {
     var date: Date
     var value: Double
-    var segment: Int
 
     var id: Date { date }
 }
@@ -43,7 +42,7 @@ struct ChartSeries: Equatable, Sendable {
 struct RecentChartData: Equatable, Sendable {
     var hoverPoints: [ChartPoint]
     var domain: ClosedRange<Date>
-    /// 超过该间隔的相邻两点不连线；悬停时也只取这个距离内的点。
+    /// 超过该间隔的相邻样本不算同一段插电；悬停位置在首尾采样之外时，只取这个距离内的点。
     var maxGap: TimeInterval
     /// 早于第一条记录的区间，标“未记录”。
     var notRecorded: Range<Date>?
@@ -76,6 +75,7 @@ struct RecentStats: Equatable, Sendable {
 struct LongTermChartData: Equatable, Sendable {
     var hoverPoints: [ChartPoint]
     var domain: ClosedRange<Date>
+    /// 悬停位置在首尾采样之外时，只取这个距离内的点。
     var maxGap: TimeInterval
     /// 早于第一条记录的区间，标“未记录”。
     var notRecorded: Range<Date>?
@@ -111,7 +111,7 @@ enum HistoryChartBuilder {
     static let recentDuration: TimeInterval = 48 * 3600
     static let sampleInterval: TimeInterval = 60
 
-    /// 相邻两点间隔超过 3 个采样周期时断开曲线。
+    /// 插电底色的连续判断和悬停范围外的容差：3 个采样周期。曲线不受它影响。
     static let maxGapIntervals: Double = 3
 
     private struct RecentRow {
@@ -156,7 +156,7 @@ enum HistoryChartBuilder {
         let domain = now.addingTimeInterval(-recentDuration)...now
         let rows = rows.filter { domain.contains($0.date) }
         let maxGap = sampleInterval * maxGapIntervals
-        let temperatures = rows.compactMap { row in row.temperatureCelsius.map { ChartPoint(date: row.date, value: $0, segment: 0) } }
+        let temperatures = rows.compactMap { row in row.temperatureCelsius.map { ChartPoint(date: row.date, value: $0) } }
         let stats = RecentStats(
             pluggedInMinutes: rows.count { $0.isExternalPower },
             chargingMinutes: rows.count { $0.isCharging },
@@ -166,7 +166,7 @@ enum HistoryChartBuilder {
             averageTemperature: temperatures.isEmpty ? nil : temperatures.reduce(0) { $0 + $1.value } / Double(temperatures.count)
         )
         return RecentChartData(
-            hoverPoints: rows.map { ChartPoint(date: $0.date, value: 0, segment: 0) },
+            hoverPoints: rows.map { ChartPoint(date: $0.date, value: 0) },
             domain: domain,
             maxGap: maxGap,
             notRecorded: notRecordedRange(in: domain, recordStart: firstRecordedAt),
@@ -176,12 +176,12 @@ enum HistoryChartBuilder {
                 maxGap: maxGap,
                 end: domain.upperBound
             ),
-            percent: ChartSeries(segmented(rows.map { ($0.date, $0.percent) }, maxGap: maxGap)),
-            temperatureCelsius: ChartSeries(segmented(rows.map { ($0.date, $0.temperatureCelsius) }, maxGap: maxGap)),
-            systemPowerWatts: ChartSeries(segmented(rows.map { ($0.date, $0.systemLoadMW.map { $0 / 1000 }) }, maxGap: maxGap)),
-            batteryPowerWatts: ChartSeries(segmented(rows.map { ($0.date, $0.batteryPowerMW.map { $0 / 1000 }) }, maxGap: maxGap)),
-            powerInWatts: ChartSeries(segmented(rows.map { ($0.date, $0.powerInMW.map { $0 / 1000 }) }, maxGap: maxGap)),
-            voltageVolts: ChartSeries(segmented(rows.map { ($0.date, $0.voltageMV.map { $0 / 1000 }) }, maxGap: maxGap)),
+            percent: ChartSeries(linePoints(rows.map { ($0.date, $0.percent) })),
+            temperatureCelsius: ChartSeries(linePoints(rows.map { ($0.date, $0.temperatureCelsius) })),
+            systemPowerWatts: ChartSeries(linePoints(rows.map { ($0.date, $0.systemLoadMW.map { $0 / 1000 }) })),
+            batteryPowerWatts: ChartSeries(linePoints(rows.map { ($0.date, $0.batteryPowerMW.map { $0 / 1000 }) })),
+            powerInWatts: ChartSeries(linePoints(rows.map { ($0.date, $0.powerInMW.map { $0 / 1000 }) })),
+            voltageVolts: ChartSeries(linePoints(rows.map { ($0.date, $0.voltageMV.map { $0 / 1000 }) })),
             chargeLimitPercent: ChartSeries(chargeLimitSteps(chargeLimitEvents, in: domain)),
             stats: stats
         )
@@ -192,14 +192,14 @@ enum HistoryChartBuilder {
     static func chargeLimitSteps(_ events: [BatteryEvent], in domain: ClosedRange<Date>) -> [ChartPoint] {
         var points: [ChartPoint] = []
         if let initial = events.last(where: { $0.date <= domain.lowerBound })?.value {
-            points.append(ChartPoint(date: domain.lowerBound, value: Double(initial), segment: 0))
+            points.append(ChartPoint(date: domain.lowerBound, value: Double(initial)))
         }
         for event in events where event.date > domain.lowerBound && event.date <= domain.upperBound {
             guard let value = event.value else { continue }
-            points.append(ChartPoint(date: event.date, value: Double(value), segment: 0))
+            points.append(ChartPoint(date: event.date, value: Double(value)))
         }
         if let last = points.last, last.date < domain.upperBound {
-            points.append(ChartPoint(date: domain.upperBound, value: last.value, segment: 0))
+            points.append(ChartPoint(date: domain.upperBound, value: last.value))
         }
         return points
     }
@@ -228,15 +228,15 @@ enum HistoryChartBuilder {
 
         // 夏令时切换的日子不是 24 小时，留 1 小时余量。
         let maxGap = 24 * 3600 * maxGapIntervals + 3600
-        let fullCharge = segmented(days.map { ($0.date, $0.sample.fullChargeCapacityMAh.map(Double.init)) }, maxGap: maxGap)
-        let cycles = segmented(days.map { ($0.date, $0.sample.cycleCount.map(Double.init)) }, maxGap: maxGap)
+        let fullCharge = linePoints(days.map { ($0.date, $0.sample.fullChargeCapacityMAh.map(Double.init)) })
+        let cycles = linePoints(days.map { ($0.date, $0.sample.cycleCount.map(Double.init)) })
         return LongTermChartData(
-            hoverPoints: days.map { ChartPoint(date: $0.date, value: 0, segment: 0) },
+            hoverPoints: days.map { ChartPoint(date: $0.date, value: 0) },
             domain: domain,
             maxGap: maxGap,
             notRecorded: notRecordedRange(in: domain, recordStart: firstRecordedStart),
-            maximumCapacityPercent: ChartSeries(segmented(days.map { ($0.date, $0.sample.systemMaxCapacityPercent.map(Double.init)) }, maxGap: maxGap)),
-            capacityRatioPercent: ChartSeries(segmented(days.map { ($0.date, capacityRatioPercent($0.sample)) }, maxGap: maxGap)),
+            maximumCapacityPercent: ChartSeries(linePoints(days.map { ($0.date, $0.sample.systemMaxCapacityPercent.map(Double.init)) })),
+            capacityRatioPercent: ChartSeries(linePoints(days.map { ($0.date, capacityRatioPercent($0.sample)) })),
             fullChargeCapacityMAh: ChartSeries(fullCharge),
             fullChargeTrend: ChartSeries(rollingAverage(fullCharge)),
             cycleCount: ChartSeries(cycles),
@@ -251,7 +251,7 @@ enum HistoryChartBuilder {
     static let comparisonWindow: TimeInterval = 30 * 86400
     static let averageMonth: TimeInterval = 30.44 * 86400
 
-    /// 14 天滑动平均：每个点取它之前 14 天内（含当天）的读数，少于 5 个时不画。保留原来的分段。
+    /// 14 天滑动平均：每个点取它之前 14 天内（含当天）的读数，少于 5 个时不画。
     static func rollingAverage(_ points: [ChartPoint]) -> [ChartPoint] {
         var result: [ChartPoint] = []
         var lower = 0
@@ -264,7 +264,7 @@ enum HistoryChartBuilder {
             }
             let count = index - lower + 1
             if count >= trendMinimumPoints {
-                result.append(ChartPoint(date: point.date, value: sum / Double(count), segment: point.segment))
+                result.append(ChartPoint(date: point.date, value: sum / Double(count)))
             }
         }
         return result
@@ -316,26 +316,11 @@ enum HistoryChartBuilder {
         return domain.lowerBound..<min(recordStart, domain.upperBound)
     }
 
-    /// 按时间顺序生成曲线点。缺失值不画；缺失值之后或相邻间隔超过 `maxGap` 时开始新的一段。
-    static func segmented(_ values: [(date: Date, value: Double?)], maxGap: TimeInterval) -> [ChartPoint] {
-        var points: [ChartPoint] = []
-        var segment = 0
-        var previousDate: Date?
-        for (date, value) in values {
-            guard let value else {
-                if previousDate != nil {
-                    segment += 1
-                }
-                previousDate = nil
-                continue
-            }
-            if let previousDate, date.timeIntervalSince(previousDate) > maxGap {
-                segment += 1
-            }
-            points.append(ChartPoint(date: date, value: value, segment: segment))
-            previousDate = date
+    /// 按时间顺序生成曲线点。缺失值不生成点，前后的点直接相连。
+    static func linePoints(_ values: [(date: Date, value: Double?)]) -> [ChartPoint] {
+        values.compactMap { date, value in
+            value.map { ChartPoint(date: date, value: $0) }
         }
-        return points
     }
 
     /// 连续为 true 的区间。每个样本覆盖 `[date, date + sampleInterval)`，间隔超过 `maxGap` 时断开，结束时间不超过 `end`。
@@ -372,16 +357,13 @@ enum HistoryChartBuilder {
     }
 
     /// 正负分开着色的曲线：按正负切成若干段，跨过 0 时在两点间按线性插值补一个值为 0 的点，前后两段共用。
-    /// 原来就断开的地方（`segment` 不同）仍然断开。0 算作正。
+    /// 0 算作正。
     static func signedRuns(_ points: [ChartPoint]) -> [SignedRun] {
         var runs: [SignedRun] = []
         var current: SignedRun?
         for point in points {
             let isPositive = point.value >= 0
-            guard var run = current, let last = run.points.last, last.segment == point.segment else {
-                if let current {
-                    runs.append(current)
-                }
+            guard var run = current, let last = run.points.last else {
                 current = SignedRun(id: runs.count, isPositive: isPositive, points: [point])
                 continue
             }
@@ -393,8 +375,7 @@ enum HistoryChartBuilder {
             let fraction = last.value / (last.value - point.value)
             let zero = ChartPoint(
                 date: last.date.addingTimeInterval(point.date.timeIntervalSince(last.date) * fraction),
-                value: 0,
-                segment: point.segment
+                value: 0
             )
             run.points.append(zero)
             runs.append(run)
@@ -406,33 +387,32 @@ enum HistoryChartBuilder {
         return runs
     }
 
-    /// 按连续段分桶，每桶保留首尾、最小及最大值，保持真实时间顺序。
-    /// 连续数据约不超过 targetCount 个绘图点；缺口很多时优先保留每段端点，不跨缺口连线。
+    /// 按点数分桶，每桶保留首尾、最小及最大值，保持真实时间顺序。约不超过 targetCount 个绘图点。
     static func downsample(_ points: [ChartPoint], targetCount: Int = 1200) -> [ChartPoint] {
         guard points.count > targetCount, targetCount >= 4 else { return points }
         let bucketSize = Int(ceil(Double(points.count) / Double(targetCount / 4)))
         var result: [ChartPoint] = []
-        var start = 0
-        while start < points.count {
-            var end = start + 1
-            while end < points.count, points[end].segment == points[start].segment {
-                end += 1
+        for lower in stride(from: 0, to: points.count, by: bucketSize) {
+            let upper = min(lower + bucketSize, points.count)
+            var minimum = lower
+            var maximum = lower
+            for index in lower..<upper {
+                if points[index].value < points[minimum].value { minimum = index }
+                if points[index].value > points[maximum].value { maximum = index }
             }
-            for lower in stride(from: start, to: end, by: bucketSize) {
-                let upper = min(lower + bucketSize, end)
-                var minimum = lower
-                var maximum = lower
-                for index in lower..<upper {
-                    if points[index].value < points[minimum].value { minimum = index }
-                    if points[index].value > points[maximum].value { maximum = index }
-                }
-                for index in Set([lower, minimum, maximum, upper - 1]).sorted() {
-                    result.append(points[index])
-                }
+            for index in Set([lower, minimum, maximum, upper - 1]).sorted() {
+                result.append(points[index])
             }
-            start = end
         }
         return result
+    }
+
+    /// 悬停选中的采样点。首尾采样之间吸附到最近的采样，不限距离，缺口上也不插值；
+    /// 首尾之外只取 `maxGap` 内的点，避免在“未记录”区间选中第一条记录。
+    static func hoverPoint(in points: [ChartPoint], to date: Date, maxGap: TimeInterval) -> ChartPoint? {
+        guard let first = points.first, let last = points.last else { return nil }
+        let isInsideRecords = date >= first.date && date <= last.date
+        return nearest(in: points, to: date, within: isInsideRecords ? .infinity : maxGap)
     }
 
     /// 离 `date` 最近的点，距离超过 `maxDistance` 时为 nil。`points` 按时间排序。

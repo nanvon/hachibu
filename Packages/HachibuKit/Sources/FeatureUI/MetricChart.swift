@@ -23,7 +23,7 @@ struct MetricChart: View {
     let series: ChartSeries
     var hoverPoints: [ChartPoint] = []
     let domain: ClosedRange<Date>
-    /// 悬停时只取这个距离内的点。
+    /// 悬停位置在首尾采样之外时，只取这个距离内的点。
     let maxGap: TimeInterval
     var bands: [Range<Date>] = []
     var notRecorded: Range<Date>?
@@ -237,21 +237,21 @@ private struct MetricPlot: View, Equatable {
             case .line(let color):
                 if let trend {
                     ForEach(series.plotPoints) { point in
-                        LineMark(x: .value("Time", point.date), y: .value("Value", point.value), series: .value("Segment", "d\(point.segment)"))
+                        LineMark(x: .value("Time", point.date), y: .value("Value", point.value), series: .value("Line", "daily"))
                             .interpolationMethod(interpolation)
                             .lineStyle(StrokeStyle(lineWidth: Self.dailyLineWidth, lineCap: .round, lineJoin: .round))
                             .foregroundStyle(color.opacity(Self.dailyLineOpacity))
                     }
-                    lineMarks(trend.plotPoints, series: { "t\($0.segment)" }, color: color)
+                    lineMarks(trend.plotPoints, series: "trend", color: color)
                 } else {
-                    lineMarks(series.plotPoints, series: { "\($0.segment)" }, color: color)
+                    lineMarks(series.plotPoints, series: "value", color: color)
                 }
             case .signed:
                 RuleMark(y: .value("Zero", 0.0))
                     .foregroundStyle(Color.primary.opacity(0.25))
                     .lineStyle(StrokeStyle(lineWidth: 1))
                 ForEach(HistoryChartBuilder.signedRuns(series.plotPoints)) { run in
-                    lineMarks(run.points, series: { _ in "\(run.id)" }, color: run.isPositive ? .green : .orange)
+                    lineMarks(run.points, series: "\(run.id)", color: run.isPositive ? .green : .orange)
                 }
             }
 
@@ -289,14 +289,14 @@ private struct MetricPlot: View, Equatable {
     @ChartContentBuilder
     private func lineMarks(
         _ points: [ChartPoint],
-        series: @escaping (ChartPoint) -> String,
+        series: String,
         color: Color
     ) -> some ChartContent {
         ForEach(points) { point in
             LineMark(
                 x: .value("Time", point.date),
                 y: .value("Value", point.value),
-                series: .value("Segment", series(point))
+                series: .value("Line", series)
             )
             .interpolationMethod(interpolation)
             .lineStyle(StrokeStyle(lineWidth: Self.lineWidth, lineCap: .round, lineJoin: .round))
@@ -355,7 +355,7 @@ private struct MetricChartInteraction: View {
                             }
                             let date: Date? = proxy.value(atX: location.x - frame.minX)
                             selection = date.flatMap {
-                                HistoryChartBuilder.nearest(in: hoverPoints, to: $0, within: maxGap)?.date
+                                HistoryChartBuilder.hoverPoint(in: hoverPoints, to: $0, maxGap: maxGap)?.date
                             }
                         case .ended:
                             selection = nil

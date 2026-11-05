@@ -133,7 +133,7 @@ All data is read and stored on your Mac. Hachibu accesses the following:
 | `/Library/Preferences/com.apple.powerd.charging.plist` | Read-only | System charge limit when PowerUI is unavailable |
 | `~/Library/Application Support/io.github.nanvon.hachibu/` | Read/write | History database `history.sqlite` |
 
-- **How data is recorded** — Minute data is kept for 7 days and then rolled up into hourly data; daily data is kept permanently. Nothing is recorded while the Mac is asleep, so charts break at that gap.
+- **How data is recorded** — Minute data is kept for 7 days and then rolled up into hourly data; daily data is kept permanently. Nothing is recorded while the Mac is asleep, so charts connect across that gap to the next reading.
 - **No data upload** — No analytics or tracking code. Battery data is never sent to any server.
 - **Update checks** — Once a day, the app fetches the update feed from GitHub Releases. No device information is sent.
 - **App Sandbox disabled** — Reading the system files above, running `system_profiler`, and calling PowerUI require the sandbox to be off. Notification permission is used only for temperature and health alerts.

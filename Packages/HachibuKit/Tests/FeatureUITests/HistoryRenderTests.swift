@@ -5,7 +5,7 @@ import SwiftUI
 import Testing
 @testable import FeatureUI
 
-/// 检查历史图表、平滑曲线和数据缺口；仅设置 HACHIBU_RENDER_DIR 时出图。
+/// 检查历史图表、平滑曲线和跨缺口连线；仅设置 HACHIBU_RENDER_DIR 时出图。
 @MainActor
 @Suite struct HistoryRenderTests {
     @Test(.enabled(if: ProcessInfo.processInfo.environment["HACHIBU_RENDER_DIR"] != nil))
@@ -15,10 +15,10 @@ import Testing
         let start = Date(timeIntervalSince1970: 1_792_454_400)
         let dates = (0..<10).map { start.addingTimeInterval(Double($0) * 86_400) }
         let capacity = ChartSeries(dates.enumerated().map {
-            ChartPoint(date: $0.element, value: $0.offset < 5 ? 96 : 95, segment: 0)
+            ChartPoint(date: $0.element, value: $0.offset < 5 ? 96 : 95)
         })
         let cycles = ChartSeries(dates.enumerated().map {
-            ChartPoint(date: $0.element, value: $0.offset < 5 ? 34 : 35, segment: 0)
+            ChartPoint(date: $0.element, value: $0.offset < 5 ? 34 : 35)
         })
         for scheme in [ColorScheme.light, .dark] {
             let charts = VStack(alignment: .leading, spacing: 20) {
@@ -52,11 +52,11 @@ import Testing
         let start = Date(timeIntervalSince1970: 1_792_454_400)
         let dates = (0..<5).map { start.addingTimeInterval(Double($0) * 60) }
         let percent = ChartSeries(dates.enumerated().map {
-            ChartPoint(date: $0.element, value: Double(60 + $0.offset * 5), segment: 0)
+            ChartPoint(date: $0.element, value: Double(60 + $0.offset * 5))
         })
-        let temperature = ChartSeries(HistoryChartBuilder.segmented(dates.enumerated().map {
+        let temperature = ChartSeries(HistoryChartBuilder.linePoints(dates.enumerated().map {
             ($0.element, $0.offset == 2 ? nil : Double(30 + $0.offset))
-        }, maxGap: 180))
+        }))
         for scheme in [ColorScheme.light, .dark] {
             let charts = HStack(alignment: .top, spacing: 18) {
                 MetricChart(
@@ -92,7 +92,7 @@ import Testing
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let start = Date(timeIntervalSince1970: 1_792_454_400)
         let points = (0..<5).map {
-            ChartPoint(date: start.addingTimeInterval(Double($0) * 60), value: Double(60 + $0 * 5), segment: 0)
+            ChartPoint(date: start.addingTimeInterval(Double($0) * 60), value: Double(60 + $0 * 5))
         }
         let series = ChartSeries(points)
         for scheme in [ColorScheme.light, .dark] {
@@ -123,8 +123,8 @@ import Testing
         let store = try HistoryStore.inMemory()
         let now = Date()
         for minute in 0..<2880 {
-            // 留出半小时缺口，确认平滑后仍然断开。
-            guard !(900..<930).contains(minute) else { continue }
+            // 留出 5 小时缺口，确认曲线连过去、插电底色仍然断开。
+            guard !(900..<1200).contains(minute) else { continue }
             let phase = Double(minute) / 90
             let isExternal = (minute / 240) % 2 == 1
             // 中途改变充电上限，确认历史图不再显示上限线。

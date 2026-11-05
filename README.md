@@ -133,7 +133,7 @@ Hachibu 每天检查一次更新，有新版本时提示安装；也可以在「
 | `/Library/Preferences/com.apple.powerd.charging.plist` | 只读 | PowerUI 不可用时读取系统充电上限 |
 | `~/Library/Application Support/io.github.nanvon.hachibu/` | 读写 | 历史数据库 `history.sqlite` |
 
-- **记录方式** — 分钟数据保留 7 天，之后汇总为小时数据；每日数据永久保存。休眠期间没有记录，曲线在这段时间断开。
+- **记录方式** — 分钟数据保留 7 天，之后汇总为小时数据；每日数据永久保存。休眠期间没有记录，曲线在这段时间直接连到下一个读数。
 - **不上传数据** — 不包含统计或追踪代码，不向任何服务器发送电池数据。
 - **检查更新** — 每天访问一次 GitHub Releases 上的更新源，不附带设备信息。
 - **未启用 App Sandbox** — 读取上表的系统文件、运行 `system_profiler` 和调用 PowerUI 需要关闭沙盒。通知权限只用于温度和健康度提醒。

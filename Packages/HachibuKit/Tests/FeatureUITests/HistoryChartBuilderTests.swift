@@ -18,22 +18,13 @@ private let utc: Calendar = {
 }()
 
 @Suite struct SegmentTests {
-    @Test func gapLongerThanMaxGapStartsNewSegment() {
-        let points = HistoryChartBuilder.segmented(
-            [(minute(0), 1), (minute(1), 2), (minute(4), 3), (minute(8), 4)],
-            maxGap: 180
+    @Test func missingValuesProduceNoPoints() {
+        let points = HistoryChartBuilder.linePoints(
+            [(minute(0), nil), (minute(1), 1), (minute(2), nil), (minute(3), nil), (minute(4), 2), (minute(600), 3)]
         )
-        // 间隔 3 分钟仍然相连，4 分钟断开。
-        #expect(points.map(\.segment) == [0, 0, 0, 1])
-    }
-
-    @Test func missingValueBreaksLineOnce() {
-        let points = HistoryChartBuilder.segmented(
-            [(minute(0), nil), (minute(1), 1), (minute(2), nil), (minute(3), nil), (minute(4), 2)],
-            maxGap: 180
-        )
-        #expect(points.map(\.date) == [minute(1), minute(4)])
-        #expect(points.map(\.segment) == [0, 1])
+        // 缺失值不生成点，长缺口两侧的点都保留，由同一条线连起来。
+        #expect(points.map(\.date) == [minute(1), minute(4), minute(600)])
+        #expect(points.map(\.value) == [1, 2, 3])
     }
 }
 
@@ -105,8 +96,8 @@ private let utc: Calendar = {
         #expect(stats.pluggedInMinutes == 2)
         #expect(stats.chargingMinutes == 1)
         #expect(stats.notRecordedMinutes == 48 * 60 - 4)
-        #expect(stats.highestTemperature == ChartPoint(date: minute(11), value: 34, segment: 0))
-        #expect(stats.lowestTemperature == ChartPoint(date: minute(13), value: 29, segment: 0))
+        #expect(stats.highestTemperature == ChartPoint(date: minute(11), value: 34))
+        #expect(stats.lowestTemperature == ChartPoint(date: minute(13), value: 29))
         #expect(stats.averageTemperature == 31)
     }
 
@@ -131,17 +122,17 @@ private let utc: Calendar = {
     }
 
     @Test func rollingAverageNeedsFivePointsWithinFourteenDays() {
-        let points = (0..<20).map { ChartPoint(date: day($0), value: Double($0), segment: 0) }
+        let points = (0..<20).map { ChartPoint(date: day($0), value: Double($0)) }
         let average = HistoryChartBuilder.rollingAverage(points)
         // 第 5 天（下标 4）起才有 5 个读数。
-        #expect(average.first == ChartPoint(date: day(4), value: 2, segment: 0))
+        #expect(average.first == ChartPoint(date: day(4), value: 2))
         // 下标 19 的窗口是 6...19 共 14 天。
         #expect(average.last?.value == 12.5)
     }
 
     @Test func trendComparesFirstAndLastThirtyDays() throws {
-        let fullCharge = (0..<90).map { ChartPoint(date: day($0), value: $0 < 30 ? 8000 : $0 >= 60 ? 7900 : 7950, segment: 0) }
-        let cycles = [ChartPoint(date: day(0), value: 30, segment: 0), ChartPoint(date: day(89), value: 40, segment: 0)]
+        let fullCharge = (0..<90).map { ChartPoint(date: day($0), value: $0 < 30 ? 8000 : $0 >= 60 ? 7900 : 7950) }
+        let cycles = [ChartPoint(date: day(0), value: 30), ChartPoint(date: day(89), value: 40)]
         let trend = try #require(HistoryChartBuilder.healthTrend(fullCharge: fullCharge, cycles: cycles))
         #expect(trend.months == 3)
         #expect(trend.fullChargeChangeMAh == -100)
@@ -151,10 +142,10 @@ private let utc: Calendar = {
     }
 
     @Test func trendNeedsSixtyDays() {
-        let fullCharge = (0..<59).map { ChartPoint(date: day($0), value: 8000, segment: 0) }
+        let fullCharge = (0..<59).map { ChartPoint(date: day($0), value: 8000) }
         #expect(HistoryChartBuilder.healthTrend(fullCharge: fullCharge, cycles: []) == nil)
         // 循环次数减少（换过电池）时不折算每月次数。
-        let cycles = [ChartPoint(date: day(0), value: 300, segment: 0), ChartPoint(date: day(60), value: 5, segment: 0)]
+        let cycles = [ChartPoint(date: day(0), value: 300), ChartPoint(date: day(60), value: 5)]
         #expect(HistoryChartBuilder.cyclesPerMonth(cycles) == nil)
     }
 }
@@ -181,7 +172,6 @@ private let utc: Calendar = {
         #expect(data.notRecorded == nil)
         // 每天一个点，在当天正午。
         #expect(data.cycleCount.points.map(\.date) == [firstRecorded.addingTimeInterval(12 * 3600), base.addingTimeInterval(12 * 3600)])
-        #expect(data.cycleCount.points.map(\.segment) == [0, 0])
     }
 
     @Test func allStartsAtFirstRecordWithoutNotRecorded() {
@@ -195,14 +185,14 @@ private let utc: Calendar = {
         #expect(data.notRecorded == nil)
     }
 
-    @Test func gapLongerThanThreeDaysBreaksLine() {
+    @Test func gapsKeepPointsOnBothSides() {
         let data = HistoryChartBuilder.longTerm(
             dailySamples: [daily("2026-10-10"), daily("2026-10-13"), daily("2026-10-17"), daily("2026-10-18", capacity: nil)],
             now: now,
             firstRecordedDay: "2026-10-10",
             calendar: utc
         )
-        #expect(data.maximumCapacityPercent.points.map(\.segment) == [0, 0, 1])
+        #expect(data.maximumCapacityPercent.points.count == 3)
     }
 
     @Test func capacityRatioNeedsBothCapacities() {
@@ -230,24 +220,22 @@ private let utc: Calendar = {
 @Suite struct SignedRunTests {
     @Test func splitsAtZeroCrossingWithInterpolatedPoint() {
         let points = [
-            ChartPoint(date: minute(0), value: 2, segment: 0),
-            ChartPoint(date: minute(2), value: -6, segment: 0),
-            ChartPoint(date: minute(3), value: -1, segment: 0),
-            ChartPoint(date: minute(10), value: -3, segment: 1),
+            ChartPoint(date: minute(0), value: 2),
+            ChartPoint(date: minute(2), value: -6),
+            ChartPoint(date: minute(3), value: -1),
+            ChartPoint(date: minute(10), value: -3),
         ]
         let runs = HistoryChartBuilder.signedRuns(points)
-        let crossing = ChartPoint(date: minute(0).addingTimeInterval(30), value: 0, segment: 0)
+        let crossing = ChartPoint(date: minute(0).addingTimeInterval(30), value: 0)
 
-        #expect(runs.map(\.isPositive) == [true, false, false])
+        #expect(runs.map(\.isPositive) == [true, false])
         #expect(runs[0].points == [points[0], crossing])
-        #expect(runs[1].points == [crossing, points[1], points[2]])
-        // 原来的断开处不补点。
-        #expect(runs[2].points == [points[3]])
+        #expect(runs[1].points == [crossing, points[1], points[2], points[3]])
     }
 }
 
 @Suite struct NearestTests {
-    private let points = [0, 10, 20].map { ChartPoint(date: minute($0), value: Double($0), segment: 0) }
+    private let points = [0, 10, 20].map { ChartPoint(date: minute($0), value: Double($0)) }
 
     @Test func picksClosestPoint() {
         #expect(HistoryChartBuilder.nearest(in: points, to: minute(4), within: 600)?.value == 0)
@@ -258,6 +246,17 @@ private let utc: Calendar = {
     @Test func nilWhenTooFar() {
         #expect(HistoryChartBuilder.nearest(in: points, to: minute(35), within: 600) == nil)
         #expect(HistoryChartBuilder.nearest(in: [], to: minute(0), within: 600) == nil)
+    }
+
+    @Test func hoverSnapsAcrossGapsButNotFarOutsideRecords() {
+        // 首尾采样之间：缺口再长也吸附到最近的真实采样。
+        #expect(HistoryChartBuilder.hoverPoint(in: points, to: minute(4), maxGap: 60)?.value == 0)
+        #expect(HistoryChartBuilder.hoverPoint(in: points, to: minute(6), maxGap: 60)?.value == 10)
+        // 首尾之外只取 maxGap 内的点。
+        #expect(HistoryChartBuilder.hoverPoint(in: points, to: minute(20).addingTimeInterval(30), maxGap: 60)?.value == 20)
+        #expect(HistoryChartBuilder.hoverPoint(in: points, to: minute(25), maxGap: 60) == nil)
+        #expect(HistoryChartBuilder.hoverPoint(in: points, to: minute(-5), maxGap: 60) == nil)
+        #expect(HistoryChartBuilder.hoverPoint(in: [], to: minute(0), maxGap: 60) == nil)
     }
 }
 
@@ -314,7 +313,7 @@ private let utc: Calendar = {
 @Suite struct DownsampleTests {
     @Test func retainsSpikesEndpointsAndOriginalHoverValues() {
         let points = (0..<2880).map {
-            ChartPoint(date: minute($0), value: $0 == 1501 ? 100 : $0 == 1502 ? -20 : 50, segment: 0)
+            ChartPoint(date: minute($0), value: $0 == 1501 ? 100 : $0 == 1502 ? -20 : 50)
         }
         let series = ChartSeries(points)
         #expect(series.plotPoints.count <= 1200)
@@ -325,18 +324,6 @@ private let utc: Calendar = {
         #expect(series.points == points)
         #expect(HistoryChartBuilder.nearest(in: series.points, to: minute(1503), within: 180) == points[1503])
         #expect(series.plotPoints.map(\.date) == series.plotPoints.map(\.date).sorted())
-    }
-
-    @Test func preservesBothSidesOfGapsAndMissingValues() {
-        var values: [(date: Date, value: Double?)] = (0..<10_000).map { (minute($0), Double($0)) }
-        values[1251].value = nil
-        values.removeSubrange(5000..<5100)
-        let points = HistoryChartBuilder.segmented(values, maxGap: 180)
-        let plot = HistoryChartBuilder.downsample(points)
-        #expect(plot.map(\.segment).contains(2))
-        for offset in [0, 1250, 1252, 4999, 5100, 9999] {
-            #expect(plot.contains { $0.date == minute(offset) })
-        }
     }
 }
 
