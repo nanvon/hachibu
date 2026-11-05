@@ -9,6 +9,49 @@ import Testing
 @MainActor
 @Suite struct HistoryRenderTests {
     @Test(.enabled(if: ProcessInfo.processInfo.environment["HACHIBU_RENDER_DIR"] != nil))
+    func renderRecentAxisLabels() throws {
+        let directory = URL(fileURLWithPath: ProcessInfo.processInfo.environment["HACHIBU_RENDER_DIR"]!)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let timeZone = try #require(TimeZone(secondsFromGMT: 8 * 3600))
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+        // 末端离整点仅 9 分钟，复现日期标签紧贴右侧纵轴的情况。
+        let end = try #require(calendar.date(from: DateComponents(year: 2026, month: 11, day: 5, hour: 15, minute: 9)))
+        let start = end.addingTimeInterval(-48 * 3600)
+        let dates = (0...48).map { start.addingTimeInterval(Double($0) * 3600) }
+        let percent = ChartSeries(dates.map { ChartPoint(date: $0, value: 98) })
+        let temperature = ChartSeries(dates.enumerated().map {
+            ChartPoint(date: $0.element, value: 26 + 2 * sin(Double($0.offset)))
+        })
+        let variants: [(ColorScheme, String, String)] = [(.light, "zh-Hans", "light"), (.dark, "zh-Hans", "dark"), (.light, "en", "light-en")]
+        for width in [672.0, 912.0] {
+            for (scheme, locale, name) in variants {
+                let charts = HStack(spacing: 18) {
+                    MetricChartCard(
+                        series: percent, domain: start...end, maxGap: 180,
+                        yScale: .fixed(0...100), style: .line(.brand), height: 168, hoverDate: .constant(nil)
+                    )
+                    MetricChartCard(
+                        series: temperature, threshold: 35, domain: start...end, maxGap: 180,
+                        style: .line(.red), height: 168, hoverDate: .constant(nil)
+                    )
+                }
+                let renderer = ImageRenderer(content: charts
+                    .frame(width: width)
+                    .padding(20)
+                    .background(scheme == .dark ? Color(white: 0.12) : Color(white: 0.96))
+                    .environment(\.colorScheme, scheme)
+                    .environment(\.locale, Locale(identifier: locale))
+                    .environment(\.timeZone, timeZone))
+                renderer.scale = 2
+                let image = try #require(renderer.cgImage)
+                let data = try #require(NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:]))
+                try data.write(to: directory.appendingPathComponent("history-recent-axis-\(Int(width))-\(name).png"))
+            }
+        }
+    }
+
+    @Test(.enabled(if: ProcessInfo.processInfo.environment["HACHIBU_RENDER_DIR"] != nil))
     func renderHealthMetrics() throws {
         let directory = URL(fileURLWithPath: ProcessInfo.processInfo.environment["HACHIBU_RENDER_DIR"]!)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)

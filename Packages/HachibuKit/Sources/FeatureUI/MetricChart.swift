@@ -259,7 +259,8 @@ private struct MetricPlot: View, Equatable {
         .chartXScale(domain: domain)
         .chartXAxis {
             AxisMarks(values: .automatic(desiredCount: 3)) { _ in
-                AxisValueLabel(anchor: .center)
+                // 使用默认锚点；空间不足时隐藏整个标签，避免末端日期被截成一个字。
+                AxisValueLabel(collisionResolution: .greedy)
             }
         }
         .chartYAxis {
