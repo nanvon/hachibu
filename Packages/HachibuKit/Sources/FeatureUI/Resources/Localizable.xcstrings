@@ -1320,6 +1320,26 @@
         }
       }
     },
+    "Optimized Charging: Discharging" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "系统优化充电：电量下降"
+          }
+        }
+      }
+    },
+    "Optimized Charging: Discharging to %lld%%" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "系统优化充电：放电至 %lld%%"
+          }
+        }
+      }
+    },
     "Over %lld months, the 30-day average full charge capacity rose by %@ (%@)." : {
       "localizations" : {
         "zh-Hans" : {

@@ -15,19 +15,23 @@ public struct PowerUIChargeLimit: Sendable, Equatable, Codable {
     public var availableLimits: [Int]?
     /// `smartChargingUIState:chargeLimit:chargingOverrideAllowed:withError:` 的状态值，方法不可用或出错时为 nil。
     public var uiState: Int?
+    /// 系统充电状态对应的目标电量（%），并非手动充电上限。
+    public var uiChargeLimit: Int?
 
     public init(
         isSupported: Bool,
         isEnabled: Bool? = nil,
         limit: Int? = nil,
         availableLimits: [Int]? = nil,
-        uiState: Int? = nil
+        uiState: Int? = nil,
+        uiChargeLimit: Int? = nil
     ) {
         self.isSupported = isSupported
         self.isEnabled = isEnabled
         self.limit = limit
         self.availableLimits = availableLimits
         self.uiState = uiState
+        self.uiChargeLimit = uiChargeLimit
     }
 }
 
@@ -40,12 +44,15 @@ public enum SystemChargeState: Sendable, Equatable {
     case temporaryFullCharge
     /// 6 `PausedForOBC`、10 `PausedForOptimzedLimit`：优化充电暂停。
     case optimizedChargingPaused
+    /// 12 `DischargingToOptimzedLimit`：系统优化充电期间放电。
+    case optimizedChargingDischarging(limit: Int?)
 
-    init?(uiState: Int) {
+    init?(uiState: Int, uiChargeLimit: Int? = nil) {
         switch uiState {
         case 18: self = .calibrating
         case 3: self = .temporaryFullCharge
         case 6, 10: self = .optimizedChargingPaused
+        case 12: self = .optimizedChargingDischarging(limit: uiChargeLimit.flatMap { (1...100).contains($0) ? $0 : nil })
         default: return nil
         }
     }
@@ -195,13 +202,14 @@ enum PowerUIClient {
         )(client, NSSelectorFromString("availableChargeLimitsWithError:"), &error)?.takeUnretainedValue()
         let availableLimits = error == nil ? (available as? [NSNumber])?.map(\.intValue) : nil
 
+        let uiReading = readUIState(client)
         return PowerUIChargeLimit(
             isSupported: true, isEnabled: isEnabled, limit: limitValue, availableLimits: availableLimits,
-            uiState: readUIState(client)
+            uiState: uiReading?.state, uiChargeLimit: uiReading?.chargeLimit
         )
     }
 
-    private static func readUIState(_ client: NSObject) -> Int? {
+    private static func readUIState(_ client: NSObject) -> (state: Int, chargeLimit: Int?)? {
         let selector = NSSelectorFromString(uiStateMethodName)
         guard class_getInstanceMethod(type(of: client), selector)
             .flatMap(method_getTypeEncoding)
@@ -214,7 +222,8 @@ enum PowerUIClient {
         let succeeded = unsafeBitCast(client.method(for: selector), to: UIStateMethod.self)(
             client, selector, &state, &chargeLimit, &overrideAllowed, &error
         )
-        return succeeded && error == nil ? Int(exactly: state) : nil
+        guard succeeded, error == nil, let state = Int(exactly: state) else { return nil }
+        return (state, Int(exactly: chargeLimit))
     }
 
     private static func loadClientClass() -> AnyClass? {

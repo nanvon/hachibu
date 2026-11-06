@@ -173,28 +173,54 @@ import Testing
         #expect(ChargeStatus(paused) == .pluggedInDraining)
     }
 
+    @Test func optimizedChargingDischargingStatus() {
+        var draining = snapshot(percent: 91, limit: .on(percent: 96))
+        draining.chargeLimitHold = ChargeLimitHold(userLimit: 80, heldLimit: 96)
+        draining.systemChargeState = .optimizedChargingDischarging(limit: 80)
+        draining.batteryPowerMW = -25000
+        draining.powerInMW = 100
+        #expect(ChargeStatus(draining) == .optimizedChargingDischarging(limit: 80))
+        #expect(draining.remainingTime == nil)
+
+        draining.systemChargeState = .optimizedChargingDischarging(limit: nil)
+        #expect(ChargeStatus(draining) == .optimizedChargingDischarging(limit: nil))
+        draining.systemChargeState = nil
+        #expect(ChargeStatus(draining) == .pluggedInDraining)
+        draining.systemChargeState = .optimizedChargingDischarging(limit: 80)
+        draining.isCharging = true
+        #expect(ChargeStatus(draining) == .charging)
+        draining.isCharging = false
+        draining.isExternalPower = false
+        #expect(ChargeStatus(draining) == .onBattery)
+    }
+
     @Test func systemChargeStateFromUIState() {
         #expect(SystemChargeState(uiState: 18) == .calibrating)
         #expect(SystemChargeState(uiState: 3) == .temporaryFullCharge)
         #expect(SystemChargeState(uiState: 6) == .optimizedChargingPaused)
         #expect(SystemChargeState(uiState: 10) == .optimizedChargingPaused)
-        for other in [0, 1, 2, 4, 5, 7, 8, 9, 11, 12, 13, 14, 15, 16, 17, 19] {
+        #expect(SystemChargeState(uiState: 12, uiChargeLimit: 80) == .optimizedChargingDischarging(limit: 80))
+        #expect(SystemChargeState(uiState: 12, uiChargeLimit: 0) == .optimizedChargingDischarging(limit: nil))
+        #expect(SystemChargeState(uiState: 12, uiChargeLimit: 101) == .optimizedChargingDischarging(limit: nil))
+        for other in [0, 1, 2, 4, 5, 7, 8, 9, 11, 13, 14, 15, 16, 17, 19] {
             #expect(SystemChargeState(uiState: other) == nil)
         }
     }
 
     @Test func parsesCalibrationFromPowerUI() {
-        func parsed(_ uiState: Int?) -> SystemChargeState? {
+        func parsed(_ uiState: Int?, uiChargeLimit: Int? = nil) -> SystemChargeState? {
             let raw = RawBatteryReadings(
                 powerSources: [["Type": .string("InternalBattery")]],
                 smartBattery: nil, smartBatteryPack: nil, adapterDetails: nil, chargeLimitArchive: nil,
-                powerUIChargeLimit: PowerUIChargeLimit(isSupported: true, isEnabled: true, limit: 80, uiState: uiState),
+                powerUIChargeLimit: PowerUIChargeLimit(isSupported: true, isEnabled: true, limit: 96, uiState: uiState, uiChargeLimit: uiChargeLimit),
                 lowPowerModeEnabled: false
             )
             guard case .battery(let snapshot) = BatteryReading(raw) else { return nil }
             return snapshot.systemChargeState
         }
         #expect(parsed(18) == .calibrating)
+        #expect(parsed(12, uiChargeLimit: 80) == .optimizedChargingDischarging(limit: 80))
+        #expect(parsed(12) == .optimizedChargingDischarging(limit: nil))
         #expect(parsed(0) == nil)
         #expect(parsed(nil) == nil)
     }

@@ -223,7 +223,7 @@ struct StatusLabel: View {
         switch status {
         case .onBattery: "battery.75percent"
         case .charging, .calibrating, .temporaryFullCharge: "bolt.fill"
-        case .aboveChargeLimit, .pluggedInDraining, .holdingCharge, .fullyCharged, .chargeLimitReached,
+        case .aboveChargeLimit, .optimizedChargingDischarging, .pluggedInDraining, .holdingCharge, .fullyCharged, .chargeLimitReached,
              .optimizedChargingPaused, .pluggedInNotCharging:
             "powerplug.fill"
         }
@@ -234,7 +234,7 @@ struct StatusLabel: View {
         case .charging, .calibrating, .temporaryFullCharge, .holdingCharge, .fullyCharged, .chargeLimitReached,
              .optimizedChargingPaused:
             .green
-        case .aboveChargeLimit, .pluggedInDraining: .orange
+        case .aboveChargeLimit, .optimizedChargingDischarging, .pluggedInDraining: .orange
         case .onBattery, .pluggedInNotCharging: .secondary
         }
     }
@@ -246,6 +246,12 @@ struct StatusLabel: View {
         case .calibrating: Text("System Calibrating Battery", bundle: .module)
         case .temporaryFullCharge: Text("Temporary Full Charge", bundle: .module)
         case .aboveChargeLimit(let limit): Text("Discharging to \(limit)%", bundle: .module)
+        case .optimizedChargingDischarging(let limit):
+            if let limit {
+                Text("Optimized Charging: Discharging to \(limit)%", bundle: .module)
+            } else {
+                Text("Optimized Charging: Discharging", bundle: .module)
+            }
         case .pluggedInDraining: Text("Plugged In, Draining", bundle: .module)
         case .holdingCharge(let percent): Text("Holding at \(percent)%", bundle: .module)
         case .fullyCharged: Text("Fully Charged", bundle: .module)

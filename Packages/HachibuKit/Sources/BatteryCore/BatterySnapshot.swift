@@ -206,7 +206,9 @@ extension BatterySnapshot {
             lowPowerModeEnabled: raw.lowPowerModeEnabled,
             chargeLimit: ChargeLimitSetting.resolve(powerUI: raw.powerUIChargeLimit, archive: raw.chargeLimitArchive),
             chargeLimitOptions: Self.chargeLimitOptions(raw.powerUIChargeLimit),
-            systemChargeState: raw.powerUIChargeLimit?.uiState.flatMap(SystemChargeState.init(uiState:))
+            systemChargeState: raw.powerUIChargeLimit?.uiState.flatMap {
+                SystemChargeState(uiState: $0, uiChargeLimit: raw.powerUIChargeLimit?.uiChargeLimit)
+            }
         )
     }
 

@@ -8,6 +8,8 @@ public enum ChargeStatus: Sendable, Equatable {
     case temporaryFullCharge
     /// 电量高于系统充电上限，系统不用充电器、由电池供电，放到上限后恢复。
     case aboveChargeLimit(limit: Int)
+    /// 系统优化充电期间放电，目标值读取不到时为 nil。
+    case optimizedChargingDischarging(limit: Int?)
     case pluggedInDraining
     /// 正在“保持当前电量”：系统上限临时为当前电量，由充电器供电。
     case holdingCharge(percent: Int)
@@ -38,7 +40,9 @@ public enum ChargeStatus: Sendable, Equatable {
             }
         } else if let batteryPower = snapshot.batteryPowerMW, batteryPower < -BatterySnapshot.batteryPowerDeadbandMW {
             // 充电器功率不够时也会放电，这时输入功率不为 0，不归为高于上限。
-            if let limit = snapshot.chargeLimitPercent, let percent = snapshot.percent, percent > limit,
+            if case .optimizedChargingDischarging(let limit) = snapshot.systemChargeState {
+                self = .optimizedChargingDischarging(limit: limit)
+            } else if let limit = snapshot.chargeLimitPercent, let percent = snapshot.percent, percent > limit,
                let powerIn = snapshot.powerInMW, powerIn < BatterySnapshot.batteryPowerDeadbandMW {
                 self = .aboveChargeLimit(limit: limit)
             } else {
