@@ -169,7 +169,8 @@ private final class ReorderedPowerSource: @unchecked Sendable {
 }
 
 @MainActor
-@Suite struct BatteryMonitorTests {
+// 多个测试会阻塞同步读取；并行运行可能占满并发线程，导致快速读取等到模拟超时才执行。
+@Suite(.serialized) struct BatteryMonitorTests {
     private func monitor(
         source: any BatteryDataSource,
         power: @escaping @Sendable () -> BatteryReading?,
@@ -192,6 +193,7 @@ private final class ReorderedPowerSource: @unchecked Sendable {
         _ = await started.next()
 
         await monitor.refreshPowerSource()
+        #expect(source.isBlocked)
         guard case .battery(let fast) = monitor.reading else { Issue.record("Quick state did not reach UI"); return }
         #expect(fast.isExternalPower == true)
         #expect(fast.systemLoadMW == nil)
