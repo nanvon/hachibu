@@ -114,12 +114,16 @@ struct ManagedChargeLimitRows: View {
         if removalFailed {
             SettingsNote(text: Text("Could not safely remove the background item. Check the charge limit and try again.", bundle: .module), isError: true)
         }
+        if let error = helper.registrationError {
+            SettingsNote(text: Text("Could not install the background item. Try again or check the error below.", bundle: .module), isError: true)
+            SettingsNote(text: Text(verbatim: error), isError: true)
+        }
     }
 
     private var helper: ChargeHelperService { monitor.helperService }
 
     private var showsHelperRow: Bool {
-        helper.state != .notRegistered || settings.managedChargeLimit < ManagedChargeLimit.helperThreshold
+        helper.state != .notRegistered || helper.registrationError != nil || settings.managedChargeLimit < ManagedChargeLimit.helperThreshold
     }
 
     @ViewBuilder
@@ -132,15 +136,15 @@ struct ManagedChargeLimitRows: View {
         ) {
             HStack(spacing: 10) {
                 helperPill
-                switch helper.state {
-                case .notRegistered:
+                switch helper.state.action {
+                case .install:
                     Button { pendingHelperInstall = true } label: { Text("Install…", bundle: .module) }
                         .settingsButtonStyle()
                         .disabled(!ChargeHelperService.isBelowThresholdSupported)
-                case .requiresApproval:
+                case .approve:
                     Button { helper.openLoginItems() } label: { Text("Open Login Items Settings…", bundle: .module) }
                         .settingsButtonStyle()
-                case .enabled, .unavailable:
+                case .remove:
                     Button { pendingRemoval = true } label: { Text("Remove…", bundle: .module) }
                         .settingsButtonStyle()
                         .disabled(monitor.isWritingChargeLimit)

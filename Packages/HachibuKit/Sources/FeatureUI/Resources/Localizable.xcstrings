@@ -1903,6 +1903,16 @@
         }
       }
     },
+    "Could not install the background item. Try again or check the error below." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法安装后台组件，请重试或查看下方错误信息。"
+          }
+        }
+      }
+    },
     "Battery Calibration" : {
       "localizations" : {
         "zh-Hans" : {

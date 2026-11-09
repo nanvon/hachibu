@@ -1,8 +1,25 @@
 import BatteryCore
 import Foundation
 import HistoryStore
+import ServiceManagement
 import Testing
 @testable import FeatureUI
+
+@Test func helperRegistrationStatesOfferAppropriateActions() {
+    let cases: [(SMAppService.Status?, ChargeHelperState, ChargeHelperState.Action)] = [
+        (nil, .notRegistered, .install),
+        (.notRegistered, .notRegistered, .install),
+        (.notFound, .unavailable, .install),
+        (.requiresApproval, .requiresApproval, .approve),
+        (.enabled, .enabled, .remove),
+    ]
+    for (status, expectedState, expectedAction) in cases {
+        let state = ChargeHelperState(status: status)
+        #expect(state == expectedState)
+        #expect(state.action == expectedAction)
+        #expect(state.canInstall == (expectedAction == .install))
+    }
+}
 
 /// 所有写入只发生在内存假系统中，不注册 helper、不修改本机充电设置。
 private final class ManagedTestSystem: BatteryDataSource, ChargeLimitWriter, @unchecked Sendable {

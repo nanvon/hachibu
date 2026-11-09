@@ -76,6 +76,7 @@ struct SettingsPageContent: View {
             monitor.helperService.refresh()
         }
         .onChange(of: settings.managedChargeLimit) { promptHelperInstallIfNeeded() }
+        .onChange(of: settings.chargeControlMode) { promptHelperInstallIfNeeded() }
         .modifier(ChargeHelperInstallAlert(isPresented: $pendingHelperInstall, helper: monitor.helperService))
     }
 
@@ -85,7 +86,7 @@ struct SettingsPageContent: View {
     private func promptHelperInstallIfNeeded() {
         guard settings.chargeControlMode == .managed,
               settings.managedChargeLimit < ManagedChargeLimit.helperThreshold,
-              monitor.helperService.state == .notRegistered,
+              monitor.helperService.state.canInstall,
               ChargeHelperService.isBelowThresholdSupported
         else { return }
         pendingHelperInstall = true

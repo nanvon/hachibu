@@ -16,6 +16,26 @@ public enum ChargeHelperState: Sendable, Equatable {
     case enabled
     /// App 包里找不到 helper 或 plist，或系统返回了其他状态。
     case unavailable
+
+    enum Action { case install, approve, remove }
+
+    var action: Action {
+        switch self {
+        case .notRegistered, .unavailable: .install
+        case .requiresApproval: .approve
+        case .enabled: .remove
+        }
+    }
+    var canInstall: Bool { action == .install }
+
+    init(status: SMAppService.Status?) {
+        switch status {
+        case nil, .notRegistered?: self = .notRegistered
+        case .requiresApproval?: self = .requiresApproval
+        case .enabled?: self = .enabled
+        default: self = .unavailable
+        }
+    }
 }
 
 /// 管理 helper 的注册、批准和移除。只在用到低于 80% 的上限或开始校准时注册。
@@ -27,6 +47,8 @@ public final class ChargeHelperService {
     public private(set) var state: ChargeHelperState = .notRegistered
     /// 注册或移除失败时的说明，只用于日志和诊断导出。
     public private(set) var lastError: String?
+    /// 安装失败时显示在设置页；等待系统批准不算安装失败。
+    private(set) var registrationError: String?
 
     /// 本机系统版本已验证可以写入低于 80% 的上限。
     public nonisolated static var isBelowThresholdSupported: Bool {
@@ -54,17 +76,12 @@ public final class ChargeHelperService {
     }
 
     public func refresh() {
-        let newState: ChargeHelperState
-        switch service?.status {
-        case nil, .notRegistered?: newState = .notRegistered
-        case .requiresApproval?: newState = .requiresApproval
-        case .enabled?: newState = .enabled
-        default: newState = .unavailable
-        }
+        let newState = ChargeHelperState(status: service?.status)
         if newState != state {
             logger.info("Helper state \(String(describing: newState), privacy: .public)")
             state = newState
         }
+        if state == .enabled || state == .requiresApproval { registrationError = nil }
         guard service != nil else { return }
         // 未验证的新系统版本仍允许读取和释放已安装的 helper，只禁止新写入。
         Self.availability.client = state == .enabled ? ChargeHelperClient() : nil
@@ -73,6 +90,7 @@ public final class ChargeHelperService {
     /// 注册 helper。需要批准时打开“登录项与扩展”。
     public func register() {
         guard let service else { return }
+        registrationError = nil
         do {
             try service.register()
             lastError = nil
@@ -81,6 +99,9 @@ public final class ChargeHelperService {
             logger.error("Failed to register helper: \(String(describing: error), privacy: .public)")
         }
         refresh()
+        if state.canInstall {
+            registrationError = lastError ?? "SMAppService status: \(service.status.rawValue)"
+        }
         if state == .requiresApproval { openLoginItems() }
     }
 
