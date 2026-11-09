@@ -8,9 +8,13 @@ on:
 permissions:
   contents: write # 创建 Release / 上传产物需要写权限
 
+env:
+  XCODEGEN_VERSION: 2.46.0
+
 jobs:
   release:
     runs-on: macos-15
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
@@ -44,8 +48,25 @@ jobs:
         with:
           xcode-version: latest-stable
 
-      - name: 安装 XcodeGen
-        run: brew install xcodegen
+      - name: 安装 XcodeGen（预编译）
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL --retry 3 \
+            "https://github.com/yonaskolb/XcodeGen/releases/download/${XCODEGEN_VERSION}/xcodegen.zip" \
+            -o "$RUNNER_TEMP/xcodegen.zip"
+          unzip -q "$RUNNER_TEMP/xcodegen.zip" -d "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/xcodegen/bin" >> "$GITHUB_PATH"
+
+      # 发布构建仍然清空 build/ 保证产物干净，只缓存 SwiftPM 的包缓存，
+      # 省掉每次重新下载 GRDB / Sparkle 的时间。
+      - name: 缓存 SwiftPM 依赖
+        uses: actions/cache@v4
+        with:
+          path: ~/Library/Caches/org.swift.swiftpm
+          key: swiftpm-release-${{ runner.os }}-${{ hashFiles('project.yml', 'Packages/HachibuKit/Package.resolved') }}-v1
+          restore-keys: |
+            swiftpm-release-${{ runner.os }}-${{ hashFiles('project.yml', 'Packages/HachibuKit/Package.resolved') }}-
 
       - name: 安装 DMG 打包工具
         shell: bash
