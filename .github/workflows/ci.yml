@@ -142,17 +142,11 @@ jobs:
         run: |
           set -euo pipefail
           xcodegen generate
-          # 缓存命中时 SourcePackages 已完整，禁止重新解析包图，避免每次白等约半分钟。
-          resolve_flag=""
-          if [[ -f build/DerivedData/SourcePackages/workspace-state.json ]]; then
-            resolve_flag="-disableAutomaticPackageResolution"
-          fi
           xcodebuild \
             -project Hachibu.xcodeproj \
             -scheme Hachibu \
             -configuration Debug \
             -derivedDataPath build/DerivedData \
-            $resolve_flag \
             CODE_SIGNING_ALLOWED=NO \
             build
 
