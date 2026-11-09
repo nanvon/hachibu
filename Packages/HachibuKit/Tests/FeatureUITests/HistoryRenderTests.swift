@@ -213,4 +213,66 @@ import Testing
             try data.write(to: directory.appendingPathComponent("history-\(name).png"))
         }
     }
+
+    /// 48 小时电量图的系统策略、校准底色，和满充容量图的校准日标记。
+    @Test(.enabled(if: ProcessInfo.processInfo.environment["HACHIBU_RENDER_DIR"] != nil))
+    func renderPolicyBands() async throws {
+        let directory = URL(fileURLWithPath: ProcessInfo.processInfo.environment["HACHIBU_RENDER_DIR"]!)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let store = try HistoryStore.inMemory()
+        let now = Date()
+        func ago(hours: Double) -> Date { now.addingTimeInterval(-hours * 3600) }
+        for minute in 0..<2880 {
+            let phase = Double(minute) / 90
+            let isExternal = (minute / 240) % 2 == 1
+            try await store.record(
+                BatterySnapshot(
+                    percent: Int(65 + 15 * sin(phase)),
+                    isExternalPower: isExternal,
+                    isCharging: isExternal && sin(phase) < 0.5,
+                    temperatureCelsius: 31 + 5 * sin(phase + 0.8),
+                    chargeLimit: .on(percent: 80)
+                ),
+                at: now.addingTimeInterval(Double(minute - 2879) * 60)
+            )
+        }
+        // 系统优化充电（与插电段重叠）、系统校准、Hachibu 校准（进行中的一次在最右）。
+        let optimized = try await store.beginChargePolicyPeriod(.optimizedCharging, at: ago(hours: 40))
+        try await store.endChargePolicyPeriod(id: optimized, at: ago(hours: 37))
+        let system = try await store.beginChargePolicyPeriod(.systemCalibration, at: ago(hours: 30))
+        try await store.endChargePolicyPeriod(id: system, at: ago(hours: 24))
+        let done = try await store.startCalibrationRun(trigger: .manual, at: ago(hours: 18), before: CalibrationHealth())
+        try await store.finishCalibrationRun(id: done, result: .completed, at: ago(hours: 9), after: nil)
+        _ = try await store.startCalibrationRun(trigger: .manual, at: ago(hours: 3), before: CalibrationHealth())
+        for day in 0..<400 {
+            let date = Calendar.current.date(byAdding: .day, value: day - 399, to: now)!
+            try await store.record(
+                BatteryHealthInfo(systemMaximumCapacityPercent: 96, condition: .good),
+                snapshot: BatterySnapshot(
+                    fullChargeCapacityMAh: 8090 - day * 4 / 10 + Int(40 * sin(Double(day) * 1.7)),
+                    designCapacityMAh: 8694,
+                    cycleCount: 34 + day * 34 / 400
+                ),
+                at: date
+            )
+        }
+        for daysAgo in [300, 150, 40] {
+            let run = try await store.startCalibrationRun(trigger: .manual, at: now.addingTimeInterval(-Double(daysAgo) * 86400), before: CalibrationHealth())
+            try await store.finishCalibrationRun(id: run, result: .completed, at: now.addingTimeInterval(-Double(daysAgo) * 86400 + 4 * 3600), after: nil)
+        }
+        let model = HistoryModel(store: store)
+        await model.reloadAll()
+        let variants: [(ColorScheme, String, String)] = [(.light, "zh-Hans", "light"), (.dark, "zh-Hans", "dark")]
+        for (scheme, locale, name) in variants {
+            let renderer = ImageRenderer(content: HistoryChartsContent(model: model, temperatureThreshold: 40)
+                .frame(width: 968)
+                .background(scheme == .dark ? Color(white: 0.12) : Color(white: 0.96))
+                .environment(\.colorScheme, scheme)
+                .environment(\.locale, Locale(identifier: locale)))
+            renderer.scale = 2
+            let image = try #require(renderer.cgImage)
+            let data = try #require(NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:]))
+            try data.write(to: directory.appendingPathComponent("history-policy-\(name).png"))
+        }
+    }
 }

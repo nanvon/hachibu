@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>io.github.nanvon.hachibu.helper</string>
+	<key>BundleProgram</key>
+	<string>Contents/MacOS/HachibuHelper</string>
+	<key>MachServices</key>
+	<dict>
+		<key>io.github.nanvon.hachibu.helper</key>
+		<true/>
+	</dict>
+	<key>RunAtLoad</key>
+	<true/>
+	<key>AssociatedBundleIdentifiers</key>
+	<array>
+		<string>io.github.nanvon.hachibu</string>
+	</array>
+</dict>
+</plist>

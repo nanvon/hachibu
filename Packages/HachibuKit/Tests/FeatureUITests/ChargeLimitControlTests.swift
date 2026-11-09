@@ -79,6 +79,17 @@ import Testing
         ))
         #expect(!writing.isInteractive)
     }
+
+    @Test func managedOptionsCoverRangeAndKeepExactRequestedTarget() throws {
+        let control = try #require(ChargeLimitControl(
+            managedTarget: 63, snapshot: snapshot(.on(percent: 80)), canWrite: true,
+            state: .awaitingHelperApproval(effective: 80), isBlocked: false
+        ))
+        #expect(control.mode == .managed)
+        #expect(control.percent == 63)
+        #expect(control.options == [20, 40, 60, 63, 80, 100])
+        #expect(control.isInteractive)
+    }
 }
 
 /// 模拟 PowerUI：写入后读回新的开关和上限。

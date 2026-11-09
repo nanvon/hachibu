@@ -1,7 +1,7 @@
 import Foundation
 
 /// 系统充电上限设置（“系统设置 → 电池 → 充电上限”）。规则见 docs/v1技术设计.md 第 6 节。
-public enum ChargeLimitSetting: Sendable, Equatable {
+public enum ChargeLimitSetting: Sendable, Equatable, Codable {
     /// 本机系统或机型不支持充电上限。
     case unsupported
     case off
@@ -12,12 +12,16 @@ public enum ChargeLimitSetting: Sendable, Equatable {
         if let powerUI {
             guard powerUI.isSupported else { return .unsupported }
             if powerUI.isEnabled == false { return .off }
-            if powerUI.isEnabled == true, let limit = powerUI.limit, (50...100).contains(limit) {
+            // 接管模式可以写入低于 80% 的上限（第 21 节），有效范围为 1–100。
+            if powerUI.isEnabled == true, let limit = powerUI.limit, ChargeLimitSetting.validPercent.contains(limit) {
                 return .on(percent: limit)
             }
         }
         return ChargeLimitFile.chargeLimit(inArchive: archive).map { .on(percent: $0) }
     }
+
+    /// 读取时认可的上限值（%）。
+    static let validPercent = 1...100
 }
 
 /// 对系统充电上限的一次修改。规则见 docs/v1技术设计.md 第 6 节。
@@ -80,7 +84,7 @@ enum ChargeLimitFile {
         return RawValue(propertyList: archive)
     }
 
-    /// 在归档的 `ChargeCtrlPolicy` 数组中找 `reason == "manualChargeLimit"` 且 `soclimit` 为 50–100 的整数。
+    /// 在归档的 `ChargeCtrlPolicy` 数组中找 `reason == "manualChargeLimit"` 且 `soclimit` 为 1–100 的整数。
     /// 其他任何情况都返回 nil（未知）。
     static func chargeLimit(inArchive archive: RawValue?) -> Int? {
         guard let archive,
@@ -98,7 +102,7 @@ enum ChargeLimitFile {
         for policy in policies.compactMap(resolve) {
             guard resolve(policy["reason"])?.stringValue == "manualChargeLimit",
                   let limit = resolve(policy["soclimit"])?.intValue,
-                  (50...100).contains(limit)
+                  ChargeLimitSetting.validPercent.contains(limit)
             else { continue }
             return limit
         }

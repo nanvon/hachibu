@@ -27,6 +27,7 @@ public final class HistoryModel {
     @ObservationIgnored private var firstRecordedAt: Date?
     /// 每日记录不变且未跨日时复用长期曲线，避免每分钟重建全部历史。
     @ObservationIgnored private var cachedDailySamples: [DailyHealth]?
+    @ObservationIgnored private var cachedCalibrationRuns: [CalibrationRun]?
     @ObservationIgnored private var longTermDay: Date?
 
     @ObservationIgnored private let store: HistoryStore?
@@ -140,8 +141,14 @@ public final class HistoryModel {
             let data = try await Task.detached(priority: .utility) {
                 let samples = try await store.minuteSamples(from: now.addingTimeInterval(-HistoryChartBuilder.recentDuration), to: now)
                 let chargeLimits = try await store.events(.chargeLimit)
+                let from = now.addingTimeInterval(-HistoryChartBuilder.recentDuration)
+                // 策略和校准记录读取失败时只是不画底色，不影响曲线。
+                let policyPeriods = (try? await store.chargePolicyPeriods(from: from, to: now)) ?? []
+                let calibrationRuns = (try? await store.calibrationRuns(overlapping: from, now)) ?? []
                 return HistoryChartBuilder.recent(
-                    minuteSamples: samples, chargeLimitEvents: chargeLimits, now: now, firstRecordedAt: firstRecordedAt
+                    minuteSamples: samples, chargeLimitEvents: chargeLimits,
+                    policyPeriods: policyPeriods, calibrationRuns: calibrationRuns,
+                    now: now, firstRecordedAt: firstRecordedAt
                 )
             }.value
             guard !Task.isCancelled, generation == recentGeneration else { return }
@@ -158,15 +165,19 @@ public final class HistoryModel {
         let now = Date()
         let today = DailyHealth.gregorianCalendar().startOfDay(for: now)
         let cachedSamples = cachedDailySamples
+        let cachedRuns = cachedCalibrationRuns
         let cachedDay = longTermDay
         do {
-            let (samples, data) = try await Task.detached(priority: .utility) {
+            let (samples, runs, data) = try await Task.detached(priority: .utility) {
                 let samples = try await store.dailyHealth()
-                guard samples != cachedSamples || today != cachedDay else {
-                    return (samples, nil as LongTermChartData?)
+                // 读取失败时不标校准日。
+                let runs = (try? await store.calibrationRuns()) ?? []
+                guard samples != cachedSamples || runs != cachedRuns || today != cachedDay else {
+                    return (samples, runs, nil as LongTermChartData?)
                 }
-                return (samples, HistoryChartBuilder.longTerm(
+                return (samples, runs, HistoryChartBuilder.longTerm(
                     dailySamples: samples,
+                    calibrationRuns: runs,
                     now: now,
                     firstRecordedDay: samples.first?.day
                 ))
@@ -174,6 +185,7 @@ public final class HistoryModel {
             guard !Task.isCancelled, generation == longTermGeneration else { return }
             if let data {
                 cachedDailySamples = samples
+                cachedCalibrationRuns = runs
                 longTermDay = today
                 longTerm = data
             }

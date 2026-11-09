@@ -69,6 +69,14 @@ codesign --force --sign - --options runtime --timestamp=none "$SPARKLE_CONTENTS/
 codesign --force --sign - --options runtime --timestamp=none "$SPARKLE_CONTENTS/Updater.app"
 codesign --force --sign - --options runtime --timestamp=none "$SPARKLE_FRAMEWORK"
 
+# 特权 helper：签名标识符必须是 io.github.nanvon.hachibu.helper，App 连接时按它校验（docs/v1技术设计.md 21.3）。
+HELPER="$APP/Contents/MacOS/HachibuHelper"
+[[ -x "$HELPER" && -f "$APP/Contents/Library/LaunchDaemons/io.github.nanvon.hachibu.helper.plist" ]] || {
+  echo "❌ 特权 helper 或其 LaunchDaemon plist 缺失" >&2; exit 1;
+}
+codesign --force --sign - --options runtime --timestamp=none \
+  --identifier io.github.nanvon.hachibu.helper "$HELPER"
+
 echo "   -> 对 Bundle 做最终签名(ad-hoc,封装资源)"
 codesign --force --sign - \
   --entitlements "$REPO_ROOT/App/Hachibu.entitlements" \

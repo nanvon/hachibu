@@ -1,6 +1,7 @@
 import AppKit
 import BatteryCore
 import Foundation
+import HistoryStore
 import Observation
 
 /// 当前电池读数，供菜单栏、面板显示；修改系统充电上限也经由这里，完成后立即刷新读数。
@@ -40,7 +41,7 @@ public final class BatteryMonitor {
     /// 最近一次 `system_profiler` 读到的健康信息。读取失败时保留上一次的值。
     public private(set) var health: BatteryHealthInfo?
     /// 正在修改系统充电上限。
-    public private(set) var isWritingChargeLimit = false
+    public internal(set) var isWritingChargeLimit = false
     /// 最近一次修改失败，或读回的设置与修改不符。下一次修改开始时清除。
     public private(set) var chargeLimitWriteFailed = false
     /// AlDente 等充电控制工具正在运行。此时不提供充电上限控制，避免两套工具同时控制充电。
@@ -51,7 +52,7 @@ public final class BatteryMonitor {
     /// 电量高于上限时“保持当前电量”。由 App 层按 `AppSettings.chargeAboveLimitAction` 设置，规则见 docs/v1技术设计.md 第 6 节。
     @ObservationIgnored public var holdsChargeAboveLimit = false {
         didSet {
-            if holdsChargeAboveLimit != oldValue { evaluateChargeLimitHold() }
+            if holdsChargeAboveLimit != oldValue { evaluateChargeControl() }
         }
     }
 
@@ -65,7 +66,7 @@ public final class BatteryMonitor {
     /// 每次 `system_profiler` 读取成功后调用，健康信息没变也调用。
     @ObservationIgnored public var onHealthRefresh: (@MainActor (BatteryHealthInfo) async -> Void)?
 
-    @ObservationIgnored private let sampler: BatterySampler
+    @ObservationIgnored let sampler: BatterySampler
     @ObservationIgnored private let powerSourceReader: @Sendable () -> BatteryReading?
     @ObservationIgnored private let smcReader: @Sendable (SMCReadScope) -> SMCReadings?
     /// IOPS 快速读取与完整采样合并后的读数，未叠加 SMC。
@@ -78,11 +79,11 @@ public final class BatteryMonitor {
     @ObservationIgnored private var stateChangeBoost: (start: Date, end: Date)?
     @ObservationIgnored private var smcTask: Task<Void, Never>?
     /// 保持当前电量期间的用户上限和临时值，保存在 `holdDefaults`。
-    @ObservationIgnored private var chargeLimitHold: ChargeLimitHold?
-    @ObservationIgnored private let holdDefaults: UserDefaults
+    @ObservationIgnored var chargeLimitHold: ChargeLimitHold?
+    @ObservationIgnored let holdDefaults: UserDefaults
     /// 启动时已有保存的状态：第一次读到系统上限时先恢复。
     @ObservationIgnored private var restoresChargeLimitHoldFirst: Bool
-    @ObservationIgnored private var chargeLimitHoldPausedUntil: Date?
+    @ObservationIgnored var chargeLimitHoldPausedUntil: Date?
     @ObservationIgnored private var latestPowerSource: (reading: BatteryReading, date: Date)?
     @ObservationIgnored private var lastReadAt: Date?
     @ObservationIgnored private var chargeLimitHoldTracker = ChargeLimitHoldTracker()
@@ -95,13 +96,56 @@ public final class BatteryMonitor {
     @ObservationIgnored private var powerSourceObserver: PowerSourceObserver?
     @ObservationIgnored private var notificationObservers: [any NSObjectProtocol] = []
 
+    // MARK: 充电接管（docs/v1技术设计.md 第 21 节），逻辑在 BatteryMonitor+ChargeControl.swift
+
+    /// 充电上限管理的设置，由 App 层按 AppSettings 同步。
+    public var chargeControl = ChargeControlConfiguration() {
+        didSet {
+            if chargeControl != oldValue { chargeControlDidChange(from: oldValue) }
+        }
+    }
+    /// 进行中的电池校准，没有时为 nil。
+    public internal(set) var calibration: CalibrationProgress?
+    /// 最近一次 `pmset -g battlimit` 的结果，nil 表示还没读到或无法确认。只在接管模式下读取。
+    public internal(set) var registration: ChargeLimitRegistration?
+    /// 最近一次改回被别处修改的上限的时间；同一次接管只记一次，面板用它提示“充电上限由 Hachibu 管理”。
+    public internal(set) var externalChangeRevertedAt: Date?
+    /// 接管模式下自动写入失败，还在节流时间内。
+    public internal(set) var managedWriteFailed = false
+    public let helperService: ChargeHelperService
+
+    /// 接管相关的提醒，由 App 层转成系统通知。
+    @ObservationIgnored public var onChargeControlNotice: (@MainActor (ChargeControlNotice) -> Void)?
+
+    @ObservationIgnored var registrationOutput: String?
+    @ObservationIgnored var registrationReadAt: Date?
+    @ObservationIgnored var registrationTask: Task<Void, Never>?
+    /// 接管前的系统设置，退出或切回跟随系统设置时恢复。保存在 `holdDefaults`。
+    @ObservationIgnored var managedOriginal: ChargeLimitSetting?
+    /// 最近一次接管写入的上限和时间：同一个值 60 秒内不因读回不一致而重写。
+    @ObservationIgnored var managedLastWrite: (limit: Int, date: Date)?
+    /// 本次接管已读回生效的上限，用于判断读回不同是被别处改过。
+    @ObservationIgnored var managedAppliedLimit: Int?
+    @ObservationIgnored var hasRevertedExternalChange = false
+    /// 其他充电控制工具运行期间已尝试还原系统设置。
+    @ObservationIgnored var restoredForOtherTool = false
+    /// 进行中的系统策略时段及其数据库记录。
+    @ObservationIgnored var policyPeriods: [ChargePolicyKind: Task<Int64?, Never>] = [:]
+    @ObservationIgnored var calibrationRecordIDs = CalibrationRecordIDs()
+    @ObservationIgnored var calibrationRecordTask: Task<CalibrationRecordIDs, Never>?
+    @ObservationIgnored var calibrationSavedAt: Date?
+    @ObservationIgnored var leaseTask: Task<Void, Never>?
+    @ObservationIgnored var helperRefreshedAt: Date?
+
     public init(
         sampler: BatterySampler,
         powerSourceReader: @escaping @Sendable () -> BatteryReading? = { IOKitBatteryDataSource.readPowerSource() },
         smcReader: @escaping @Sendable (SMCReadScope) -> SMCReadings? = { SMCReader.shared.read($0) },
-        holdDefaults: UserDefaults = .standard
+        holdDefaults: UserDefaults = .standard,
+        helperService: ChargeHelperService? = nil
     ) {
         self.sampler = sampler
+        self.helperService = helperService ?? ChargeHelperService(service: nil)
         self.powerSourceReader = powerSourceReader
         self.smcReader = smcReader
         self.holdDefaults = holdDefaults
@@ -109,6 +153,7 @@ public final class BatteryMonitor {
             .flatMap { try? JSONDecoder().decode(ChargeLimitHold.self, from: $0) }
         chargeLimitHold = hold
         restoresChargeLimitHoldFirst = hold != nil
+        loadChargeControlState()
     }
 
     /// 开始采样。重复调用无效果。
@@ -129,6 +174,7 @@ public final class BatteryMonitor {
         startSMCLoop()
         startMinuteLoop()
         startHealthLoop()
+        startChargeControl()
     }
 
     /// 面板打开时每 10 秒完整读取一次、每 2.5 秒读 SMC 和 IOPS；关闭时每 60 秒完整读取一次、每 1.5 秒读 `CHSC`。
@@ -349,7 +395,7 @@ public final class BatteryMonitor {
             updated = .battery(snapshot)
         }
         if reading != updated { reading = updated }
-        evaluateChargeLimitHold()
+        evaluateChargeControl()
     }
 
     private func startStateChangeBoost() {
@@ -388,6 +434,7 @@ public final class BatteryMonitor {
         }
         baseReading = updated
         publish()
+        if chargeControl.mode == .managed { refreshRegistration(force: false) }
         await onRead?(reading, date)
     }
 
@@ -395,7 +442,8 @@ public final class BatteryMonitor {
     /// 保持当前电量期间：改成低于临时值的档位只更新保存的用户上限；关闭（含选 100%）前先写回用户上限。
     /// 上限关闭时选低于 100% 的档位：先开启再写入档位，`setMCLLimit:error:` 只在已开启时调用。
     public func setChargeLimit(_ change: ChargeLimitChange) async {
-        guard !isWritingChargeLimit else { return }
+        // 接管模式下界面改的是 AppSettings 里的目标，由 `chargeControl` 同步过来后写入。
+        guard !isWritingChargeLimit, chargeControl.mode == .followSystem else { return }
         var changes = [change]
         if let hold = chargeLimitHold {
             switch change {
@@ -418,7 +466,7 @@ public final class BatteryMonitor {
     }
 
     /// 依次写入，任一次失败就停止。调用前已设置 `isWritingChargeLimit`。
-    private func runChargeLimitWrites(_ changes: [ChargeLimitChange]) async -> Bool {
+    func runChargeLimitWrites(_ changes: [ChargeLimitChange]) async -> Bool {
         chargeLimitWriteFailed = false
         var applied = true
         for change in changes {
@@ -430,26 +478,28 @@ public final class BatteryMonitor {
             }
         }
         chargeLimitWriteFailed = !applied
+        if chargeControl.mode == .managed { managedWriteFailed = !applied }
         if !applied {
             chargeLimitHoldPausedUntil = Date().addingTimeInterval(Self.chargeLimitHoldRetryDelay)
         }
         // 充电器 1–3 秒内开始或停止充电，IOPS / IORegistry 要等约一分钟才报告，这段时间加快读 SMC。
         startStateChangeBoost()
         await refreshSMC(.display)
+        if chargeControl.mode == .managed { refreshRegistration(force: true) }
         // 刷新期间仍视为写入中，刷新后连续完成状态清理或启动下一次自动写入。
         isWritingChargeLimit = false
-        evaluateChargeLimitHold()
+        evaluateChargeControl()
         return applied
     }
 
     /// 按当前读数决定是否开始保持、恢复或丢弃保存的值。写入期间不判断；写入成功或失败后，
     /// 读回的系统上限不再等于临时值时由 `.forget` 清除保存的值。
-    private func evaluateChargeLimitHold() {
+    func evaluateChargeLimitHold() {
         guard !isWritingChargeLimit, case .battery(let snapshot)? = reading else { return }
         let action = ChargeLimitHold.action(
             current: chargeLimitHold,
             snapshot: snapshot,
-            isEnabled: holdsChargeAboveLimit && canWriteChargeLimit && !isChargeControlAppRunning,
+            isEnabled: holdsChargeAboveLimit && canWriteChargeLimit && !isChargeControlAppRunning && calibration == nil,
             restoresFirst: restoresChargeLimitHoldFirst
         )
         let change: ChargeLimitChange
@@ -477,11 +527,11 @@ public final class BatteryMonitor {
         }
     }
 
-    private var isChargeLimitHoldPaused: Bool {
+    var isChargeLimitHoldPaused: Bool {
         chargeLimitHoldPausedUntil.map { Date() < $0 } ?? false
     }
 
-    private func setChargeLimitHold(_ hold: ChargeLimitHold?) {
+    func setChargeLimitHold(_ hold: ChargeLimitHold?) {
         chargeLimitHold = hold
         if let hold, let data = try? JSONEncoder().encode(hold) {
             holdDefaults.set(data, forKey: Self.chargeLimitHoldKey)
@@ -491,9 +541,15 @@ public final class BatteryMonitor {
         }
     }
 
-    /// 应用退出前同步写回用户设置的上限。系统上限已不是临时值时只丢弃保存的值；
-    /// 写入失败（如 PowerUI 正忙）时保留，下次启动时恢复。临时充满期间不写入，也保留到下次启动。
+    /// 应用退出前同步恢复：接管模式按 21.4 恢复系统设置或保留当前上限，否则写回“保持当前电量”前的上限。
     public func restoreChargeLimitBeforeExit() {
+        if restoreManagedLimitBeforeExit() { return }
+        restoreChargeLimitHoldBeforeExit()
+    }
+
+    /// 写回用户设置的上限。系统上限已不是临时值时只丢弃保存的值；
+    /// 写入失败（如 PowerUI 正忙）时保留，下次启动时恢复。临时充满期间不写入，也保留到下次启动。
+    private func restoreChargeLimitHoldBeforeExit() {
         guard let hold = chargeLimitHold, case .battery(let snapshot)? = reading, let limit = snapshot.chargeLimit else { return }
         if snapshot.systemChargeState == .temporaryFullCharge { return }
         if limit == .on(percent: hold.heldLimit) {
@@ -509,7 +565,8 @@ public final class BatteryMonitor {
         }
         if running != isChargeControlAppRunning {
             isChargeControlAppRunning = running
-            evaluateChargeLimitHold()
+            otherToolDidChange(running)
+            evaluateChargeControl()
         }
     }
 

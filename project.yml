@@ -21,7 +21,17 @@ targets:
       Release: Config/Base.xcconfig
     sources:
       - path: App
+      # 特权 helper 的 LaunchDaemon plist，SMAppService.daemon 从这里注册，见 docs/v1技术设计.md 21.3。
+      - path: Helper/io.github.nanvon.hachibu.helper.plist
+        buildPhase:
+          copyFiles:
+            destination: wrapper
+            subpath: Contents/Library/LaunchDaemons
     dependencies:
+      - target: HachibuHelper
+        embed: true
+        copy:
+          destination: executables
       - package: HachibuKit
         product: BatteryCore
       - package: HachibuKit
@@ -30,3 +40,16 @@ targets:
         product: FeatureUI
       - package: Sparkle
     scheme: {}
+
+  # 特权 helper：以 root 运行，只修改充电上限。嵌入 App 的 Contents/MacOS。
+  HachibuHelper:
+    type: tool
+    platform: macOS
+    configFiles:
+      Debug: Config/Helper.xcconfig
+      Release: Config/Helper.xcconfig
+    sources:
+      - path: Helper/main.swift
+    dependencies:
+      - package: HachibuKit
+        product: BatteryCore

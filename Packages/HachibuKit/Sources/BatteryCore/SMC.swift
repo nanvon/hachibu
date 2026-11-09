@@ -175,7 +175,7 @@ public struct SMCReadings: Sendable, Equatable {
             },
             chargeLimit: bytes(.chargeLimit).flatMap { bytes in
                 if bytes.allSatisfy({ $0 == 0 }) { return .off }
-                return (50...100).contains(Int(bytes[0])) ? .on(percent: Int(bytes[0])) : nil
+                return ChargeLimitSetting.validPercent.contains(Int(bytes[0])) ? .on(percent: Int(bytes[0])) : nil
             }
         )
     }

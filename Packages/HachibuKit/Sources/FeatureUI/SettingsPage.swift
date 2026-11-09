@@ -42,11 +42,16 @@ struct SettingsPageContent: View {
     @State private var loginItem = LoginItem()
     @State private var isExporting = false
     @State private var couldNotOpenBatterySettings = false
+    @State private var pendingHelperInstall = false
 
     var body: some View {
         // 充电上限最常用，放在最前；导入、诊断和关于用得少，放在后面。
         SettingsColumns {
             chargingGroup
+            if settings.chargeControlMode == .managed, chargeLimitControl != nil {
+                SettingsGroupDivider()
+                CalibrationSettingsGroup(settings: settings, monitor: monitor, pendingHelperInstall: $pendingHelperInstall)
+            }
             SettingsGroupDivider()
             menuBarGroup
             SettingsGroupDivider()
@@ -60,21 +65,46 @@ struct SettingsPageContent: View {
             SettingsGroupDivider()
             aboutGroup
         }
-        .onAppear { loginItem.refresh() }
+        .onAppear {
+            loginItem.refresh()
+            monitor.helperService.refresh()
+            promptHelperInstallIfNeeded()
+        }
         // 用户可能在系统设置里批准或关闭登录项后切回来。
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             loginItem.refresh()
+            monitor.helperService.refresh()
         }
+        .onChange(of: settings.managedChargeLimit) { promptHelperInstallIfNeeded() }
+        .modifier(ChargeHelperInstallAlert(isPresented: $pendingHelperInstall, helper: monitor.helperService))
     }
 
     // MARK: 电池充电
 
+    /// 接管模式下选了低于 80% 的目标而后台组件还没安装时，先说明再安装。
+    private func promptHelperInstallIfNeeded() {
+        guard settings.chargeControlMode == .managed,
+              settings.managedChargeLimit < ManagedChargeLimit.helperThreshold,
+              monitor.helperService.state == .notRegistered,
+              ChargeHelperService.isBelowThresholdSupported
+        else { return }
+        pendingHelperInstall = true
+    }
+
+    private var chargingDescription: Text {
+        if chargeLimitControl == nil {
+            Text("Change the charge limit in System Settings → Battery. Requires macOS 26.4 or later.", bundle: .module)
+        } else if settings.chargeControlMode == .managed {
+            Text("Hachibu sets the charge limit while it runs, and changes made in System Settings are reverted. Below 80%, System Settings shows a 0% limit; the limit shown in Hachibu is the one in effect.", bundle: .module)
+        } else {
+            Text("Changes the same setting as System Settings → Battery.", bundle: .module)
+        }
+    }
+
     private var chargingGroup: some View {
         SettingsGroup(
             Text("Battery Charging", bundle: .module),
-            description: chargeLimitControl != nil
-                ? Text("Changes the same setting as System Settings → Battery.", bundle: .module)
-                : Text("Change the charge limit in System Settings → Battery. Requires macOS 26.4 or later.", bundle: .module)
+            description: chargingDescription
         ) {
             switch monitor.reading {
             case nil:
@@ -88,8 +118,17 @@ struct SettingsPageContent: View {
                 }
             case .battery(let snapshot):
                 if let control = chargeLimitControl {
-                    ChargeLimitControlRows(control: control) { change in
-                        Task { await monitor.setChargeLimit(change) }
+                    ChargeControlModeRow(settings: settings, snapshot: snapshot, isDisabled: control.isBlocked)
+                    SettingsRowDivider()
+                    if control.mode == .managed {
+                        ManagedChargeLimitRows(
+                            settings: settings, control: control, snapshot: snapshot, monitor: monitor,
+                            pendingHelperInstall: $pendingHelperInstall
+                        )
+                    } else {
+                        ChargeLimitControlRows(control: control) { change in
+                            Task { await monitor.setChargeLimit(change) }
+                        }
                     }
                     if control.isEnabled {
                         SettingsRowDivider()
@@ -114,8 +153,14 @@ struct SettingsPageContent: View {
                     }
                 }
                 SettingsRowDivider()
-                SettingsRow(Text("Current Status", bundle: .module)) {
+                SettingsRow(
+                    Text("Current Status", bundle: .module),
+                    subtitle: settings.chargeControlMode == .managed ? RegistrationSubtitle.text(monitor.registration) : nil
+                ) {
                     StatusLabel(status: ChargeStatus(snapshot))
+                }
+                if settings.chargeControlMode == .managed, snapshot.activeChargePolicies.contains(.optimizedCharging) {
+                    SettingsNote(text: Text("Optimized Battery Charging is on. It can hold the charge below your limit until macOS expects you to unplug. Turn it off in Battery settings if you want Hachibu's limit to apply on its own.", bundle: .module))
                 }
             }
             SettingsRowDivider()

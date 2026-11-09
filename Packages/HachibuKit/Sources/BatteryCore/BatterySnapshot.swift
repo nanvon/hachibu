@@ -66,6 +66,8 @@ public struct BatterySnapshot: Sendable, Equatable {
     public var chargeLimitOptions: [Int]?
     /// PowerUI 报告的系统充电状态，只记录面板要说明的几种，其他情况或读不到时为 nil。
     public var systemChargeState: SystemChargeState?
+    /// 系统正在强制充满（长期未充满时为校准电量计充到 100%），读不到时为 nil。规则见 docs/v1技术设计.md 21.5。
+    public var isFullChargeOverrideActive: Bool?
     /// 本次插电期间电量已在未充电时到达当前充电上限。不是读数，由 `ChargeLimitHoldTracker` 根据连续读数推导，解析结果为 false。
     public var hasReachedChargeLimit: Bool
     /// 正在“保持当前电量”时为保存的上限，此时 `chargeLimit` 是系统实际的临时值。不是读数，由 BatteryMonitor 写入，解析结果为 nil。
@@ -115,6 +117,7 @@ public struct BatterySnapshot: Sendable, Equatable {
         chargeLimit: ChargeLimitSetting? = nil,
         chargeLimitOptions: [Int]? = nil,
         systemChargeState: SystemChargeState? = nil,
+        isFullChargeOverrideActive: Bool? = nil,
         hasReachedChargeLimit: Bool = false,
         chargeLimitHold: ChargeLimitHold? = nil
     ) {
@@ -142,6 +145,7 @@ public struct BatterySnapshot: Sendable, Equatable {
         self.chargeLimit = chargeLimit
         self.chargeLimitOptions = chargeLimitOptions
         self.systemChargeState = systemChargeState
+        self.isFullChargeOverrideActive = isFullChargeOverrideActive
         self.hasReachedChargeLimit = hasReachedChargeLimit
         self.chargeLimitHold = chargeLimitHold
     }
@@ -208,7 +212,8 @@ extension BatterySnapshot {
             chargeLimitOptions: Self.chargeLimitOptions(raw.powerUIChargeLimit),
             systemChargeState: raw.powerUIChargeLimit?.uiState.flatMap {
                 SystemChargeState(uiState: $0, uiChargeLimit: raw.powerUIChargeLimit?.uiChargeLimit)
-            }
+            },
+            isFullChargeOverrideActive: raw.fullChargeOverrideActive
         )
     }
 

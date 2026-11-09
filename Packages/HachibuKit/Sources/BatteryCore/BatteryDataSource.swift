@@ -26,6 +26,7 @@ public struct IOKitBatteryDataSource: BatteryDataSource {
             adapterDetails: Self.adapterDetails(),
             chargeLimitArchive: ChargeLimitFile.readArchive(),
             powerUIChargeLimit: PowerUIClient.read(),
+            fullChargeOverrideActive: SystemFullChargeOverride.isActive(),
             lowPowerModeEnabled: ProcessInfo.processInfo.isLowPowerModeEnabled
         )
     }

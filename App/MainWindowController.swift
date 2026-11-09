@@ -10,6 +10,7 @@ import UniformTypeIdentifiers
 final class MainWindowController: NSWindowController, NSWindowDelegate {
     private static let defaultContentSize = NSSize(width: 1200, height: 840)
     private var history: HistoryModel?
+    private weak var monitor: BatteryMonitor?
     private let navigation = MainWindowNavigation()
 
     convenience init(history: HistoryModel, monitor: BatteryMonitor, settings: AppSettings, alerts: AlertMonitor, updates: UpdateController) {
@@ -30,6 +31,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         }
         self.init(window: window)
         self.history = history
+        self.monitor = monitor
         let hostingView = NSHostingView(rootView: MainWindowRootView(
             history: history,
             settings: settings,
@@ -122,7 +124,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         guard await savePanel.beginSheetModal(for: window) == .OK, let url = savePanel.url else { return }
 
         do {
-            let report = try await DiagnosticReport.collect()
+            let chargeControl = await monitor?.chargeControlDiagnostics()
+            let report = try await DiagnosticReport.collect(chargeControl: chargeControl)
             try report.jsonData().write(to: url, options: .atomic)
         } catch {
             await NSAlert(error: error).beginSheetModal(for: window)

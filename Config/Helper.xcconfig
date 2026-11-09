@@ -1,0 +1,12 @@
+// 特权 helper（命令行工具）的构建设置。版本号、签名设置沿用 Base.xcconfig。
+#include "Base.xcconfig"
+
+PRODUCT_NAME = HachibuHelper
+PRODUCT_BUNDLE_IDENTIFIER = io.github.nanvon.hachibu.helper
+// Info.plist 嵌入可执行文件，ad-hoc 签名时签名标识符取 Bundle ID，App 按它校验 helper。
+INFOPLIST_FILE = Helper/Info.plist
+CREATE_INFOPLIST_SECTION_IN_BINARY = YES
+CODE_SIGN_ENTITLEMENTS =
+ASSETCATALOG_COMPILER_APPICON_NAME =
+ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME =
+SKIP_INSTALL = YES

@@ -24,6 +24,18 @@ public final class AppSettings {
         didSet { defaults.set(temperatureAlertThreshold, forKey: Key.temperatureAlertThreshold) }
     }
     /// 保留旧设置，不再控制提醒。
+    /// 电池校准完成和中断。
+    public var calibrationAlertsEnabled: Bool {
+        didSet { defaults.set(calibrationAlertsEnabled, forKey: Key.calibrationAlertsEnabled) }
+    }
+    /// 充电上限没能生效。
+    public var chargeLimitAlertEnabled: Bool {
+        didSet { defaults.set(chargeLimitAlertEnabled, forKey: Key.chargeLimitAlertEnabled) }
+    }
+    /// macOS 开始校准电池。
+    public var systemCalibrationAlertEnabled: Bool {
+        didSet { defaults.set(systemCalibrationAlertEnabled, forKey: Key.systemCalibrationAlertEnabled) }
+    }
     public var healthAlertEnabled: Bool {
         didSet { defaults.set(healthAlertEnabled, forKey: Key.healthAlertEnabled) }
     }
@@ -36,6 +48,33 @@ public final class AppSettings {
         didSet { defaults.set(chargeAboveLimitAction.rawValue, forKey: Key.chargeAboveLimitAction) }
     }
 
+    /// 充电上限管理方式，见 docs/v1技术设计.md 21.1。
+    public var chargeControlMode: ChargeControlMode {
+        didSet { defaults.set(chargeControlMode.rawValue, forKey: Key.chargeControlMode) }
+    }
+    /// 接管模式的目标上限（%），100 表示关闭。
+    public var managedChargeLimit: Int {
+        didSet {
+            let clamped = Self.clamp(managedChargeLimit, ManagedChargeLimit.targetRange)
+            if clamped != managedChargeLimit { managedChargeLimit = clamped; return }
+            defaults.set(managedChargeLimit, forKey: Key.managedChargeLimit)
+        }
+    }
+    public var managedLimitOnQuit: ManagedLimitOnQuit {
+        didSet { defaults.set(managedLimitOnQuit.rawValue, forKey: Key.managedLimitOnQuit) }
+    }
+    public var afterSystemFullCharge: AfterSystemFullCharge {
+        didSet { defaults.set(afterSystemFullCharge.rawValue, forKey: Key.afterSystemFullCharge) }
+    }
+
+    /// 同步给 BatteryMonitor 的接管设置。
+    public var chargeControlConfiguration: ChargeControlConfiguration {
+        ChargeControlConfiguration(
+            mode: chargeControlMode, target: managedChargeLimit, keepsLimitOnQuit: managedLimitOnQuit == .keepLimit,
+            continuesCalibrationAfterSystemFullCharge: afterSystemFullCharge == .continueCalibration
+        )
+    }
+
     @ObservationIgnored private let defaults: UserDefaults
 
     public init(defaults: UserDefaults = .standard) {
@@ -44,10 +83,22 @@ public final class AppSettings {
         menuBarIconStyle = defaults.string(forKey: Key.menuBarIconStyle).flatMap(MenuBarIconStyle.init(rawValue:)) ?? .battery
         temperatureAlertEnabled = defaults.object(forKey: Key.temperatureAlertEnabled) as? Bool ?? true
         temperatureAlertThreshold = Self.integer(defaults, Key.temperatureAlertThreshold, default: 40, in: Self.temperatureThresholdRange)
+        calibrationAlertsEnabled = defaults.object(forKey: Key.calibrationAlertsEnabled) as? Bool ?? true
+        chargeLimitAlertEnabled = defaults.object(forKey: Key.chargeLimitAlertEnabled) as? Bool ?? true
+        systemCalibrationAlertEnabled = defaults.object(forKey: Key.systemCalibrationAlertEnabled) as? Bool ?? false
         healthAlertEnabled = defaults.object(forKey: Key.healthAlertEnabled) as? Bool ?? true
         healthAlertThreshold = Self.integer(defaults, Key.healthAlertThreshold, default: 80, in: Self.healthThresholdRange)
         chargeAboveLimitAction = defaults.string(forKey: Key.chargeAboveLimitAction)
             .flatMap(ChargeAboveLimitAction.init(rawValue:)) ?? .dischargeToLimit
+        chargeControlMode = defaults.string(forKey: Key.chargeControlMode).flatMap(ChargeControlMode.init(rawValue:)) ?? .followSystem
+        managedChargeLimit = Self.integer(defaults, Key.managedChargeLimit, default: 80, in: ManagedChargeLimit.targetRange)
+        managedLimitOnQuit = defaults.string(forKey: Key.managedLimitOnQuit).flatMap(ManagedLimitOnQuit.init(rawValue:)) ?? .restoreSystem
+        afterSystemFullCharge = defaults.string(forKey: Key.afterSystemFullCharge)
+            .flatMap(AfterSystemFullCharge.init(rawValue:)) ?? .dischargeToLimit
+    }
+
+    private static func clamp(_ value: Int, _ range: ClosedRange<Int>) -> Int {
+        min(max(value, range.lowerBound), range.upperBound)
     }
 
     /// 没有保存过时用默认值；超出范围时取范围内最近的值。
@@ -61,9 +112,16 @@ public final class AppSettings {
         static let menuBarIconStyle = "menuBarIconStyle"
         static let temperatureAlertEnabled = "temperatureAlertEnabled"
         static let temperatureAlertThreshold = "temperatureAlertThreshold"
+        static let calibrationAlertsEnabled = "calibrationAlertsEnabled"
+        static let chargeLimitAlertEnabled = "chargeLimitAlertEnabled"
+        static let systemCalibrationAlertEnabled = "systemCalibrationAlertEnabled"
         static let healthAlertEnabled = "healthAlertEnabled"
         static let healthAlertThreshold = "healthAlertThreshold"
         static let chargeAboveLimitAction = "chargeAboveLimitAction"
+        static let chargeControlMode = "chargeControlMode"
+        static let managedChargeLimit = "managedChargeLimit"
+        static let managedLimitOnQuit = "managedLimitOnQuit"
+        static let afterSystemFullCharge = "afterSystemFullCharge"
     }
 }
 
@@ -73,6 +131,22 @@ public enum ChargeAboveLimitAction: String, CaseIterable, Sendable {
     case dischargeToLimit
     /// 把系统上限临时写成当前电量，由充电器供电。
     case holdCurrentCharge
+}
+
+/// 接管模式下退出 Hachibu 后的处理。
+public enum ManagedLimitOnQuit: String, CaseIterable, Sendable {
+    /// 恢复接管前的系统设置（默认）。
+    case restoreSystem
+    /// 保留当前上限，helper 也不自动恢复。
+    case keepLimit
+}
+
+/// 系统自动充满（校准、强制充满）后的处理，见 docs/v1技术设计.md 21.6。
+public enum AfterSystemFullCharge: String, CaseIterable, Sendable {
+    /// 放电回上限（默认）。
+    case dischargeToLimit
+    /// 接着完成校准，从第 3 步开始。
+    case continueCalibration
 }
 
 /// 菜单栏电池外观；旧样式和未知存储值回退到 macOS。

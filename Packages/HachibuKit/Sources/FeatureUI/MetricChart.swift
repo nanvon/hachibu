@@ -26,6 +26,9 @@ struct MetricChart: View {
     /// 悬停位置在首尾采样之外时，只取这个距离内的点。
     let maxGap: TimeInterval
     var bands: [Range<Date>] = []
+    /// 只在电量图传入：系统充电策略和电池校准时段的底色。
+    var policyBands: [Range<Date>] = []
+    var calibrationBands: [Range<Date>] = []
     var notRecorded: Range<Date>?
     var threshold: Double?
     var yScale: YScale = .automatic(includesZero: false)
@@ -41,8 +44,8 @@ struct MetricChart: View {
                 .padding(.horizontal, 4)
             MetricChartCard(
                 series: series, threshold: threshold, hoverPoints: hoverPoints,
-                domain: domain, maxGap: maxGap, bands: bands, notRecorded: notRecorded,
-                yScale: yScale, style: style, height: chartHeight, hoverDate: $hoverDate
+                domain: domain, maxGap: maxGap, bands: bands, policyBands: policyBands, calibrationBands: calibrationBands,
+                notRecorded: notRecorded, yScale: yScale, style: style, height: chartHeight, hoverDate: $hoverDate
             )
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -116,6 +119,10 @@ struct MetricChartCard: View {
     let domain: ClosedRange<Date>
     let maxGap: TimeInterval
     var bands: [Range<Date>] = []
+    var policyBands: [Range<Date>] = []
+    var calibrationBands: [Range<Date>] = []
+    /// 竖向标记线，用于满充容量图上完成校准的日子。
+    var markers: [Date] = []
     var notRecorded: Range<Date>?
     var yScale: MetricChart.YScale = .automatic(includesZero: false)
     var integerYTicks = false
@@ -126,7 +133,8 @@ struct MetricChartCard: View {
     var body: some View {
         MetricPlot(
             series: series, trend: trend, threshold: threshold, domain: domain,
-            bands: bands, notRecorded: notRecorded, yScale: yScale, integerYTicks: integerYTicks, style: style
+            bands: bands, policyBands: policyBands, calibrationBands: calibrationBands, markers: markers,
+            notRecorded: notRecorded, yScale: yScale, integerYTicks: integerYTicks, style: style
         )
         .equatable()
         .chartOverlay { proxy in
@@ -153,12 +161,18 @@ private struct MetricPlot: View, Equatable {
     let threshold: Double?
     let domain: ClosedRange<Date>
     let bands: [Range<Date>]
+    let policyBands: [Range<Date>]
+    let calibrationBands: [Range<Date>]
+    let markers: [Date]
     let notRecorded: Range<Date>?
     let yScale: MetricChart.YScale
     let integerYTicks: Bool
     let style: MetricChart.Style
     private let interpolation: InterpolationMethod = .monotone
     private static let bandColor = Color.green.opacity(0.05)
+    /// 系统充电策略：中性灰；校准：品牌蓝。两者都与插电的绿色底色区分。
+    private static let policyBandColor = Color.secondary.opacity(0.16)
+    private static let calibrationBandColor = Color.brand.opacity(0.14)
     private static let lineWidth: CGFloat = 2
     /// 有趋势线时，每日读数画成细线。
     private static let dailyLineWidth: CGFloat = 1
@@ -169,7 +183,8 @@ private struct MetricPlot: View, Equatable {
     nonisolated static func == (lhs: Self, rhs: Self) -> Bool {
         lhs.series.plotID == rhs.series.plotID && lhs.trend?.plotID == rhs.trend?.plotID
             && lhs.threshold == rhs.threshold
-            && lhs.domain == rhs.domain && lhs.bands == rhs.bands && lhs.notRecorded == rhs.notRecorded
+            && lhs.domain == rhs.domain && lhs.bands == rhs.bands && lhs.policyBands == rhs.policyBands
+            && lhs.calibrationBands == rhs.calibrationBands && lhs.markers == rhs.markers && lhs.notRecorded == rhs.notRecorded
             && lhs.yScale == rhs.yScale && lhs.integerYTicks == rhs.integerYTicks && lhs.style == rhs.style
     }
 
@@ -216,6 +231,19 @@ private struct MetricPlot: View, Equatable {
             ForEach(bands, id: \.lowerBound) { band in
                 RectangleMark(xStart: .value("Start", band.lowerBound), xEnd: .value("End", band.upperBound))
                     .foregroundStyle(Self.bandColor)
+            }
+            ForEach(policyBands, id: \.lowerBound) { band in
+                RectangleMark(xStart: .value("Start", band.lowerBound), xEnd: .value("End", band.upperBound))
+                    .foregroundStyle(Self.policyBandColor)
+            }
+            ForEach(calibrationBands, id: \.lowerBound) { band in
+                RectangleMark(xStart: .value("Start", band.lowerBound), xEnd: .value("End", band.upperBound))
+                    .foregroundStyle(Self.calibrationBandColor)
+            }
+            ForEach(markers, id: \.self) { day in
+                RuleMark(x: .value("Calibration", day))
+                    .foregroundStyle(Color.brand.opacity(0.5))
+                    .lineStyle(StrokeStyle(lineWidth: 1, dash: Self.referenceDash))
             }
             if let notRecorded {
                 RectangleMark(xStart: .value("Start", notRecorded.lowerBound), xEnd: .value("End", notRecorded.upperBound))

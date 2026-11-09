@@ -29,6 +29,8 @@ struct NotificationsPageContent: View {
             authorizationGroup
             SettingsGroupDivider()
             temperatureGroup
+            SettingsGroupDivider()
+            chargeControlGroup
         }
         .task {
             await alerts.refreshAuthorization()
@@ -119,6 +121,29 @@ struct NotificationsPageContent: View {
             SettingsRowDivider()
             SettingsRow(Text("Status", bundle: .module)) {
                 AlertStatusPill(status: alerts.temperatureStatus)
+            }
+        }
+    }
+
+    // MARK: 充电接管
+
+    private var chargeControlGroup: some View {
+        SettingsGroup(
+            Text("Charge Control", bundle: .module),
+            description: Text("Alerts about the charge limit and battery calibration.", bundle: .module)
+        ) {
+            if settings.chargeControlMode == .managed {
+                SettingsRow(Text("Calibration", bundle: .module), subtitle: Text("Completed or paused", bundle: .module)) {
+                    SettingsSwitch(isOn: $settings.calibrationAlertsEnabled, label: Text("Calibration", bundle: .module))
+                }
+                SettingsRowDivider()
+                SettingsRow(Text("Charge Limit Not Applied", bundle: .module)) {
+                    SettingsSwitch(isOn: $settings.chargeLimitAlertEnabled, label: Text("Charge Limit Not Applied", bundle: .module))
+                }
+                SettingsRowDivider()
+            }
+            SettingsRow(Text("macOS Battery Calibration", bundle: .module), subtitle: Text("When macOS starts it", bundle: .module)) {
+                SettingsSwitch(isOn: $settings.systemCalibrationAlertEnabled, label: Text("macOS Battery Calibration", bundle: .module))
             }
         }
     }

@@ -24,7 +24,7 @@ public actor BatterySampler {
     public init(
         dataSource: any BatteryDataSource = IOKitBatteryDataSource(),
         systemProfiler: any SystemProfilerSource = SystemProfilerReader(),
-        chargeLimitWriter: (any ChargeLimitWriter)? = PowerUIChargeLimitWriter(),
+        chargeLimitWriter: (any ChargeLimitWriter)? = RoutedChargeLimitWriter(helper: { ChargeHelperService.readyClient() }),
         store: HistoryStore?
     ) {
         self.dataSource = dataSource
@@ -121,6 +121,101 @@ public actor BatterySampler {
             }
         }
         return health
+    }
+
+    // MARK: - 充电接管记录（docs/v1技术设计.md 21.8）
+
+    /// 记录系统策略时段的开始，返回 id；没有数据库或写入失败时为 nil。
+    func beginPolicyPeriod(_ kind: ChargePolicyKind, at date: Date) async -> Int64? {
+        await recording("begin policy period") { try await $0.beginChargePolicyPeriod(kind, at: date) }
+    }
+
+    func endPolicyPeriod(id: Int64, at date: Date) async {
+        _ = await recording("end policy period") { try await $0.endChargePolicyPeriod(id: id, at: date) }
+    }
+
+    /// 启动时结束上次异常退出留下的时段。
+    func endOpenPolicyPeriods(at date: Date) async {
+        _ = await recording("end open policy periods") { try await $0.endOpenChargePolicyPeriods(at: date) }
+    }
+
+    func startCalibrationRun(_ kind: CalibrationStartKind, at date: Date, before: CalibrationHealth) async -> Int64? {
+        let trigger: CalibrationTrigger = kind == .manual ? .manual : .afterSystemFullCharge
+        return await recording("start calibration") {
+            try await $0.startCalibrationRun(trigger: trigger, at: date, before: before)
+        }
+    }
+
+    func finishCalibrationRun(id: Int64, ending: CalibrationEnding, at date: Date, after: CalibrationHealth?) async {
+        let result: CalibrationResult = switch ending {
+        case .completed: .completed
+        case .cancelled: .cancelled
+        case .interrupted: .interrupted
+        }
+        _ = await recording("finish calibration") {
+            try await $0.finishCalibrationRun(id: id, result: result, at: date, after: after)
+        }
+    }
+
+    func beginCalibrationStep(runID: Int64, step: CalibrationStep, at date: Date, percent: Int?) async -> Int64? {
+        await recording("begin calibration step") {
+            try await $0.beginCalibrationStep(runID: runID, step: step.rawValue, at: date, percent: percent)
+        }
+    }
+
+    func finishCalibrationStep(id: Int64, completion: CalibrationStepCompletion, at date: Date, percent: Int?) async {
+        let outcome: CalibrationStepOutcome = switch completion {
+        case .reached: .reached
+        case .alreadySatisfied: .alreadySatisfied
+        case .skipped: .skipped
+        }
+        _ = await recording("finish calibration step") {
+            try await $0.finishCalibrationStep(id: id, at: date, percent: percent, outcome: outcome)
+        }
+    }
+
+    func beginCalibrationPause(runID: Int64, reason: CalibrationPauseReason, at date: Date) async -> Int64? {
+        await recording("begin calibration pause") {
+            try await $0.beginCalibrationPause(runID: runID, reason: reason.rawValue, at: date)
+        }
+    }
+
+    func endCalibrationPause(id: Int64, at date: Date) async {
+        _ = await recording("end calibration pause") { try await $0.endCalibrationPause(id: id, at: date) }
+    }
+
+    /// 最近 1 小时的分钟数据是否一直插电且电量 ≥ 99%（校准确认框判断起点用）。没有数据时为 false。
+    func heldFull(since date: Date, until end: Date) async -> Bool {
+        guard let store else { return false }
+        do {
+            let samples = try await store.minuteSamples(from: date, to: end)
+            // 至少要有大半个小时的分钟数据，缺口太多时不判断为已满足。
+            guard samples.count >= 45 else { return false }
+            return samples.allSatisfy { $0.isExternalPower == true && ($0.percent ?? 0) >= CalibrationStep.holdMinimumPercent }
+        } catch {
+            logger.error("Failed to read minute samples: \(String(describing: error), privacy: .public)")
+            return false
+        }
+    }
+
+    func calibrationRuns(limit: Int) async -> [CalibrationRun] {
+        await recording("read calibration runs") { try await $0.calibrationRuns(limit: limit) } ?? []
+    }
+
+    func lastFullChargeTime() async -> Date? {
+        await recording("read last full charge") { try await $0.lastFullChargeTime() } ?? nil
+    }
+
+    private func recording<Value: Sendable>(
+        _ label: String, _ operation: (HistoryStore) async throws -> Value
+    ) async -> Value? {
+        guard let store else { return nil }
+        do {
+            return try await operation(store)
+        } catch {
+            logger.error("Failed to \(label, privacy: .public): \(String(describing: error), privacy: .public)")
+            return nil
+        }
     }
 
     /// 把超过保留期的分钟数据聚合为小时数据。

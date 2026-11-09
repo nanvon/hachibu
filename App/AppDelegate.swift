@@ -34,7 +34,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func configure(store: HistoryStore?, sampler: BatterySampler, statusItem: NSStatusItem) {
         historyStore = store
-        let batteryMonitor = BatteryMonitor(sampler: sampler)
+        let batteryMonitor = BatteryMonitor(sampler: sampler, helperService: .shared)
         self.batteryMonitor = batteryMonitor
         batteryMonitor.onRead = { [alertMonitor] reading, date in
             await alertMonitor.handleReading(reading, at: date)
@@ -42,8 +42,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         batteryMonitor.onHealthRefresh = { [alertMonitor] health in
             await alertMonitor.handleHealth(health)
         }
+        batteryMonitor.onChargeControlNotice = { [alertMonitor] notice in
+            Task { await alertMonitor.handleChargeControlNotice(notice) }
+        }
         alertMonitor.start()
         syncChargeAboveLimitAction()
+        syncChargeControl()
         batteryMonitor.start()
 
         let panelController = PanelController(
@@ -80,7 +84,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    /// 正在“保持当前电量”时写回用户设置的上限，见 docs/v1技术设计.md 第 6 节。
+    /// 把设置页的充电上限管理设置同步给 BatteryMonitor，见 docs/v1技术设计.md 21.1。
+    private func syncChargeControl() {
+        batteryMonitor?.chargeControl = withObservationTracking {
+            settings.chargeControlConfiguration
+        } onChange: { [weak self] in
+            Task { @MainActor in self?.syncChargeControl() }
+        }
+    }
+
+    /// 接管模式下恢复系统设置（21.4），或在“保持当前电量”时写回用户设置的上限（第 6 节）。
     func applicationWillTerminate(_ notification: Notification) {
         batteryMonitor?.restoreChargeLimitBeforeExit()
     }

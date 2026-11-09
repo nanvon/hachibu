@@ -355,3 +355,41 @@ private let utc: Calendar = {
         #expect(model.longTerm?.cycleCount.points.map(\.value) == [10, 100])
     }
 }
+
+@Suite struct PolicyBandTests {
+    @Test func mergesClipsAndDropsOtherTool() {
+        let now = minute(48 * 60)
+        let periods = [
+            ChargePolicyPeriod(id: 1, kind: .optimizedCharging, start: minute(-100), end: minute(60)),
+            ChargePolicyPeriod(id: 2, kind: .fullChargeOverride, start: minute(30), end: minute(120)),
+            ChargePolicyPeriod(id: 3, kind: .otherTool, start: minute(200), end: minute(300)),
+            ChargePolicyPeriod(id: 4, kind: .systemCalibration, start: minute(48 * 60 - 10), end: nil),
+        ]
+        let data = HistoryChartBuilder.recent(minuteSamples: [], policyPeriods: periods, now: now, firstRecordedAt: nil)
+        #expect(data.systemPolicy == [minute(0)..<minute(120), minute(48 * 60 - 10)..<minute(48 * 60)])
+        #expect(data.calibration.isEmpty)
+    }
+
+    @Test func calibrationBandsAndDays() {
+        let now = base.addingTimeInterval(15 * 3600)
+        let runs = [
+            CalibrationRun(id: 1, startedAt: base.addingTimeInterval(-3600), endedAt: base.addingTimeInterval(3600), trigger: .manual, result: .completed),
+            CalibrationRun(id: 2, startedAt: base.addingTimeInterval(-3 * 86400), endedAt: base.addingTimeInterval(-3 * 86400 + 600), trigger: .manual, result: .cancelled),
+            CalibrationRun(id: 3, startedAt: base.addingTimeInterval(-86400), endedAt: nil, trigger: .manual),
+        ]
+        let recent = HistoryChartBuilder.recent(minuteSamples: [], calibrationRuns: runs, now: now, firstRecordedAt: nil)
+        #expect(recent.calibration.count == 1)
+        let data = HistoryChartBuilder.longTerm(
+            dailySamples: [DailyHealth(day: "2026-10-18", fullChargeCapacityMAh: 6000)],
+            calibrationRuns: runs, now: now, firstRecordedDay: "2026-10-18", calendar: utc
+        )
+        // 只有完成的校准按结束当天标记。
+        #expect(data.calibrationDays == [base.addingTimeInterval(12 * 3600)])
+    }
+
+    @Test func noRecordsLeavesDataUnchanged() {
+        let now = minute(48 * 60)
+        let data = HistoryChartBuilder.recent(minuteSamples: [], now: now, firstRecordedAt: nil)
+        #expect(data.systemPolicy.isEmpty && data.calibration.isEmpty)
+    }
+}

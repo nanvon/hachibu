@@ -9,6 +9,7 @@ public struct PanelRootView: View {
     private let onOpenMainWindow: @MainActor () -> Void
     private let onOpenSettings: @MainActor () -> Void
     private let onQuit: @MainActor () -> Void
+    @State private var confirmsCalibration = false
 
     public init(
         monitor: BatteryMonitor,
@@ -31,13 +32,35 @@ public struct PanelRootView: View {
             highTemperatureCelsius: settings.temperatureAlertThreshold,
             chargeLimitControl: ChargeLimitControl(monitor: monitor),
             isFlowAnimating: monitor.isPanelVisible,
-            onChangeChargeLimit: { [monitor] change in
-                Task { await monitor.setChargeLimit(change) }
+            onChangeChargeLimit: { [monitor, settings, onOpenSettings] change in
+                guard monitor.chargeControl.mode == .managed else {
+                    Task { await monitor.setChargeLimit(change) }
+                    return
+                }
+                // 接管模式改的是 Hachibu 的目标。低于 80% 需要后台组件，未批准时打开设置页说明和批准，面板里不弹窗。
+                let percent = if case .limit(let percent) = change { percent } else { 100 }
+                settings.managedChargeLimit = percent
+                if percent < ManagedChargeLimit.helperThreshold, !monitor.helperService.isReady { onOpenSettings() }
             },
             onOpenMainWindow: onOpenMainWindow,
             onOpenSettings: onOpenSettings,
-            onQuit: onQuit
+            onQuit: onQuit,
+            calibration: CalibrationDisplay(monitor: monitor),
+            onCalibrationAction: { action in
+                if action == .startAfterSystemFullCharge {
+                    if monitor.helperService.isReady { confirmsCalibration = true }
+                    else { onOpenSettings() }
+                } else {
+                    monitor.perform(action)
+                }
+            }
         )
+        .alert(Text("Start Battery Calibration?", bundle: .module), isPresented: $confirmsCalibration) {
+            Button { monitor.perform(.startAfterSystemFullCharge) } label: { Text("Start", bundle: .module) }
+            Button(role: .cancel) {} label: { Text("Cancel", bundle: .module) }
+        } message: {
+            Text("Keep your Mac plugged in. Calibration takes about half a day and adds about one charge cycle. It continues from discharging to 15%, then charges to 100% again before returning to your limit.", bundle: .module)
+        }
         // 面板成为 key window 时系统会把第一个控件设为焦点，开启“键盘导航”后会画焦点环，这里统一不显示。
         .focusEffectDisabled()
         // 与 PanelController 的玻璃底板同圆角。
@@ -57,6 +80,9 @@ struct PanelContent: View {
     let onOpenMainWindow: @MainActor () -> Void
     let onOpenSettings: @MainActor () -> Void
     let onQuit: @MainActor () -> Void
+    /// 校准进行中时代替充电上限块。
+    var calibration: CalibrationDisplay?
+    var onCalibrationAction: @MainActor (CalibrationAction) -> Void = { _ in }
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
@@ -77,7 +103,9 @@ struct PanelContent: View {
                     highTemperatureCelsius: highTemperatureCelsius,
                     chargeLimitControl: chargeLimitControl,
                     isFlowAnimating: isFlowAnimating,
-                    onChangeChargeLimit: onChangeChargeLimit
+                    onChangeChargeLimit: onChangeChargeLimit,
+                    calibration: calibration,
+                    onCalibrationAction: onCalibrationAction
                 )
             }
 
@@ -96,6 +124,8 @@ struct PanelContent: View {
         .animation(PanelMotion.animation(reduceMotion: reduceMotion), value: PanelStructure(reading))
         .animation(PanelMotion.animation(reduceMotion: reduceMotion), value: health)
         .animation(PanelMotion.animation(reduceMotion: reduceMotion), value: chargeLimitControl)
+        .animation(PanelMotion.animation(reduceMotion: reduceMotion), value: calibration?.step)
+        .animation(PanelMotion.animation(reduceMotion: reduceMotion), value: calibration == nil)
     }
 
     private var snapshot: BatterySnapshot? {
@@ -133,12 +163,16 @@ private struct BatteryPanelContent: View {
     let chargeLimitControl: ChargeLimitControl?
     let isFlowAnimating: Bool
     let onChangeChargeLimit: @MainActor (ChargeLimitChange) -> Void
+    let calibration: CalibrationDisplay?
+    let onCalibrationAction: @MainActor (CalibrationAction) -> Void
 
     var body: some View {
-        PowerTile(snapshot: snapshot, isFlowAnimating: isFlowAnimating)
+        PowerTile(snapshot: snapshot, isFlowAnimating: isFlowAnimating, calibrationStep: calibration?.pauseReason == nil ? calibration?.step : nil)
         MetricsRow(snapshot: snapshot, highTemperatureCelsius: highTemperatureCelsius)
-        if let chargeLimitControl {
-            ChargeLimitTile(control: chargeLimitControl, onChange: onChangeChargeLimit)
+        if let calibration {
+            CalibrationTile(display: calibration, onAction: onCalibrationAction)
+        } else if let chargeLimitControl {
+            ChargeLimitTile(control: chargeLimitControl, onChange: onChangeChargeLimit, onCalibrationAction: onCalibrationAction)
         }
         HealthTile(snapshot: snapshot, health: health)
     }
@@ -150,10 +184,12 @@ private struct BatteryPanelContent: View {
 private struct PowerTile: View {
     let snapshot: BatterySnapshot
     let isFlowAnimating: Bool
+    /// 校准进行中（未暂停）时状态文字换成校准步骤，图标仍按实际充电状态。
+    let calibrationStep: CalibrationStep?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            StatusHeader(status: ChargeStatus(snapshot))
+            StatusHeader(status: ChargeStatus(snapshot), calibrationStep: calibrationStep)
             if let flow = PowerFlow(snapshot) {
                 PowerFlowView(flow: flow, isAnimating: isFlowAnimating)
             }
@@ -165,13 +201,14 @@ private struct PowerTile: View {
 /// 面板里的状态行：图标放在同色的圆形底上。
 private struct StatusHeader: View {
     let status: ChargeStatus?
+    var calibrationStep: CalibrationStep?
 
     var body: some View {
         HStack(spacing: 8) {
             if let status {
                 TintedSymbol(name: StatusLabel.symbolName(status), tint: StatusLabel.tint(status), diameter: 24)
             }
-            StatusLabel.text(status)
+            (calibrationStep?.statusText ?? StatusLabel.text(status))
                 .font(.system(size: 13.5, weight: .semibold))
                 .minimumScaleFactor(0.75)
         }
@@ -602,19 +639,44 @@ private struct MetricCaption<Content: View>: View {
 private struct ChargeLimitTile: View {
     let control: ChargeLimitControl
     let onChange: @MainActor (ChargeLimitChange) -> Void
+    let onCalibrationAction: @MainActor (CalibrationAction) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
                 TintedSymbol(name: "bolt.shield.fill", tint: .green, diameter: 24)
-                Text("System Charge Limit", bundle: .module)
-                    .font(.system(size: 13, weight: .semibold))
-                    .minimumScaleFactor(0.8)
+                Group {
+                    if control.mode == .managed {
+                        Text("Charge Limit", bundle: .module)
+                    } else {
+                        Text("System Charge Limit", bundle: .module)
+                    }
+                }
+                .font(.system(size: 13, weight: .semibold))
+                .minimumScaleFactor(0.8)
+                Spacer(minLength: 0)
+                if control.offersCalibration {
+                    Button { onCalibrationAction(.startAfterSystemFullCharge) } label: {
+                        Text("Finish Calibration Now", bundle: .module)
+                            .font(.system(size: 11.5, weight: .medium))
+                            .padding(.horizontal, 4)
+                    }
+                    .panelGlassButtonStyle()
+                    .controlSize(.small)
+                    .buttonBorderShape(.capsule)
+                    .focusable(false)
+                }
             }
             LimitSegments(options: control.options, selection: control.percent) { onChange(.limit($0)) }
                 .disabled(!control.isInteractive)
-            ChargeLimitNote(control: control)
-                .font(.system(size: 11))
+            Group {
+                if control.mode == .managed {
+                    ManagedLimitNote(control: control)
+                } else {
+                    ChargeLimitNote(control: control)
+                }
+            }
+            .font(.system(size: 11))
         }
         .panelTile()
     }

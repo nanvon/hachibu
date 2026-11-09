@@ -48,6 +48,10 @@ struct RecentChartData: Equatable, Sendable {
     var notRecorded: Range<Date>?
     /// 插电时段，画底色。
     var pluggedIn: [Range<Date>]
+    /// 系统充电策略时段（系统校准、优化充电、临时充满等，不含其他充电工具），已合并，只画电量图。
+    var systemPolicy: [Range<Date>] = []
+    /// Hachibu 电池校准时段，只画电量图。
+    var calibration: [Range<Date>] = []
     var percent: ChartSeries
     var temperatureCelsius: ChartSeries
     var systemPowerWatts: ChartSeries
@@ -86,6 +90,8 @@ struct LongTermChartData: Equatable, Sendable {
     /// 满充容量的 14 天滑动平均，作为满充容量图的主线。
     var fullChargeTrend: ChartSeries
     var cycleCount: ChartSeries
+    /// 完成过电池校准的日子（画在当天正午，与每日点对齐），满充容量图上标出。
+    var calibrationDays: [Date] = []
     /// 最近一天的设计容量，用于满充容量图的最小纵轴跨度。
     var designCapacityMAh: Int?
     /// 记录满 60 天后的变化趋势，不足时为 nil。
@@ -133,6 +139,8 @@ enum HistoryChartBuilder {
     static func recent(
         minuteSamples: [MinuteSample],
         chargeLimitEvents: [BatteryEvent] = [],
+        policyPeriods: [ChargePolicyPeriod] = [],
+        calibrationRuns: [CalibrationRun] = [],
         now: Date,
         firstRecordedAt: Date?
     ) -> RecentChartData {
@@ -149,10 +157,20 @@ enum HistoryChartBuilder {
                 isCharging: sample.isCharging == true
             )
         }
-        return recent(rows: rows, chargeLimitEvents: chargeLimitEvents, now: now, firstRecordedAt: firstRecordedAt)
+        return recent(
+            rows: rows, chargeLimitEvents: chargeLimitEvents, policyPeriods: policyPeriods, calibrationRuns: calibrationRuns,
+            now: now, firstRecordedAt: firstRecordedAt
+        )
     }
 
-    private static func recent(rows: [RecentRow], chargeLimitEvents: [BatteryEvent], now: Date, firstRecordedAt: Date?) -> RecentChartData {
+    private static func recent(
+        rows: [RecentRow],
+        chargeLimitEvents: [BatteryEvent],
+        policyPeriods: [ChargePolicyPeriod],
+        calibrationRuns: [CalibrationRun],
+        now: Date,
+        firstRecordedAt: Date?
+    ) -> RecentChartData {
         let domain = now.addingTimeInterval(-recentDuration)...now
         let rows = rows.filter { domain.contains($0.date) }
         let maxGap = sampleInterval * maxGapIntervals
@@ -176,6 +194,10 @@ enum HistoryChartBuilder {
                 maxGap: maxGap,
                 end: domain.upperBound
             ),
+            systemPolicy: mergedRanges(
+                policyPeriods.filter { $0.kind != .otherTool }.map { ($0.start, $0.end) }, in: domain
+            ),
+            calibration: mergedRanges(calibrationRuns.map { ($0.startedAt, $0.endedAt) }, in: domain),
             percent: ChartSeries(linePoints(rows.map { ($0.date, $0.percent) })),
             temperatureCelsius: ChartSeries(linePoints(rows.map { ($0.date, $0.temperatureCelsius) })),
             systemPowerWatts: ChartSeries(linePoints(rows.map { ($0.date, $0.systemLoadMW.map { $0 / 1000 }) })),
@@ -204,11 +226,30 @@ enum HistoryChartBuilder {
         return points
     }
 
+    /// 把 `[start, end)` 裁剪到范围内并合并重叠的区间；`end` 为 nil 表示进行中，画到范围终点。
+    static func mergedRanges(_ spans: [(start: Date, end: Date?)], in domain: ClosedRange<Date>) -> [Range<Date>] {
+        let clipped: [Range<Date>] = spans.compactMap { span in
+            let lower = max(span.start, domain.lowerBound)
+            let upper = min(span.end ?? domain.upperBound, domain.upperBound)
+            return lower < upper ? lower..<upper : nil
+        }
+        var result: [Range<Date>] = []
+        for range in clipped.sorted(by: { $0.lowerBound < $1.lowerBound }) {
+            if let last = result.last, range.lowerBound <= last.upperBound {
+                result[result.count - 1] = last.lowerBound..<max(last.upperBound, range.upperBound)
+            } else {
+                result.append(range)
+            }
+        }
+        return result
+    }
+
     // MARK: - 长期
 
     /// 全部每日数据，每天一个点，画在当天正午。横轴从最早记录当天 0 点到明天 0 点。
     static func longTerm(
         dailySamples: [DailyHealth],
+        calibrationRuns: [CalibrationRun] = [],
         now: Date,
         firstRecordedDay: String?,
         calendar: Calendar = .current
@@ -240,10 +281,20 @@ enum HistoryChartBuilder {
             fullChargeCapacityMAh: ChartSeries(fullCharge),
             fullChargeTrend: ChartSeries(rollingAverage(fullCharge)),
             cycleCount: ChartSeries(cycles),
+            calibrationDays: calibrationDays(calibrationRuns, in: domain, calendar: calendar),
             designCapacityMAh: days.last { $0.sample.designCapacityMAh != nil }?.sample.designCapacityMAh,
             trend: healthTrend(fullCharge: fullCharge, cycles: cycles),
             cyclesPerMonth: cyclesPerMonth(cycles)
         )
+    }
+
+    /// 完成的校准按结束当天去重，取当天正午。
+    static func calibrationDays(_ runs: [CalibrationRun], in domain: ClosedRange<Date>, calendar: Calendar) -> [Date] {
+        let days = Set(runs.compactMap { run -> Date? in
+            guard run.result == .completed, let ended = run.endedAt else { return nil }
+            return calendar.startOfDay(for: ended).addingTimeInterval(12 * 3600)
+        })
+        return days.filter { domain.contains($0) }.sorted()
     }
 
     static let trendWindow: TimeInterval = 14 * 86400

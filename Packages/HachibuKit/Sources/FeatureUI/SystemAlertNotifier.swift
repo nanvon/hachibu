@@ -41,6 +41,35 @@ public final class SystemAlertNotifier: NSObject, AlertNotifier, UNUserNotificat
                 localized: "The battery has stayed above \(threshold) °C for 3 minutes. Current temperature: \(DisplayFormat.celsius(celsius)).",
                 bundle: .module
             )
+        case .calibrationCompleted:
+            identifier = "calibrationCompleted"
+            content.title = String(localized: "Battery Calibration Complete", bundle: .module)
+            content.body = String(localized: "The charge limit is back to your setting.", bundle: .module)
+        case let .calibrationPaused(reason):
+            identifier = "calibrationPaused"
+            content.title = String(localized: "Battery Calibration Paused", bundle: .module)
+            switch reason {
+            case .unplugged:
+                content.body = String(localized: "Calibration paused. Plug in the power adapter to continue.", bundle: .module)
+            case .appQuit:
+                content.body = String(localized: "Calibration was not finished when Hachibu quit. Open Hachibu to continue or discard it.", bundle: .module)
+            case .otherTool:
+                content.body = String(localized: "Calibration paused because another charge control app is running.", bundle: .module)
+            case .writeFailed:
+                content.body = String(localized: "Calibration paused because the charge limit could not be changed. Hachibu will retry.", bundle: .module)
+            case .helperUnavailable:
+                content.body = String(localized: "Calibration paused. Approve the Hachibu background item in Login Items to continue.", bundle: .module)
+            case .user, .systemPolicy:
+                return
+            }
+        case let .limitNotApplied(limit):
+            identifier = "limitNotApplied"
+            content.title = String(localized: "Charge Limit Not Applied", bundle: .module)
+            content.body = String(localized: "Hachibu could not set the charge limit to \(limit)%. It will retry.", bundle: .module)
+        case .systemCalibrationStarted:
+            identifier = "systemCalibrationStarted"
+            content.title = String(localized: "macOS Is Calibrating the Battery", bundle: .module)
+            content.body = String(localized: "macOS is charging to 100% to calibrate the battery. Hachibu will return to your limit afterwards.", bundle: .module)
         case .lowHealth:
             // 保留旧接口，但不再发送最大容量提醒。
             return

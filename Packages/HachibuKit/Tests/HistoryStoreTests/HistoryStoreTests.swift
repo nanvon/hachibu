@@ -373,7 +373,7 @@ private func batteryCount(_ store: HistoryStore) throws -> Int {
         let migrations = try await reopened.dbQueue.read { db in
             try HistoryStore.migrator.appliedIdentifiers(db)
         }
-        #expect(migrations == ["v1", "v2", "v3"])
+        #expect(migrations == ["v1", "v2", "v3", "v4"])
     }
 
     /// v1 的每日数据转入 `daily_health`，没有电池；第一次确定电池时归给它。旧的小时行新增列为 NULL。

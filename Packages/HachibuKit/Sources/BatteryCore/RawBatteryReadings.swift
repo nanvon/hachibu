@@ -14,6 +14,8 @@ public struct RawBatteryReadings: Sendable, Equatable, Codable {
     public var chargeLimitArchive: RawValue?
     /// PowerUI 只读接口的充电上限结果，不可用时为 nil。
     public var powerUIChargeLimit: PowerUIChargeLimit?
+    /// 系统是否正在强制充满（`SystemFullChargeOverride`），读不到时为 nil。旧版本录制的数据没有这一项。
+    public var fullChargeOverrideActive: Bool?
     public var lowPowerModeEnabled: Bool
 
     public init(
@@ -23,6 +25,7 @@ public struct RawBatteryReadings: Sendable, Equatable, Codable {
         adapterDetails: [String: RawValue]?,
         chargeLimitArchive: RawValue?,
         powerUIChargeLimit: PowerUIChargeLimit? = nil,
+        fullChargeOverrideActive: Bool? = nil,
         lowPowerModeEnabled: Bool
     ) {
         self.powerSources = powerSources
@@ -31,6 +34,7 @@ public struct RawBatteryReadings: Sendable, Equatable, Codable {
         self.adapterDetails = adapterDetails
         self.chargeLimitArchive = chargeLimitArchive
         self.powerUIChargeLimit = powerUIChargeLimit
+        self.fullChargeOverrideActive = fullChargeOverrideActive
         self.lowPowerModeEnabled = lowPowerModeEnabled
     }
 
@@ -41,6 +45,7 @@ public struct RawBatteryReadings: Sendable, Equatable, Codable {
         case adapterDetails = "externalPowerAdapterDetails"
         case chargeLimitArchive
         case powerUIChargeLimit
+        case fullChargeOverrideActive
         case lowPowerModeEnabled
     }
 
@@ -53,6 +58,7 @@ public struct RawBatteryReadings: Sendable, Equatable, Codable {
             adapterDetails: adapterDetails.map { RawValue.redact($0) },
             chargeLimitArchive: chargeLimitArchive?.redacted(extraKeys: ["token"]),
             powerUIChargeLimit: powerUIChargeLimit,
+            fullChargeOverrideActive: fullChargeOverrideActive,
             lowPowerModeEnabled: lowPowerModeEnabled
         )
     }

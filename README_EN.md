@@ -57,13 +57,15 @@ For a laptop that stays plugged in most of the time, keeping the charge around 8
 
 ### System Charge Limit
 
-Requires macOS 26.4 or later. This is the same setting as System Settings → Battery, and no privileged helper is installed.
+Requires macOS 26.4 or later. The default, Follow System Settings, changes the same setting as System Settings → Battery and needs no privileged helper. Version 0.1.8 adds the managed mode and calibration described below; on-device validation remains pending.
 
-- **Switch and level** — Turn the charge limit on or off and pick a level from 80% to 100% in the panel or in Settings → Battery Charging.
+- **Charge levels** — Pick a level from 80% to 100% in the panel or in Settings → Battery Charging. Selecting 100% turns the limit off.
+- **Managed by Hachibu** — An optional mode with its own 20%–100% target, adjustable in 1% steps in Settings. Changes made in System Settings are reverted while Hachibu runs. On quit, it restores the original system setting by default, or keeps the limit if you choose. Limits below 80% are offered only on the verified macOS 27 version and require approval for a background item limited to charge control.
+- **Battery calibration** — In managed mode, manually charge to full, hold for an hour, discharge to 15% while plugged in, charge to full and hold again, then return to your limit. Pause, resume, skip or redo steps, and review saved records. Takes about half a day and adds about one charge cycle. Macs with Apple silicon generally do not need manual calibration.
 - **When above the limit** — By default, Discharge to Limit: macOS runs on battery until the charge drops to the limit. With Hold Current Charge, Hachibu temporarily sets the system limit to the current level (up to 99%), so the charger powers your Mac and the battery stops discharging. Your limit is restored when you unplug, switch back to the default, or quit Hachibu.
 - **Other charge control apps** — The charge limit is not changed while another charge control app is running.
 
-Limits below 80%, pausing charging while the battery is below the limit, and forced discharge are not supported: on recent firmware, the SMC keys needed to pause charging can't be accessed even with administrator privileges.
+Charge control uses the native macOS limit without writing SMC keys or cutting adapter power. System calibration, forced full charges and Optimized Battery Charging remain under macOS control. If you have used the background item, remove it in Settings before quitting and deleting the app. See the [validation steps (Chinese)](docs/充电接管与校准验收.md).
 
 ### History
 

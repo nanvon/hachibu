@@ -146,4 +146,80 @@ private actor FakeNotifier: AlertNotifier {
             #expect(monitor.temperatureStatus == .alerted)
         }
     }
+
+    // MARK: 充电接管通知
+
+    private func makeChargeMonitor(_ defaults: UserDefaults, configure: (AppSettings) -> Void = { _ in }) async -> (AlertMonitor, FakeNotifier) {
+        let settings = AppSettings(defaults: defaults)
+        configure(settings)
+        let notifier = FakeNotifier(status: .allowed)
+        let monitor = AlertMonitor(settings: settings, notifier: notifier, defaults: defaults)
+        await monitor.refreshAuthorization()
+        return (monitor, notifier)
+    }
+
+    @Test func chargeControlNoticesAreDelivered() async {
+        await withDefaults { defaults in
+            let (monitor, notifier) = await makeChargeMonitor(defaults) { $0.systemCalibrationAlertEnabled = true }
+            await monitor.handleChargeControlNotice(.calibrationCompleted, at: start)
+            await monitor.handleChargeControlNotice(.calibrationPaused(.unplugged), at: start)
+            await monitor.handleChargeControlNotice(.limitNotApplied(limit: 60), at: start)
+            await monitor.handleChargeControlNotice(.systemCalibrationStarted, at: start)
+            #expect(await notifier.attempts == [
+                .calibrationCompleted, .calibrationPaused(.unplugged), .limitNotApplied(limit: 60), .systemCalibrationStarted,
+            ])
+        }
+    }
+
+    @Test func chargeControlNoticesRespectSwitches() async {
+        await withDefaults { defaults in
+            let (monitor, notifier) = await makeChargeMonitor(defaults) {
+                $0.calibrationAlertsEnabled = false
+                $0.chargeLimitAlertEnabled = false
+            }
+            await monitor.handleChargeControlNotice(.calibrationCompleted, at: start)
+            await monitor.handleChargeControlNotice(.calibrationPaused(.unplugged), at: start)
+            await monitor.handleChargeControlNotice(.limitNotApplied(limit: 60), at: start)
+            // 系统校准提醒默认关闭。
+            await monitor.handleChargeControlNotice(.systemCalibrationStarted, at: start)
+            #expect(await notifier.attempts.isEmpty)
+        }
+    }
+
+    @Test func userAndSystemPolicyPausesAreNotDelivered() async {
+        await withDefaults { defaults in
+            let (monitor, notifier) = await makeChargeMonitor(defaults)
+            await monitor.handleChargeControlNotice(.calibrationPaused(.user), at: start)
+            await monitor.handleChargeControlNotice(.calibrationPaused(.systemPolicy), at: start)
+            #expect(await notifier.attempts.isEmpty)
+        }
+    }
+
+    @Test func chargeControlNoticesAreDeduplicatedForThirtyMinutes() async {
+        await withDefaults { defaults in
+            let (monitor, notifier) = await makeChargeMonitor(defaults)
+            await monitor.handleChargeControlNotice(.limitNotApplied(limit: 60), at: start)
+            await monitor.handleChargeControlNotice(.limitNotApplied(limit: 60), at: start.addingTimeInterval(29 * 60))
+            // 不同上限、不同原因各自计时。
+            await monitor.handleChargeControlNotice(.limitNotApplied(limit: 50), at: start.addingTimeInterval(60))
+            await monitor.handleChargeControlNotice(.calibrationPaused(.unplugged), at: start)
+            await monitor.handleChargeControlNotice(.calibrationPaused(.unplugged), at: start.addingTimeInterval(10 * 60))
+            await monitor.handleChargeControlNotice(.calibrationPaused(.otherTool), at: start.addingTimeInterval(10 * 60))
+            #expect(await notifier.attempts.count == 4)
+
+            await monitor.handleChargeControlNotice(.limitNotApplied(limit: 60), at: start.addingTimeInterval(30 * 60))
+            await monitor.handleChargeControlNotice(.calibrationPaused(.unplugged), at: start.addingTimeInterval(30 * 60))
+            #expect(await notifier.attempts.count == 6)
+        }
+    }
+
+    @Test func chargeControlNoticesNeedAuthorization() async {
+        await withDefaults { defaults in
+            let notifier = FakeNotifier(status: .denied)
+            let monitor = AlertMonitor(settings: AppSettings(defaults: defaults), notifier: notifier, defaults: defaults)
+            await monitor.refreshAuthorization()
+            await monitor.handleChargeControlNotice(.calibrationCompleted, at: start)
+            #expect(await notifier.attempts.isEmpty)
+        }
+    }
 }

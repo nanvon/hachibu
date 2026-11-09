@@ -52,12 +52,12 @@ import Testing
         #expect(ChargeLimitFile.chargeLimit(inArchive: report.readings.chargeLimitArchive) == 80)
     }
 
-    @Test(arguments: [50, 80, 100])
+    @Test(arguments: [1, 15, 49, 50, 80, 100])
     func acceptsValidLimit(_ limit: Int) {
         #expect(ChargeLimitFile.chargeLimit(inArchive: archive(soclimit: .int(Int64(limit)))) == limit)
     }
 
-    @Test(arguments: [RawValue.int(49), .int(101), .real(80), .string("80")])
+    @Test(arguments: [RawValue.int(0), .int(-1), .int(101), .real(80), .string("80")])
     func rejectsInvalidLimit(_ soclimit: RawValue) {
         #expect(ChargeLimitFile.chargeLimit(inArchive: archive(soclimit: soclimit)) == nil)
     }

@@ -18,6 +18,7 @@ import Testing
         let defaults = UserDefaults(suiteName: "HachibuRender.Notifications")!
         defaults.removePersistentDomain(forName: "HachibuRender.Notifications")
         let settings = AppSettings(defaults: defaults)
+        settings.chargeControlMode = .managed
         let alerts = AlertMonitor(settings: settings, notifier: FixedNotifier(), defaults: defaults)
         await alerts.refreshAuthorization()
         await alerts.handleReading(.battery(BatterySnapshot(temperatureCelsius: 31.5)), at: Date())

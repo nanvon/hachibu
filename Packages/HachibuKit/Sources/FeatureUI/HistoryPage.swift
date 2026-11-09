@@ -191,6 +191,11 @@ private struct HealthSection: View {
                 LegendItem(text: Text("14-Day Average", bundle: .module)) {
                     Capsule().fill(Color.brand).frame(width: 14, height: 2)
                 }
+                if !data.calibrationDays.isEmpty {
+                    LegendItem(text: Text("Calibration", bundle: .module)) {
+                        DashedLegendLine(color: Color.brand.opacity(0.5))
+                    }
+                }
             }
             Spacer(minLength: 8)
             if let shownDate {
@@ -211,7 +216,10 @@ private struct HealthSection: View {
         case .fullCharge:
             // 纵轴至少跨设计容量的 10%，避免几十 mAh 的日常波动显得像大幅衰减。
             let span = Double(data.designCapacityMAh ?? 5000) * 0.1
-            card(data.fullChargeCapacityMAh, trend: data.fullChargeTrend, data: data, yScale: .minimumSpan(span, upperLimit: nil))
+            card(
+                data.fullChargeCapacityMAh, trend: data.fullChargeTrend, data: data,
+                yScale: .minimumSpan(span, upperLimit: nil), markers: data.calibrationDays
+            )
         case .maximumCapacity:
             card(data.maximumCapacityPercent, data: data, yScale: .minimumSpan(10, upperLimit: 100))
         case .cycleCount:
@@ -224,7 +232,8 @@ private struct HealthSection: View {
         trend: ChartSeries? = nil,
         data: LongTermChartData,
         yScale: MetricChart.YScale,
-        integerYTicks: Bool = false
+        integerYTicks: Bool = false,
+        markers: [Date] = []
     ) -> MetricChartCard {
         MetricChartCard(
             series: series,
@@ -232,6 +241,7 @@ private struct HealthSection: View {
             hoverPoints: data.hoverPoints,
             domain: data.domain,
             maxGap: data.maxGap,
+            markers: markers,
             notRecorded: data.notRecorded,
             yScale: yScale,
             integerYTicks: integerYTicks,
@@ -327,6 +337,20 @@ private struct RecentSection: View {
                         .fill(Color.green.opacity(0.22))
                         .frame(width: 12, height: 10)
                 }
+                if let data = model.recent, !data.systemPolicy.isEmpty {
+                    LegendItem(text: Text("System Charging Policy", bundle: .module)) {
+                        RoundedRectangle(cornerRadius: 3)
+                            .fill(Color.secondary.opacity(0.3))
+                            .frame(width: 12, height: 10)
+                    }
+                }
+                if let data = model.recent, !data.calibration.isEmpty {
+                    LegendItem(text: Text("Calibration", bundle: .module)) {
+                        RoundedRectangle(cornerRadius: 3)
+                            .fill(Color.brand.opacity(0.3))
+                            .frame(width: 12, height: 10)
+                    }
+                }
                 if let data = model.recent, threshold(data) != nil {
                     LegendItem(text: Text("Alert Threshold", bundle: .module)) {
                         DashedLegendLine(color: .orange)
@@ -340,7 +364,7 @@ private struct RecentSection: View {
                     VStack(alignment: .leading, spacing: 10) {
                         chart(
                             Text("Battery Level", bundle: .module), data.percent, data: data,
-                            yScale: .fixed(0...100), style: .line(.brand), formatDate: formatDate
+                            yScale: .fixed(0...100), style: .line(.brand), formatDate: formatDate, showsPolicyBands: true
                         ) {
                             DisplayFormat.percent(Int($0.rounded()))
                         }
@@ -393,6 +417,7 @@ private struct RecentSection: View {
         yScale: MetricChart.YScale = .automatic(includesZero: false),
         style: MetricChart.Style,
         formatDate: @escaping (Date) -> String,
+        showsPolicyBands: Bool = false,
         formatValue: @escaping (Double) -> String
     ) -> MetricChart {
         MetricChart(
@@ -402,6 +427,8 @@ private struct RecentSection: View {
             domain: data.domain,
             maxGap: data.maxGap,
             bands: data.pluggedIn,
+            policyBands: showsPolicyBands ? data.systemPolicy : [],
+            calibrationBands: showsPolicyBands ? data.calibration : [],
             notRecorded: data.notRecorded,
             threshold: threshold,
             yScale: yScale,

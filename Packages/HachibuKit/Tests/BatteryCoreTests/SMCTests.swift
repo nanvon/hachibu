@@ -63,7 +63,9 @@ private func raw(_ key: SMCKey, _ bytes: [UInt8]) -> (SMCKey, SMCRawValue) {
         #expect(limit([0x50, 0x05, 0x05]) == .on(percent: 80))
         #expect(limit([0x64, 0x05, 0x05]) == .on(percent: 100))
         #expect(limit([0x00, 0x00, 0x00]) == .off)
-        #expect(limit([0x12, 0x05, 0x05]) == nil)
+        #expect(limit([0x12, 0x05, 0x05]) == .on(percent: 18))
+        #expect(limit([0x01, 0x05, 0x05]) == .on(percent: 1))
+        #expect(limit([0x65, 0x05, 0x05]) == nil)
     }
 
     @Test func rejectsMismatchedTypeOrSize() {

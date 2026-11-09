@@ -1,5 +1,46 @@
 import Foundation
 
+/// 充电接管和校准的诊断信息，由 App 层从 BatteryMonitor 组装。见 docs/v1技术设计.md 21.7。
+public struct ChargeControlDiagnostics: Sendable, Equatable, Codable {
+    /// `ChargeControlMode` 的原始值。
+    public var mode: String
+    public var target: Int
+    public var keepsLimitOnQuit: Bool
+    /// 后台组件的注册状态，如 `enabled`、`requiresApproval`。
+    public var helperState: String
+    /// helper 读取的偏好里的两个值（`MCLFeatureState`、`mclLimitValue`）和其他状态；读不到时为 nil。
+    public var helperStatus: ChargeHelperStatus?
+    /// `pmset -g battlimit` 原文；没有读取过时为 nil。
+    public var battlimitOutput: String?
+    /// 解析后的登记结果；无法确认时为 nil。
+    public var registration: ChargeLimitRegistration?
+    public var calibration: CalibrationProgress?
+    /// 接管模式下上限是否生效的描述，跟随系统设置时为 nil。
+    public var managedLimitState: String?
+
+    public init(
+        mode: String,
+        target: Int,
+        keepsLimitOnQuit: Bool,
+        helperState: String,
+        helperStatus: ChargeHelperStatus? = nil,
+        battlimitOutput: String? = nil,
+        registration: ChargeLimitRegistration? = nil,
+        calibration: CalibrationProgress? = nil,
+        managedLimitState: String? = nil
+    ) {
+        self.mode = mode
+        self.target = target
+        self.keepsLimitOnQuit = keepsLimitOnQuit
+        self.helperState = helperState
+        self.helperStatus = helperStatus
+        self.battlimitOutput = battlimitOutput
+        self.registration = registration
+        self.calibration = calibration
+        self.managedLimitState = managedLimitState
+    }
+}
+
 /// 诊断导出，供用户提 issue 时附上，也用作测试 fixture。规则见 docs/v1技术设计.md 第 14 节。
 public struct DiagnosticReport: Sendable, Equatable, Codable {
     public struct SystemInfo: Sendable, Equatable, Codable {
@@ -38,6 +79,8 @@ public struct DiagnosticReport: Sendable, Equatable, Codable {
     public var systemProfilerPower: RawValue?
     /// 5.1 节各 SMC key 的原始读数，键为 key 名。打不开 SMC 连接时为 nil，读不到的 key 不写。
     public var smc: [String: SMCRawValue]?
+    /// 充电接管和校准信息。旧文件没有这个字段。
+    public var chargeControl: ChargeControlDiagnostics?
 
     public static let currentFormatVersion = 1
 
@@ -45,7 +88,8 @@ public struct DiagnosticReport: Sendable, Equatable, Codable {
     public static func collect(
         dataSource: any BatteryDataSource = IOKitBatteryDataSource(),
         systemProfiler: any SystemProfilerSource = SystemProfilerReader(),
-        smcReader: @Sendable () -> [SMCKey: SMCRawValue]? = { SMCReader.shared.readRaw(SMCKey.allCases) }
+        smcReader: @Sendable () -> [SMCKey: SMCRawValue]? = { SMCReader.shared.readRaw(SMCKey.allCases) },
+        chargeControl: ChargeControlDiagnostics? = nil
     ) async throws -> DiagnosticReport {
         let readings = try dataSource.read()
         let smc = smcReader()
@@ -56,7 +100,8 @@ public struct DiagnosticReport: Sendable, Equatable, Codable {
             system: .current(),
             readings: readings.redacted(),
             systemProfilerPower: profilerOutput?.redacted(),
-            smc: smc.map { Dictionary(uniqueKeysWithValues: $0.map { ($0.key.rawValue, $0.value) }) }
+            smc: smc.map { Dictionary(uniqueKeysWithValues: $0.map { ($0.key.rawValue, $0.value) }) },
+            chargeControl: chargeControl
         )
     }
 
@@ -79,7 +124,8 @@ public struct DiagnosticReport: Sendable, Equatable, Codable {
         system: SystemInfo,
         readings: RawBatteryReadings,
         systemProfilerPower: RawValue?,
-        smc: [String: SMCRawValue]? = nil
+        smc: [String: SMCRawValue]? = nil,
+        chargeControl: ChargeControlDiagnostics? = nil
     ) {
         self.formatVersion = formatVersion
         self.exportedAt = exportedAt
@@ -87,6 +133,7 @@ public struct DiagnosticReport: Sendable, Equatable, Codable {
         self.readings = readings
         self.systemProfilerPower = systemProfilerPower
         self.smc = smc
+        self.chargeControl = chargeControl
     }
 
     /// `smc` 中能识别的 key 的原始读数。
@@ -98,7 +145,7 @@ public struct DiagnosticReport: Sendable, Equatable, Codable {
 
     // `readings` 的字段平铺在顶层，导出文件少一层嵌套。
     private enum CodingKeys: String, CodingKey {
-        case formatVersion, exportedAt, system, systemProfilerPower, smc
+        case formatVersion, exportedAt, system, systemProfilerPower, smc, chargeControl
     }
 
     public init(from decoder: any Decoder) throws {
@@ -108,6 +155,7 @@ public struct DiagnosticReport: Sendable, Equatable, Codable {
         system = try container.decode(SystemInfo.self, forKey: .system)
         systemProfilerPower = try container.decodeIfPresent(RawValue.self, forKey: .systemProfilerPower)
         smc = try container.decodeIfPresent([String: SMCRawValue].self, forKey: .smc)
+        chargeControl = try container.decodeIfPresent(ChargeControlDiagnostics.self, forKey: .chargeControl)
         readings = try RawBatteryReadings(from: decoder)
     }
 
@@ -118,6 +166,7 @@ public struct DiagnosticReport: Sendable, Equatable, Codable {
         try container.encode(system, forKey: .system)
         try container.encodeIfPresent(systemProfilerPower, forKey: .systemProfilerPower)
         try container.encodeIfPresent(smc, forKey: .smc)
+        try container.encodeIfPresent(chargeControl, forKey: .chargeControl)
         try readings.encode(to: encoder)
     }
 }

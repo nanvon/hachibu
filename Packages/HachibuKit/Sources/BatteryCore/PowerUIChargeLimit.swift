@@ -147,6 +147,20 @@ enum PowerUIClient {
         guard succeeded else { throw ChargeLimitWriteError(message: "PowerUI returned false") }
     }
 
+    /// 不用写入后缓存的读取，队列忙时最多等 1 秒。用于写入后轮询读回。
+    static func readFresh() -> PowerUIChargeLimit? {
+        for _ in 0..<10 {
+            do {
+                return try operations.run(timeout: .milliseconds(500)) { readCurrent() }
+            } catch PowerUIOperationQueue.Failure.busy {
+                Thread.sleep(forTimeInterval: 0.1)
+            } catch {
+                return nil
+            }
+        }
+        return nil
+    }
+
     static func read() -> PowerUIChargeLimit? {
         // 写入后的立即刷新复用同一次操作已验证的结果，避免与周期读取争用队列。
         if let value = writeReadback.recentValue() { return value }

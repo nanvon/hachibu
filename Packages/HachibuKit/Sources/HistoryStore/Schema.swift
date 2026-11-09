@@ -142,6 +142,52 @@ extension HistoryStore {
                 """)
         }
 
+        // 系统策略时段、校准记录，见 docs/v1技术设计.md 第 21.8 节。
+        migrator.registerMigration("v4") { db in
+            try db.create(table: "charge_policy_periods") { t in
+                t.autoIncrementedPrimaryKey("id")
+                t.column("kind", .text).notNull()
+                t.column("start_ts", .integer).notNull()
+                t.column("end_ts", .integer)
+            }
+            try db.create(indexOn: "charge_policy_periods", columns: ["start_ts"])
+
+            try db.create(table: "calibration_runs") { t in
+                t.autoIncrementedPrimaryKey("id")
+                t.column("started_at", .integer).notNull()
+                t.column("ended_at", .integer)
+                t.column("trigger", .text).notNull()
+                t.column("result", .text)
+                t.column("before_full_charge_mah", .integer)
+                t.column("before_system_max_capacity_pct", .integer)
+                t.column("before_cycle_count", .integer)
+                t.column("after_full_charge_mah", .integer)
+                t.column("after_system_max_capacity_pct", .integer)
+                t.column("after_cycle_count", .integer)
+            }
+
+            try db.create(table: "calibration_steps") { t in
+                t.autoIncrementedPrimaryKey("id")
+                t.column("run_id", .integer).notNull().references("calibration_runs", onDelete: .cascade)
+                t.column("step", .integer).notNull()
+                t.column("started_at", .integer).notNull()
+                t.column("ended_at", .integer)
+                t.column("start_percent", .integer)
+                t.column("end_percent", .integer)
+                t.column("outcome", .text)
+            }
+            try db.create(indexOn: "calibration_steps", columns: ["run_id"])
+
+            try db.create(table: "calibration_pauses") { t in
+                t.autoIncrementedPrimaryKey("id")
+                t.column("run_id", .integer).notNull().references("calibration_runs", onDelete: .cascade)
+                t.column("start_ts", .integer).notNull()
+                t.column("end_ts", .integer)
+                t.column("reason", .text).notNull()
+            }
+            try db.create(indexOn: "calibration_pauses", columns: ["run_id"])
+        }
+
         return migrator
     }
 }

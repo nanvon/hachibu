@@ -42,8 +42,8 @@ enum DisplayFormat {
     }
 
     /// 剩余时间，例如“3 小时 20 分钟”，按系统语言格式化。
-    static func duration(minutes: Int) -> String {
-        Duration.seconds(minutes * 60).formatted(.units(allowed: [.hours, .minutes], width: .abbreviated))
+    static func duration(minutes: Int, locale: Locale = .current) -> String {
+        Duration.seconds(minutes * 60).formatted(.units(allowed: [.hours, .minutes], width: .abbreviated).locale(locale))
     }
 
     private static func decimal(_ value: Double, fractionLength: Int) -> String {
