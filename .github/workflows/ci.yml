@@ -69,19 +69,20 @@ jobs:
         with:
           xcode-version: latest-stable
 
-      # 每个 shard 只缓存自己 target 的构建，避免三个 job 抢同一个缓存键。
+      # .build 里包含 GRDB 的 checkout 和编译产物，是本仓库最耗时的一段。
+      # 三个 shard 都构建完整测试 bundle，缓存键保持一致；先完成的 job 保存一次即可复用。
       - name: 缓存 SwiftPM 构建
         uses: actions/cache@v4
         with:
           path: Packages/HachibuKit/.build
-          key: spm-${{ runner.os }}-${{ matrix.target }}-${{ hashFiles('Packages/HachibuKit/Package.resolved') }}-v1
+          key: spm-${{ runner.os }}-${{ hashFiles('Packages/HachibuKit/Package.resolved') }}-v1
           restore-keys: |
-            spm-${{ runner.os }}-${{ matrix.target }}-${{ hashFiles('Packages/HachibuKit/Package.resolved') }}-
+            spm-${{ runner.os }}-${{ hashFiles('Packages/HachibuKit/Package.resolved') }}-
 
       - name: 编译并测试 ${{ matrix.target }}
         run: |
           set -euo pipefail
-          swift build --package-path Packages/HachibuKit --target ${{ matrix.target }}
+          swift build --package-path Packages/HachibuKit --build-tests
           swift test --package-path Packages/HachibuKit --skip-build --filter ${{ matrix.target }}
 
   # App 编译与测试并行，只缓存 Xcode 自己的 DerivedData，不拉 SwiftPM 测试缓存。
