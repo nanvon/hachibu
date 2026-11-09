@@ -5,10 +5,34 @@ import os
 /// helper 只能修改充电上限：读取状态、设置 1–99 的目标、释放并恢复原值、续约，不开放任意 key、路径或命令。
 public enum ChargeHelper {
     public static let appIdentifier = "io.github.nanvon.hachibu"
+    /// helper 的签名标识符，与 launchd label 无关，各版本相同。
     public static let helperIdentifier = "io.github.nanvon.hachibu.helper"
-    public static let machServiceName = "io.github.nanvon.hachibu.helper"
-    /// `Contents/Library/LaunchDaemons/` 下的文件名，`SMAppService.daemon(plistName:)` 用它注册。
-    public static let daemonPlistName = "io.github.nanvon.hachibu.helper.plist"
+    /// 0.1.10 及更早版本的固定 label。新版本不再注册它，只用来注销旧 helper。
+    public static let legacyLabel = "io.github.nanvon.hachibu.helper"
+    /// App Info.plist 里本版本 helper label 的 key，构建时由 `HACHIBU_HELPER_LABEL` 填入。
+    public static let labelInfoKey = "HachibuHelperLabel"
+
+    /// 本版本的 launchd label，也是 MachServices 名。每个版本不同：ad-hoc 签名没有 Team ID，
+    /// 系统按 label 建后台项目记录并记下 helper 的 cdhash，之后不再更新，沿用旧 label 时升级后的 helper 会被拒绝启动。
+    /// 只在 App 进程里有意义；helper 用 launchd 传入的 `XPC_SERVICE_NAME`。读不到（测试）时为 `legacyLabel`。
+    public static let label: String = {
+        let value = Bundle.main.object(forInfoDictionaryKey: labelInfoKey) as? String
+        return value.flatMap { isValidLabel($0) ? $0 : nil } ?? legacyLabel
+    }()
+    public static var machServiceName: String { label }
+    /// `Contents/Library/LaunchDaemons/` 下本版本的文件名，`SMAppService.daemon(plistName:)` 用它注册。
+    public static var daemonPlistName: String { plistName(for: label) }
+
+    public static func plistName(for label: String) -> String { "\(label).plist" }
+
+    /// `legacyLabel` 本身，或它加上 `.` 和版本后缀（字母、数字、`.`、`-`）。
+    public static func isValidLabel(_ value: String) -> Bool {
+        if value == legacyLabel { return true }
+        let prefix = legacyLabel + "."
+        guard value.hasPrefix(prefix), value.count <= 128 else { return false }
+        let suffix = value.dropFirst(prefix.count)
+        return !suffix.isEmpty && suffix.allSatisfy { $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "." || $0 == "-") }
+    }
     /// helper 可执行文件名，位于 `Contents/MacOS/`。
     public static let executableName = "HachibuHelper"
     /// 接口版本。改动 XPC 接口或行为时加一。

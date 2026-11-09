@@ -71,9 +71,17 @@ codesign --force --sign - --options runtime --timestamp=none "$SPARKLE_FRAMEWORK
 
 # 特权 helper：签名标识符必须是 io.github.nanvon.hachibu.helper，App 连接时按它校验（docs/v1技术设计.md 21.3）。
 HELPER="$APP/Contents/MacOS/HachibuHelper"
-[[ -x "$HELPER" && -f "$APP/Contents/Library/LaunchDaemons/io.github.nanvon.hachibu.helper.plist" ]] || {
+# 本版本的 plist 按 HACHIBU_HELPER_LABEL 生成；固定 label 的旧 plist 只用来注销 0.1.10 及更早的 helper。
+HELPER_LABEL="$(/usr/libexec/PlistBuddy -c "Print :HachibuHelperLabel" "$APP/Contents/Info.plist" 2>/dev/null || true)"
+DAEMONS="$APP/Contents/Library/LaunchDaemons"
+[[ -x "$HELPER" && -n "$HELPER_LABEL" && -f "$DAEMONS/$HELPER_LABEL.plist" \
+   && -f "$DAEMONS/io.github.nanvon.hachibu.helper.plist" ]] || {
   echo "❌ 特权 helper 或其 LaunchDaemon plist 缺失" >&2; exit 1;
 }
+[[ "$(/usr/libexec/PlistBuddy -c "Print :Label" "$DAEMONS/$HELPER_LABEL.plist")" == "$HELPER_LABEL" ]] || {
+  echo "❌ helper plist 的 Label 与 Info.plist 不一致" >&2; exit 1;
+}
+echo "   helper label: $HELPER_LABEL"
 codesign --force --sign - --options runtime --timestamp=none \
   --identifier io.github.nanvon.hachibu.helper "$HELPER"
 

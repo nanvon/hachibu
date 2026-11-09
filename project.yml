@@ -21,12 +21,31 @@ targets:
       Release: Config/Base.xcconfig
     sources:
       - path: App
-      # 特权 helper 的 LaunchDaemon plist，SMAppService.daemon 从这里注册，见 docs/v1技术设计.md 21.3。
+      # 0.1.10 及更早版本的 LaunchDaemon plist（固定 label）。新版本不注册它，只用它注销旧 helper，见 docs/v1技术设计.md 21.3。
       - path: Helper/io.github.nanvon.hachibu.helper.plist
         buildPhase:
           copyFiles:
             destination: wrapper
             subpath: Contents/Library/LaunchDaemons
+    postBuildScripts:
+      # 本版本的 LaunchDaemon plist，label 来自 HACHIBU_HELPER_LABEL（Config/Base.xcconfig），SMAppService.daemon 从这里注册。
+      - name: Generate Helper LaunchDaemon plist
+        outputFiles:
+          - $(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Library/LaunchDaemons/$(HACHIBU_HELPER_LABEL).plist
+        script: |
+          set -euo pipefail
+          plist="${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}/Library/LaunchDaemons/${HACHIBU_HELPER_LABEL}.plist"
+          mkdir -p "$(dirname "$plist")"
+          rm -f "$plist"
+          /usr/libexec/PlistBuddy \
+            -c "Add :Label string ${HACHIBU_HELPER_LABEL}" \
+            -c "Add :BundleProgram string Contents/MacOS/HachibuHelper" \
+            -c "Add :MachServices dict" \
+            -c "Add :MachServices:${HACHIBU_HELPER_LABEL} bool true" \
+            -c "Add :RunAtLoad bool true" \
+            -c "Add :AssociatedBundleIdentifiers array" \
+            -c "Add :AssociatedBundleIdentifiers:0 string ${PRODUCT_BUNDLE_IDENTIFIER}" \
+            "$plist"
     dependencies:
       - target: HachibuHelper
         embed: true

@@ -135,22 +135,137 @@ final class FakeHelperRegistration: ChargeHelperRegistration {
 }
 
 @MainActor
-@Test func unreachableEnabledHelperIsRegisteredAgainOnce() async {
-    // 已允许但连不上（launchd 没有加载）时重新注册一次，让系统再加载 helper。
+@Test func unreachableEnabledHelperIsNotRegisteredAgain() async {
+    // 已允许但连不上时不自动重新注册：重新注册会让系统重新核对，把用户刚打开的开关撤回。
     let backend = FakeHelperRegistration()
     backend.status = .enabled
     let service = ChargeHelperService(registration: backend)
     let status = await service.connectedStatus(retryDelay: .zero)
     #expect(status == nil)
-    #expect(backend.registrations == 1)
+    #expect(backend.registrations == 0)
     #expect(service.state == .enabled)
     #expect(service.registrationError == nil)
+}
 
-    // 需要允许时不重新注册，等用户在系统设置里允许。
-    backend.status = .requiresApproval
-    service.refresh()
-    _ = await service.connectedStatus(retryDelay: .zero)
-    #expect(backend.registrations == 1)
+@MainActor
+@Test func upgradeRegistersNewLabelAndUnregistersLegacyHelper() async {
+    // 0.1.10 及更早只注册过固定 label，没有记录：按旧 helper 的状态判断，注册本版本并注销旧的。
+    let current = FakeHelperRegistration()
+    let legacy = FakeHelperRegistration()
+    legacy.status = .enabled
+    current.statusAfterRegister = .requiresApproval
+    let defaults = UserDefaults(suiteName: "HelperMigration-\(UUID().uuidString)")!
+    let label = "io.github.nanvon.hachibu.helper.0.1.11"
+    let service = ChargeHelperService(
+        registration: current, label: label,
+        registrationForLabel: { $0 == ChargeHelper.legacyLabel ? legacy : nil }, defaults: defaults
+    )
+    await service.migrateFromPreviousLabel()
+    #expect(current.registrations == 1)
+    #expect(legacy.unregistrations == 1)
+    #expect(service.state == .requiresApproval)
+    #expect(defaults.string(forKey: ChargeHelperService.registeredLabelKey) == label)
+
+    // 已迁移过：不再注册或注销。
+    await service.migrateFromPreviousLabel()
+    #expect(current.registrations == 1)
+    #expect(legacy.unregistrations == 1)
+}
+
+@MainActor
+@Test func neverRegisteredLabelWithPlistCanBeInstalled() async {
+    // 新 label 从没注册过时系统返回 notFound：plist 在包里就可以安装，升级时照常迁移。
+    let current = FakeHelperRegistration()
+    current.status = .notFound
+    current.statusAfterRegister = .requiresApproval
+    let legacy = FakeHelperRegistration()
+    legacy.status = .enabled
+    let service = ChargeHelperService(
+        registration: current, label: "io.github.nanvon.hachibu.helper.0.1.11",
+        registrationForLabel: { $0 == ChargeHelper.legacyLabel ? legacy : nil }, hasDaemonPlist: true
+    )
+    #expect(service.state == .notRegistered)
+    await service.migrateFromPreviousLabel()
+    #expect(current.registrations == 1)
+    #expect(legacy.unregistrations == 1)
+
+    // plist 不在包里：App 缺少 helper。
+    let missing = FakeHelperRegistration()
+    missing.status = .notFound
+    #expect(ChargeHelperService(registration: missing).state == .unavailable)
+}
+
+@MainActor
+@Test func upgradeUnregistersPreviousVersionedLabel() async {
+    let current = FakeHelperRegistration()
+    let previous = FakeHelperRegistration()
+    previous.removalError = NSError(domain: "SMAppServiceErrorDomain", code: 3)
+    current.statusAfterRegister = .enabled
+    let defaults = UserDefaults(suiteName: "HelperMigration-\(UUID().uuidString)")!
+    defaults.set("io.github.nanvon.hachibu.helper.0.1.11", forKey: ChargeHelperService.registeredLabelKey)
+    let label = "io.github.nanvon.hachibu.helper.0.1.12"
+    let service = ChargeHelperService(
+        registration: current, label: label,
+        registrationForLabel: { $0 == "io.github.nanvon.hachibu.helper.0.1.11" ? previous : nil }, defaults: defaults
+    )
+    await service.migrateFromPreviousLabel()
+    // 旧 plist 不在包里时注销会失败，仍改用本版本。
+    #expect(previous.unregistrations == 1)
+    #expect(current.registrations == 1)
+    #expect(defaults.string(forKey: ChargeHelperService.registeredLabelKey) == label)
+}
+
+@MainActor
+@Test func noMigrationWithoutPreviousHelper() async {
+    // 从没装过 helper：不自动注册。移除后清掉记录，之后也不再自动注册。
+    let current = FakeHelperRegistration()
+    let legacy = FakeHelperRegistration()
+    let defaults = UserDefaults(suiteName: "HelperMigration-\(UUID().uuidString)")!
+    let service = ChargeHelperService(
+        registration: current, label: "io.github.nanvon.hachibu.helper.0.1.11",
+        registrationForLabel: { _ in legacy }, defaults: defaults
+    )
+    await service.migrateFromPreviousLabel()
+    #expect(current.registrations == 0)
+    #expect(legacy.unregistrations == 0)
+
+    current.statusAfterRegister = .enabled
+    service.register()
+    #expect(defaults.string(forKey: ChargeHelperService.registeredLabelKey) != nil)
+    await service.unregister()
+    #expect(defaults.string(forKey: ChargeHelperService.registeredLabelKey) == nil)
+}
+
+@Test func helperLaunchStateParsesLaunchctlOutput() {
+    // 2026-11-09 本机 launchctl print 的原文片段。
+    let failed = """
+    system/io.github.nanvon.hachibu.helper = {
+    \tactive count = 0
+    \tstate = spawn scheduled
+    \tlast exit code = 78: EX_CONFIG
+    \t\tstate = active
+    \tjob state = spawn failed
+    }
+    """
+    #expect(HelperLaunchState.parse(output: failed, exitCode: 0) == .spawnFailed)
+
+    let running = """
+    system/com.apple.powerd = {
+    \tstate = running
+    \t\tstate = active
+    \tjob state = running
+    }
+    """
+    #expect(HelperLaunchState.parse(output: running, exitCode: 0) == .running)
+    #expect(HelperLaunchState.parse(output: "\tstate = running\n", exitCode: 0) == .running)
+
+    let missing = "Bad request.\nCould not find service \"io.github.nanvon.hachibu.helper\" in domain for system\n"
+    #expect(HelperLaunchState.parse(output: missing, exitCode: 113) == .notLoaded)
+
+    // 不认识的输出不当成连不上，照常经 XPC 检查。
+    #expect(HelperLaunchState.parse(output: "\tstate = waiting\n", exitCode: 0) == .unknown)
+    #expect(HelperLaunchState.parse(output: "", exitCode: 1) == .unknown)
+    #expect(!HelperLaunchState.unknown.isUnreachable)
 }
 
 /// 所有写入只发生在内存假系统中，不注册 helper、不修改本机充电设置。

@@ -20,16 +20,33 @@ final class Daemon: NSObject, NSXPCListenerDelegate, ChargeHelperProtocol, @unch
     private var skippedCorruptRestore = false
     /// 允许连接的 App 主程序路径：helper 所在 App 包的 `Contents/MacOS/Hachibu`。
     private let appExecutablePath: String?
+    /// 启动时自己的可执行文件。App 升级后文件被替换，新版本用新的 label 注册自己的 helper。
+    private let ownExecutablePath: String?
+    private let ownFileID: FileID?
 
     /// 没有标记文件、没有连接且空闲这么久后退出，下次由 launchd 按需启动。
     private static let idleExitInterval: TimeInterval = 120
     private static let tickInterval: DispatchTimeInterval = .seconds(15)
 
     override init() {
-        let own = Self.executablePath(pid: getpid()).map(URL.init(fileURLWithPath:))
+        ownExecutablePath = Self.executablePath(pid: getpid())
+        ownFileID = ownExecutablePath.flatMap(FileID.init(path:))
+        let own = ownExecutablePath.map(URL.init(fileURLWithPath:))
         // .../Hachibu.app/Contents/MacOS/HachibuHelper → .../Hachibu.app/Contents/MacOS/Hachibu
         appExecutablePath = own?.deletingLastPathComponent().appendingPathComponent("Hachibu").path
         super.init()
+    }
+
+    private struct FileID: Equatable {
+        let device: dev_t
+        let inode: ino_t
+
+        init?(path: String) {
+            var info = stat()
+            guard stat(path, &info) == 0 else { return nil }
+            device = info.st_dev
+            inode = info.st_ino
+        }
     }
 
     func start() {
@@ -210,6 +227,12 @@ final class Daemon: NSObject, NSXPCListenerDelegate, ChargeHelperProtocol, @unch
     }
 
     private func tick() {
+        // 可执行文件被替换（App 已升级）：直接退出，不释放、不删标记文件。新版本的 helper 用新的 label 运行，
+        // 允许后按标记续约或恢复；旧进程留着会在续约超时后把上限恢复成原值，覆盖新 helper 的写入。
+        if let ownExecutablePath, let ownFileID, FileID(path: ownExecutablePath) != ownFileID {
+            logger.info("Executable replaced; exiting without release")
+            exit(0)
+        }
         let marker = readMarker()
         if case .valid(let marker)? = marker, !marker.keepsLimit {
             guard let deadline = leaseDeadline else {
@@ -297,10 +320,13 @@ guard geteuid() == 0 else {
     exit(1)
 }
 
+// launchd 按 plist 的 Label 设置 XPC_SERVICE_NAME，MachServices 与 Label 同名。label 随版本变化，见 docs/v1技术设计.md 21.3。
+let serviceName = ProcessInfo.processInfo.environment["XPC_SERVICE_NAME"]
+    .flatMap { ChargeHelper.isValidLabel($0) ? $0 : nil } ?? ChargeHelper.legacyLabel
 let daemon = Daemon()
-let listener = NSXPCListener(machServiceName: ChargeHelper.machServiceName)
+let listener = NSXPCListener(machServiceName: serviceName)
 listener.delegate = daemon
 daemon.start()
 listener.resume()
-logger.info("Helper \(ChargeHelper.version, privacy: .public) started")
+logger.info("Helper \(ChargeHelper.version, privacy: .public) started as \(serviceName, privacy: .public)")
 dispatchMain()

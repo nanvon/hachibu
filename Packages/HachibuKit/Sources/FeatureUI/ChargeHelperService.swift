@@ -75,6 +75,15 @@ public final class ChargeHelperService {
     @ObservationIgnored private let service: (any ChargeHelperRegistration)?
     @ObservationIgnored private let updatesAvailability: Bool
     @ObservationIgnored private let opensSystemSettings: Bool
+    @ObservationIgnored private let launchState: @Sendable () async -> HelperLaunchState
+    /// 本版本的 label 和其他 label 的注册对象，升级时用来注销旧版本的 helper。
+    @ObservationIgnored private let label: String
+    @ObservationIgnored private let registrationForLabel: (String) -> (any ChargeHelperRegistration)?
+    /// 记录最近一次注册的 label。
+    @ObservationIgnored private let defaults: UserDefaults
+    static let registeredLabelKey = "ChargeHelperRegisteredLabel"
+    /// 本版本的 LaunchDaemon plist 是否在 App 包里。
+    @ObservationIgnored private let hasDaemonPlist: () -> Bool
     /// 写入路由在后台线程读取，所以单独加锁保存。
     private nonisolated static let availability = Availability()
 
@@ -83,14 +92,38 @@ public final class ChargeHelperService {
         self.service = service
         self.updatesAvailability = service != nil
         self.opensSystemSettings = service != nil
+        self.label = ChargeHelper.label
+        self.defaults = .standard
+        let plist = Bundle.main.bundleURL
+            .appendingPathComponent("Contents/Library/LaunchDaemons", isDirectory: true)
+            .appendingPathComponent(ChargeHelper.daemonPlistName)
+        self.hasDaemonPlist = { service != nil && FileManager.default.fileExists(atPath: plist.path) }
+        if service == nil {
+            self.launchState = { @Sendable in .unknown }
+            self.registrationForLabel = { _ in nil }
+        } else {
+            self.launchState = { @Sendable in await HelperLaunchState.read(label: ChargeHelper.machServiceName) }
+            self.registrationForLabel = { SMAppService.daemon(plistName: ChargeHelper.plistName(for: $0)) }
+        }
         refresh()
     }
 
     /// 测试注册、系统批准和取消时的状态变化，不触碰系统服务。
-    init(registration: any ChargeHelperRegistration) {
+    init(
+        registration: any ChargeHelperRegistration,
+        label: String = ChargeHelper.legacyLabel,
+        registrationForLabel: @escaping (String) -> (any ChargeHelperRegistration)? = { _ in nil },
+        defaults: UserDefaults? = nil,
+        hasDaemonPlist: Bool = false
+    ) {
         self.service = registration
         self.updatesAvailability = false
         self.opensSystemSettings = false
+        self.launchState = { .unknown }
+        self.label = label
+        self.registrationForLabel = registrationForLabel
+        self.hasDaemonPlist = { hasDaemonPlist }
+        self.defaults = defaults ?? UserDefaults(suiteName: "ChargeHelperServiceTests-\(UUID().uuidString)")!
         refresh()
     }
 
@@ -100,7 +133,11 @@ public final class ChargeHelperService {
     }
 
     public func refresh() {
-        let newState = ChargeHelperState(status: service?.status)
+        let status = service?.status
+        var newState = ChargeHelperState(status: status)
+        // 系统从没见过的 label 返回 notFound（2026-11-09 本机实测，每个版本的新 label 都是这样）：
+        // plist 在包里就按未注册处理，可以安装；不在才是 App 缺少 helper。
+        if status == .notFound, hasDaemonPlist() { newState = .notRegistered }
         if newState != state {
             logger.info("Helper state \(String(describing: newState), privacy: .public)")
             state = newState
@@ -113,6 +150,10 @@ public final class ChargeHelperService {
 
     /// 注册 helper。系统要求用户允许时打开“登录项与扩展”。
     public func register() {
+        register(opensLoginItems: true)
+    }
+
+    private func register(opensLoginItems: Bool) {
         guard let service else { return }
         registrationError = nil
         var failure: String?
@@ -126,10 +167,42 @@ public final class ChargeHelperService {
         }
         refresh()
         switch state {
-        case .requiresApproval: openLoginItems()
-        case .enabled: break
+        case .requiresApproval:
+            defaults.set(label, forKey: Self.registeredLabelKey)
+            if opensLoginItems { openLoginItems() }
+        case .enabled:
+            defaults.set(label, forKey: Self.registeredLabelKey)
         case .notRegistered, .unavailable:
             registrationError = failure ?? "SMAppService status: \(service.status.rawValue)"
+        }
+    }
+
+    /// 升级后改用本版本的 label：之前注册过其他 label（0.1.10 及更早为固定 label）时，注册本版本的 helper，
+    /// 再注销旧的，结束仍在运行的旧 helper。不打开系统设置，设置页显示需要允许。
+    /// 旧 label 的 plist 不在本版本包里时注销可能失败，只记日志：旧 helper 发现自己的文件被替换后会退出。
+    public func migrateFromPreviousLabel() async {
+        guard service != nil, !isBusy else { return }
+        let legacy = ChargeHelper.legacyLabel
+        var previous = defaults.string(forKey: Self.registeredLabelKey)
+        if previous == nil, label != legacy,
+           let old = registrationForLabel(legacy), [.enabled, .requiresApproval].contains(old.status) {
+            previous = legacy
+        }
+        guard let previous, previous != label else { return }
+        isBusy = true
+        defer { isBusy = false }
+        logger.info("Migrating helper from \(previous, privacy: .public) to \(self.label, privacy: .public)")
+        if state == .notRegistered { register(opensLoginItems: false) }
+        if let old = registrationForLabel(previous) {
+            do {
+                try await old.unregister()
+            } catch {
+                logger.error("Failed to unregister previous helper: \(String(describing: error), privacy: .public)")
+            }
+        }
+        // 本版本没注册成功时保留旧记录，下次启动再试。
+        if state == .enabled || state == .requiresApproval {
+            defaults.set(label, forKey: Self.registeredLabelKey)
         }
     }
 
@@ -168,32 +241,31 @@ public final class ChargeHelperService {
             logger.error("Failed to unregister helper: \(String(describing: error), privacy: .public)")
         }
         refresh()
+        if state == .notRegistered { defaults.removeObject(forKey: Self.registeredLabelKey) }
     }
 
     /// 状态查询的超时。launchd 里有这个服务但启动失败时，连接不会立即报错，而是等到超时；
     /// 写入用的默认 8 秒对状态查询太长，设置页会长时间停在“正在检查”。
+    /// launchd 报告没有加载或启动失败时不发 XPC，直接返回，不等这个超时。
     static let statusTimeout: TimeInterval = 3
 
     /// 读取 helper 报告的状态，用于设置页、移除前检查和诊断导出。失败时为 nil。
     public func helperStatus() async -> ChargeHelperStatus? {
         guard Self.readyClient() != nil else { return nil }
+        let launch = await launchState()
+        if launch.isUnreachable {
+            logger.error("Helper not reachable in launchd: \(String(describing: launch), privacy: .public)")
+            return nil
+        }
         let client = ChargeHelperClient(timeout: Self.statusTimeout)
         return await Task.detached { try? client.status() }.value
     }
 
-    /// 确认已允许的 helper 能连上。连不上时重新注册一次再试：在系统设置里打开开关时，
-    /// smd 可能在密码验证完成前就尝试加载 helper（日志为 “Job is not allowed to bootstrap”），
-    /// 验证完成后不会再加载，状态显示已允许，launchd 里却没有这个服务。重新注册会让 smd 再加载一次；
-    /// helper 文件变过（ad-hoc 签名没有 Team ID，系统按文件校验和识别）时，重新注册后状态会变回需要允许。
-    /// 最长约 3 + 1 + 3 + 1 + 3 秒。
+    /// 确认已允许的 helper 能连上，失败时间隔 `retryDelay` 再试一次。
+    /// 不自动重新注册：2026-11-09 本机日志，helper 因签名校验不符起不来时，重新注册让系统重新核对后台项目，
+    /// 把用户刚打开的开关撤回成需要允许。连不上时由用户点“重新检查”或“重新安装”。
     func connectedStatus(retryDelay: Duration = .seconds(1)) async -> ChargeHelperStatus? {
-        if let status = await helperStatusRetrying(attempts: 2, delay: retryDelay) { return status }
-        guard state == .enabled, !isBusy, !Task.isCancelled else { return nil }
-        logger.info("Helper enabled but not reachable; registering again")
-        register()
-        guard state == .enabled, !Task.isCancelled else { return nil }
-        try? await Task.sleep(for: retryDelay)
-        return await helperStatus()
+        await helperStatusRetrying(attempts: 2, delay: retryDelay)
     }
 
     /// 刚允许或刚注册时 launchd 可能还没加载 helper，失败后稍等再试，避免误报连接失败。
@@ -213,6 +285,78 @@ public final class ChargeHelperService {
         var client: ChargeHelperClient? {
             get { lock.withLock { value } }
             set { lock.withLock { value = newValue } }
+        }
+    }
+}
+
+/// launchd 里 helper 任务的状态，来自 `launchctl print system/<label>`（plist 的 Label 与 MachServices 同名）。
+/// 只用来提前判断连不上，不作为可用的依据；输出格式不认识时为 unknown，照常经 XPC 检查。
+enum HelperLaunchState: Sendable, Equatable {
+    case running
+    /// launchd 里没有这个任务，例如允许时 smd 没有加载成功。
+    case notLoaded
+    /// launchd 启动 helper 失败，例如系统按签名拒绝启动（Launch Constraint Violation）。
+    case spawnFailed
+    case unknown
+
+    var isUnreachable: Bool { self == .notLoaded || self == .spawnFailed }
+
+    static func parse(output: String, exitCode: Int32) -> HelperLaunchState {
+        guard exitCode == 0 else {
+            return output.contains("Could not find service") ? .notLoaded : .unknown
+        }
+        let lines = output.split(whereSeparator: \.isNewline).map { $0.trimmingCharacters(in: .whitespaces) }
+        if let jobState = lines.first(where: { $0.hasPrefix("job state = ") }) {
+            let value = jobState.dropFirst("job state = ".count)
+            if value == "running" { return .running }
+            if value.hasPrefix("spawn failed") { return .spawnFailed }
+            return .unknown
+        }
+        return lines.contains("state = running") ? .running : .unknown
+    }
+
+    /// 运行 `launchctl print`，超时或运行失败时为 unknown。普通用户可以读取 system 域的任务状态。
+    static func read(label: String, timeout: TimeInterval = 1) async -> HelperLaunchState {
+        await withCheckedContinuation { (continuation: CheckedContinuation<HelperLaunchState, Never>) in
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/bin/launchctl")
+            process.arguments = ["print", "system/\(label)"]
+            let pipe = Pipe()
+            process.standardOutput = pipe
+            process.standardError = pipe
+            let once = OnceResume(continuation)
+            process.terminationHandler = { process in
+                let data = pipe.fileHandleForReading.readDataToEndOfFile()
+                once.resume(HelperLaunchState.parse(output: String(decoding: data, as: UTF8.self), exitCode: process.terminationStatus))
+            }
+            do {
+                try process.run()
+            } catch {
+                logger.error("Failed to run launchctl: \(String(describing: error), privacy: .public)")
+                once.resume(.unknown)
+                return
+            }
+            DispatchQueue.global().asyncAfter(deadline: .now() + timeout) {
+                if process.isRunning { process.terminate() }
+                once.resume(.unknown)
+            }
+        }
+    }
+
+    private final class OnceResume: @unchecked Sendable {
+        private let lock = NSLock()
+        private var continuation: CheckedContinuation<HelperLaunchState, Never>?
+
+        init(_ continuation: CheckedContinuation<HelperLaunchState, Never>) {
+            self.continuation = continuation
+        }
+
+        func resume(_ value: HelperLaunchState) {
+            let pending = lock.withLock { () -> CheckedContinuation<HelperLaunchState, Never>? in
+                defer { continuation = nil }
+                return continuation
+            }
+            pending?.resume(returning: value)
         }
     }
 }

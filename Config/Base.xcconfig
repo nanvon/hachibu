@@ -8,6 +8,12 @@ PRODUCT_BUNDLE_IDENTIFIER = io.github.nanvon.hachibu
 MARKETING_VERSION = 0.1.10
 CURRENT_PROJECT_VERSION = $(MARKETING_VERSION)
 
+// 特权 helper 的 launchd label，每个版本不同。ad-hoc 签名没有 Team ID，系统按 label 建后台项目记录并记下
+// helper 的 cdhash，之后不再更新；沿用旧 label 时升级后的 helper 会被拒绝启动。见 docs/v1技术设计.md 21.3。
+// Debug 构建另用一个 label，不与同版本的正式版共用记录。
+HACHIBU_HELPER_LABEL = io.github.nanvon.hachibu.helper.$(MARKETING_VERSION)
+HACHIBU_HELPER_LABEL[config=Debug] = io.github.nanvon.hachibu.helper.$(MARKETING_VERSION).debug
+
 MACOSX_DEPLOYMENT_TARGET = 14.0
 ARCHS = arm64
 SWIFT_VERSION = 6.0

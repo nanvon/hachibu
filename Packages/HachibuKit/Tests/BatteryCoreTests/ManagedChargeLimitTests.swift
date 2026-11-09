@@ -91,4 +91,17 @@ import Testing
         #expect(ChargeHelperMarker(featureState: 1, limitValue: 15).restoredLimit == 80)
         #expect(ChargeHelperMarker(featureState: 0, limitValue: 80).restoredLimit == nil)
     }
+
+    @Test func helperLabelsCarryVersionSuffix() {
+        #expect(ChargeHelper.isValidLabel("io.github.nanvon.hachibu.helper"))
+        #expect(ChargeHelper.isValidLabel("io.github.nanvon.hachibu.helper.0.1.11"))
+        #expect(ChargeHelper.isValidLabel("io.github.nanvon.hachibu.helper.0.1.11.debug"))
+        #expect(!ChargeHelper.isValidLabel("io.github.nanvon.hachibu.helper."))
+        #expect(!ChargeHelper.isValidLabel("io.github.nanvon.hachibu.helperx"))
+        #expect(!ChargeHelper.isValidLabel("io.github.nanvon.hachibu.helper.0 1"))
+        #expect(!ChargeHelper.isValidLabel("com.example.helper.0.1.11"))
+        #expect(ChargeHelper.plistName(for: "io.github.nanvon.hachibu.helper.0.1.11") == "io.github.nanvon.hachibu.helper.0.1.11.plist")
+        // 测试进程的 Info.plist 没有这个 key，退回固定 label。
+        #expect(ChargeHelper.label == ChargeHelper.legacyLabel)
+    }
 }

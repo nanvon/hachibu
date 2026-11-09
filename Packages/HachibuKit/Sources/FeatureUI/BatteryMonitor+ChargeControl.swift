@@ -121,6 +121,8 @@ extension BatteryMonitor {
         Task { await sampler.endOpenPolicyPeriods(at: Date()) }
         helperService.refresh()
         helperRefreshedAt = Date()
+        let helperService = helperService
+        Task { await helperService.migrateFromPreviousLabel() }
         leaseTask?.cancel()
         leaseTask = Task { [weak self] in
             while !Task.isCancelled {
