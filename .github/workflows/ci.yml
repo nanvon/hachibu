@@ -63,6 +63,13 @@ jobs:
         target: [BatteryCoreTests, HistoryStoreTests, FeatureUITests]
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # checkout 把所有文件写成当前时间，会让 SwiftPM/Xcode 认为源码全变了。
+      # 先恢复成各文件最后一次提交的时间，缓存里的编译产物才能真正复用。
+      - name: 恢复文件修改时间
+        run: python3 scripts/restore-git-mtimes.py
 
       - name: 选择最新 Xcode
         uses: maxim-lobanov/setup-xcode@v1
@@ -75,7 +82,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: Packages/HachibuKit/.build
-          key: spm-${{ runner.os }}-${{ hashFiles('Packages/HachibuKit/Package.resolved') }}-v1
+          key: spm-${{ runner.os }}-${{ hashFiles('Packages/HachibuKit/Package.resolved') }}-v2
           restore-keys: |
             spm-${{ runner.os }}-${{ hashFiles('Packages/HachibuKit/Package.resolved') }}-
 
@@ -94,6 +101,11 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 恢复文件修改时间
+        run: python3 scripts/restore-git-mtimes.py
 
       - name: 选择最新 Xcode
         uses: maxim-lobanov/setup-xcode@v1
@@ -116,7 +128,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: build/DerivedData
-          key: xcode-${{ runner.os }}-${{ hashFiles('project.yml', 'Config/**', 'Packages/HachibuKit/Package.resolved') }}-v1
+          key: xcode-${{ runner.os }}-${{ hashFiles('project.yml', 'Config/**', 'Packages/HachibuKit/Package.resolved') }}-v2
           restore-keys: |
             xcode-${{ runner.os }}-${{ hashFiles('project.yml', 'Config/**', 'Packages/HachibuKit/Package.resolved') }}-
 
