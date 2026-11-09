@@ -348,6 +348,16 @@
         }
       }
     },
+    "Allow Hachibu Helper first so Hachibu can restore the charge limit, then remove it." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请先允许 Hachibu Helper，让 Hachibu 恢复充电上限后再移除。"
+          }
+        }
+      }
+    },
     "Allow Notifications…" : {
       "localizations" : {
         "zh-Hans" : {
@@ -560,6 +570,16 @@
         }
       }
     },
+    "Calibration needs Hachibu Helper to discharge to 15%. Set it up under Battery Charging first." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "校准需要 Hachibu Helper 将电量放至 15%，请先在“电池充电”中安装。"
+          }
+        }
+      }
+    },
     "Calibration paused because another charge control app is running." : {
       "localizations" : {
         "zh-Hans" : {
@@ -576,6 +596,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "校准已暂停，无法修改充电上限。Hachibu 会重试。"
+          }
+        }
+      }
+    },
+    "Calibration paused. Allow Hachibu Helper in Settings to continue." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "校准已暂停，请在设置中允许 Hachibu Helper 后继续。"
           }
         }
       }
@@ -721,7 +751,6 @@
       }
     },
     "Charge Limit" : {
-      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -747,6 +776,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "充电上限未生效"
+          }
+        }
+      }
+    },
+    "After you install it, System Settings opens: turn on Hachibu under Background App Activity. macOS may ask for your password." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "安装后会打开系统设置，请在“后台App活动”中打开 Hachibu，系统可能要求输入密码。"
           }
         }
       }
@@ -812,12 +851,32 @@
         }
       }
     },
+    "Check Again" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重新检查"
+          }
+        }
+      }
+    },
     "Check for Updates…" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "检查更新…"
+          }
+        }
+      }
+    },
+    "Checking…" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在检查…"
           }
         }
       }
@@ -872,6 +931,16 @@
         }
       }
     },
+    "Could not install Hachibu Helper: %@" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法安装 Hachibu Helper：%@"
+          }
+        }
+      }
+    },
     "Could not open Battery settings. Open System Settings → Battery manually." : {
       "localizations" : {
         "zh-Hans" : {
@@ -888,6 +957,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "无法读取文件。"
+          }
+        }
+      }
+    },
+    "Could not safely remove Hachibu Helper. Check the charge limit and try again." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未能安全移除 Hachibu Helper。请检查充电上限后重试。"
           }
         }
       }
@@ -1183,6 +1262,36 @@
         }
       }
     },
+    "Hachibu first returns the charge limit to 80% or higher, then removes Hachibu Helper and cancels the current calibration. Limits below 80% and calibration will no longer be available." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hachibu 会先将充电上限恢复到 80% 或以上，再移除 Hachibu Helper 并取消当前校准。之后将无法使用低于 80% 的上限和电池校准。"
+          }
+        }
+      }
+    },
+    "Hachibu first returns the charge limit to 80% or higher, then removes Hachibu Helper. Limits below 80% and calibration will no longer be available." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hachibu 会先将充电上限恢复至 80% 或更高，再移除 Hachibu Helper。移除后将无法使用低于 80% 的上限和校准功能。"
+          }
+        }
+      }
+    },
+    "Hachibu Helper" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hachibu Helper"
+          }
+        }
+      }
+    },
     "Hachibu keeps its own limit while it runs. Choose what happens when it quits below." : {
       "localizations" : {
         "zh-Hans" : {
@@ -1383,6 +1492,16 @@
         }
       }
     },
+    "In System Settings → General → Login Items & Extensions, turn on Hachibu under Background App Activity. macOS may ask for your password. If it is already on but this still shows, turn it off and on again, or reinstall." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请在“系统设置 → 通用 → 登录项与扩展”的“后台App活动”中打开 Hachibu，系统可能要求输入密码。如果已经打开但这里仍显示需要允许，请把开关关闭后重新打开，或重新安装。"
+          }
+        }
+      }
+    },
     "Input Voltage · Current" : {
       "localizations" : {
         "zh-Hans" : {
@@ -1399,6 +1518,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "安装…"
+          }
+        }
+      }
+    },
+    "Installing…" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在安装…"
           }
         }
       }
@@ -1473,6 +1602,16 @@
         }
       }
     },
+    "Last Calibration" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上次校准"
+          }
+        }
+      }
+    },
     "Last updated %@" : {
       "localizations" : {
         "zh-Hans" : {
@@ -1533,6 +1672,16 @@
         }
       }
     },
+    "Limits below 80%% need Hachibu Helper, which you can set up in Settings. Using %lld%% for now." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "低于 80%% 的上限需要 Hachibu Helper，可在设置中安装，当前按 %lld%% 执行。"
+          }
+        }
+      }
+    },
     "Line" : {},
     "Low Power Mode" : {
       "localizations" : {
@@ -1560,6 +1709,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "macOS"
+          }
+        }
+      }
+    },
+    "macOS allows Hachibu Helper, but Hachibu can't connect to it. Check again, or reinstall it." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "系统已允许 Hachibu Helper，但 Hachibu 无法连接。请重新检查，或重新安装。"
           }
         }
       }
@@ -1744,6 +1903,26 @@
         }
       }
     },
+    "Only needed for limits below 80% and battery calibration; limits from 80% to 100% work without it. It runs as root and can only change the charge limit." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "只有低于 80% 的上限和电池校准需要它，80%–100% 的上限不用安装。它以 root 运行，只能修改充电上限。"
+          }
+        }
+      }
+    },
+    "Needs Permission" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "需要允许"
+          }
+        }
+      }
+    },
     "No Battery Detected" : {
       "localizations" : {
         "zh-Hans" : {
@@ -1800,6 +1979,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "未请求"
+          }
+        }
+      }
+    },
+    "Not Responding" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无响应"
           }
         }
       }
@@ -1939,6 +2128,16 @@
         }
       }
     },
+    "Open System Settings…" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开系统设置…"
+          }
+        }
+      }
+    },
     "Optimized Battery Charging is on and may hold the charge lower. Turn it off in Battery settings." : {
       "localizations" : {
         "zh-Hans" : {
@@ -2059,6 +2258,16 @@
         }
       }
     },
+    "Paused. Allow Hachibu Helper in Settings to continue." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已暂停，请在设置中允许 Hachibu Helper 后继续。"
+          }
+        }
+      }
+    },
     "Paused. Plug in the power adapter to continue." : {
       "localizations" : {
         "zh-Hans" : {
@@ -2149,6 +2358,16 @@
         }
       }
     },
+    "Reinstall" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重新安装"
+          }
+        }
+      }
+    },
     "Remove" : {
       "localizations" : {
         "zh-Hans" : {
@@ -2159,12 +2378,32 @@
         }
       }
     },
+    "Remove Hachibu Helper?" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移除 Hachibu Helper？"
+          }
+        }
+      }
+    },
     "Remove…" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "移除…"
+          }
+        }
+      }
+    },
+    "Removing…" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在移除…"
           }
         }
       }
@@ -2230,6 +2469,7 @@
       }
     },
     "Segment" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -2627,12 +2867,32 @@
         }
       }
     },
+    "The saved system limit could not be read. Check the charge limit in System Settings before removing Hachibu Helper." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法读取保存的系统上限。移除 Hachibu Helper 前，请先在系统设置中检查充电上限。"
+          }
+        }
+      }
+    },
     "The system could not find this login item." : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "系统找不到此登录项。"
+          }
+        }
+      }
+    },
+    "This copy of Hachibu is missing Hachibu Helper. Download Hachibu again and replace the app." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当前的 Hachibu 缺少 Hachibu Helper，请重新下载并替换 App。"
           }
         }
       }
@@ -2791,177 +3051,7 @@
         }
       }
     },
-    "Zero" : {},
-    "Background Item" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "后台组件"
-          }
-        }
-      }
-    },
-    "Could not install the background item. Try again or check the error below." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "无法安装后台组件，请重试或查看下方错误信息。"
-          }
-        }
-      }
-    },
-    "Calibration needs the background item to discharge to 15%." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "校准需要后台组件将电量放至 15%。"
-          }
-        }
-      }
-    },
-    "Calibration paused. Approve the Hachibu background item in Login Items to continue." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "校准已暂停，请在“登录项”中批准 Hachibu 后台组件后继续。"
-          }
-        }
-      }
-    },
-    "Charge limits below 80% and battery calibration need a background item that runs as root. It can only change the charge limit. After installing, approve Hachibu in System Settings → General → Login Items & Extensions. Until then, Hachibu uses 80%." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "低于 80% 的上限和电池校准需要以 root 运行的后台组件，它只能修改充电上限。安装后，请在“系统设置 → 通用 → 登录项与扩展”中批准 Hachibu。批准前仍按 80% 执行。"
-          }
-        }
-      }
-    },
-    "Could not safely remove the background item. Check the charge limit and try again." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "未能安全移除后台组件。请检查充电上限后重试。"
-          }
-        }
-      }
-    },
-    "Hachibu first returns the charge limit to 80% or higher, then removes the background item. Limits below 80% and calibration will no longer be available." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Hachibu 会先将充电上限恢复至 80% 或更高，再移除后台组件。移除后将无法使用低于 80% 的上限和校准功能。"
-          }
-        }
-      }
-    },
-    "Install" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "安装"
-          }
-        }
-      }
-    },
-    "Install Background Item?" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "安装后台组件？"
-          }
-        }
-      }
-    },
-    "Needed for limits below 80% and battery calibration. It runs as root and can only change the charge limit." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "低于 80% 的上限和电池校准需要此组件。它以 root 运行，只能修改充电上限。"
-          }
-        }
-      }
-    },
-    "Not Now" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "暂不安装"
-          }
-        }
-      }
-    },
-    "Paused. Approve the Hachibu background item in Settings to continue." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已暂停，请在设置中批准 Hachibu 后台组件后继续。"
-          }
-        }
-      }
-    },
-    "Remove Background Item?" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "移除后台组件？"
-          }
-        }
-      }
-    },
-    "The saved system limit could not be read. Check the charge limit in System Settings before removing the background item." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "无法读取保存的系统上限。移除后台组件前，请先在系统设置中检查充电上限。"
-          }
-        }
-      }
-    },
-    "Waiting for Approval" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "等待批准"
-          }
-        }
-      }
-    },
-    "Waiting for the background item to be approved. Using %lld%% for now." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "等待批准后台组件，当前仍按 %lld%% 执行。"
-          }
-        }
-      }
-    },
-    "macOS Last Charged to Full" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "系统上次充满"
-          }
-        }
-      }
-    }
+    "Zero" : {}
   },
   "version" : "1.0"
 }

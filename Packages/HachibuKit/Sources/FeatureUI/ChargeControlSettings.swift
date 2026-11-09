@@ -65,16 +65,14 @@ struct ChargeControlModeRow: View {
     }
 }
 
-/// 接管模式的充电上限：档位加步进器（精确到 1%），退出后的处理，后台组件，当前状态。
+/// 接管模式的充电上限：档位加步进器（精确到 1%），退出后的处理。
 struct ManagedChargeLimitRows: View {
     @Bindable var settings: AppSettings
     let control: ChargeLimitControl
-    let snapshot: BatterySnapshot
     let monitor: BatteryMonitor
-    @Binding var pendingHelperInstall: Bool
-    @State private var pendingRemoval = false
     @State private var removalFailed = false
     @State private var helperStatus: ChargeHelperStatus?
+    @State private var helperCheckFinished = false
 
     var body: some View {
         SettingsRow(Text("Charge Limit", bundle: .module)) {
@@ -84,10 +82,10 @@ struct ManagedChargeLimitRows: View {
                 text: settings.managedChargeLimit >= 100 ? String(localized: "Off", bundle: .module) : DisplayFormat.percent(settings.managedChargeLimit),
                 label: Text("Charge Limit", bundle: .module)
             )
-            .disabled(control.isBlocked)
+            .disabled(control.isBlocked || monitor.isRemovingChargeHelper)
         }
         LimitSegments(options: control.options, selection: control.percent) { settings.managedChargeLimit = $0 }
-            .disabled(control.isBlocked)
+            .disabled(control.isBlocked || monitor.isRemovingChargeHelper)
             .padding(.bottom, 10)
         ManagedLimitNote(control: control)
             .font(.system(size: 11.5))
@@ -103,94 +101,211 @@ struct ManagedChargeLimitRows: View {
                 label: Text("After Quitting Hachibu", bundle: .module)
             )
         }
+    }
+}
 
-        if showsHelperRow {
-            SettingsRowDivider()
-            helperRow
-        }
-        if helperStatus?.isMarkerCorrupt == true {
-            SettingsNote(text: Text("The saved system limit could not be read. Check the charge limit in System Settings before removing the background item.", bundle: .module), isError: true)
-        }
-        if removalFailed {
-            SettingsNote(text: Text("Could not safely remove the background item. Check the charge limit and try again.", bundle: .module), isError: true)
-        }
-        if let error = helper.registrationError {
-            SettingsNote(text: Text("Could not install the background item. Try again or check the error below.", bundle: .module), isError: true)
-            SettingsNote(text: Text(verbatim: error), isError: true)
-        }
+/// Hachibu Helper 行：接管模式下始终显示，装过时任何模式都显示，保证随时能移除。
+/// 点“安装…”直接注册，不另弹说明，用途和下一步写在行内文字里。
+struct ChargeHelperRows: View {
+    @Bindable var settings: AppSettings
+    let monitor: BatteryMonitor
+    @State private var pendingRemoval = false
+    @State private var removalFailed = false
+    @State private var helperStatus: ChargeHelperStatus?
+    @State private var helperCheckFinished = false
+
+    var body: some View {
+        helperRow
+        helperNotes
     }
 
     private var helper: ChargeHelperService { monitor.helperService }
 
-    private var showsHelperRow: Bool {
-        helper.state != .notRegistered || helper.registrationError != nil || settings.managedChargeLimit < ManagedChargeLimit.helperThreshold
+    /// 注册、重新安装或移除进行中。
+    private var isHelperBusy: Bool { helper.isBusy || monitor.isRemovingChargeHelper }
+
+    /// 系统已允许，但连接 helper 失败。
+    private var isHelperUnreachable: Bool {
+        helper.state == .enabled && helperCheckFinished && helperStatus == nil
     }
 
     @ViewBuilder
     private var helperRow: some View {
         SettingsRow(
-            Text("Background Item", bundle: .module),
+            Text("Hachibu Helper", bundle: .module),
             subtitle: ChargeHelperService.isBelowThresholdSupported
-                ? Text("Needed for limits below 80% and battery calibration. It runs as root and can only change the charge limit.", bundle: .module)
+                ? Text("Only needed for limits below 80% and battery calibration; limits from 80% to 100% work without it. It runs as root and can only change the charge limit.", bundle: .module)
                 : Text("Limits below 80% are not available on this version of macOS yet.", bundle: .module)
         ) {
             HStack(spacing: 10) {
                 helperPill
-                switch helper.state.action {
-                case .install:
-                    Button { pendingHelperInstall = true } label: { Text("Install…", bundle: .module) }
-                        .settingsButtonStyle()
-                        .disabled(!ChargeHelperService.isBelowThresholdSupported)
-                case .approve:
-                    Button { helper.openLoginItems() } label: { Text("Open Login Items Settings…", bundle: .module) }
-                        .settingsButtonStyle()
-                case .remove:
-                    Button { pendingRemoval = true } label: { Text("Remove…", bundle: .module) }
-                        .settingsButtonStyle()
-                        .disabled(monitor.isWritingChargeLimit)
-                }
+                    .fixedSize()
+                helperButton
+                    .fixedSize()
             }
         }
         .alert(
-            Text("Remove Background Item?", bundle: .module),
+            Text("Remove Hachibu Helper?", bundle: .module),
             isPresented: $pendingRemoval
         ) {
-            Button(role: .destructive) {
-                if settings.managedChargeLimit < ManagedChargeLimit.helperThreshold {
-                    settings.managedChargeLimit = ManagedChargeLimit.helperThreshold
-                }
-                Task { removalFailed = !(await monitor.removeChargeHelper()) }
-            } label: {
-                Text("Remove", bundle: .module)
-            }
+            Button(role: .destructive) { remove() } label: { Text("Remove", bundle: .module) }
             Button(role: .cancel) {} label: { Text("Cancel", bundle: .module) }
         } message: {
-            Text("Hachibu first returns the charge limit to 80% or higher, then removes the background item. Limits below 80% and calibration will no longer be available.", bundle: .module)
+            if monitor.calibration != nil {
+                Text("Hachibu first returns the charge limit to 80% or higher, then removes Hachibu Helper and cancels the current calibration. Limits below 80% and calibration will no longer be available.", bundle: .module)
+            } else {
+                Text("Hachibu first returns the charge limit to 80% or higher, then removes Hachibu Helper. Limits below 80% and calibration will no longer be available.", bundle: .module)
+            }
         }
-        .task(id: helper.state) { helperStatus = await helper.helperStatus() }
+        .task(id: helper.state) { await watchHelper() }
     }
 
-    private var helperPill: some View {
+    /// 每个状态只有一个主要操作，放在状态旁边；补救操作放在说明下面。
+    @ViewBuilder
+    private var helperButton: some View {
         switch helper.state {
-        case .notRegistered: StatusPill(text: Text("Not Installed", bundle: .module))
-        case .requiresApproval: StatusPill(text: Text("Waiting for Approval", bundle: .module), tint: .orange)
-        case .enabled: StatusPill(text: Text("Enabled", bundle: .module), tint: .green)
-        case .unavailable: StatusPill(text: Text("Unavailable", bundle: .module), tint: .red)
+        case .notRegistered:
+            Button { helper.register() } label: { Text("Install…", bundle: .module) }
+                .settingsButtonStyle()
+                .focusable(false)
+                .disabled(!ChargeHelperService.isBelowThresholdSupported || isHelperBusy)
+        case .unavailable:
+            // 重新安装解决不了缺少文件，只留说明。
+            EmptyView()
+        case .requiresApproval:
+            Button { helper.openLoginItems() } label: { Text("Open System Settings…", bundle: .module) }
+                .settingsButtonStyle()
+                .focusable(false)
+                .disabled(isHelperBusy)
+        case .enabled:
+            if isHelperUnreachable {
+                Button { Task { await checkHelper() } } label: { Text("Check Again", bundle: .module) }
+                    .settingsButtonStyle()
+                    .focusable(false)
+                    .disabled(isHelperBusy)
+            } else {
+                Button { pendingRemoval = true } label: { Text("Remove…", bundle: .module) }
+                    .settingsButtonStyle()
+                    .focusable(false)
+                    .disabled(monitor.isWritingChargeLimit || isHelperBusy || !helperCheckFinished)
+            }
         }
     }
-}
 
-/// 安装后台组件前的说明，确认后注册；需要批准时打开“登录项与扩展”。
-struct ChargeHelperInstallAlert: ViewModifier {
-    @Binding var isPresented: Bool
-    let helper: ChargeHelperService
+    @ViewBuilder
+    private var helperNotes: some View {
+        switch helper.state {
+        case .requiresApproval:
+            SettingsNote(text: Text("In System Settings → General → Login Items & Extensions, turn on Hachibu under Background App Activity. macOS may ask for your password. If it is already on but this still shows, turn it off and on again, or reinstall.", bundle: .module))
+            SettingsPanelFooter {
+                Button { pendingRemoval = true } label: { Text("Remove…", bundle: .module) }
+                    .settingsButtonStyle()
+                    .focusable(false)
+                    .disabled(monitor.isWritingChargeLimit || isHelperBusy)
+                reinstallButton
+            }
+        case .enabled where isHelperUnreachable:
+            SettingsNote(text: Text("macOS allows Hachibu Helper, but Hachibu can't connect to it. Check again, or reinstall it.", bundle: .module), isError: true)
+            SettingsPanelFooter { reinstallButton }
+        case .unavailable:
+            SettingsNote(text: Text("This copy of Hachibu is missing Hachibu Helper. Download Hachibu again and replace the app.", bundle: .module), isError: true)
+        case .notRegistered where ChargeHelperService.isBelowThresholdSupported && !helper.isBusy:
+            SettingsNote(text: Text("After you install it, System Settings opens: turn on Hachibu under Background App Activity. macOS may ask for your password.", bundle: .module))
+        case .notRegistered, .enabled:
+            EmptyView()
+        }
+        if let error = helper.registrationError, helper.state == .notRegistered {
+            SettingsNote(text: Text("Could not install Hachibu Helper: \(error)", bundle: .module), isError: true)
+        }
+        if helperStatus?.isMarkerCorrupt == true {
+            SettingsNote(text: Text("The saved system limit could not be read. Check the charge limit in System Settings before removing Hachibu Helper.", bundle: .module), isError: true)
+        }
+        if removalFailed {
+            if helper.state == .requiresApproval {
+                SettingsNote(text: Text("Allow Hachibu Helper first so Hachibu can restore the charge limit, then remove it.", bundle: .module), isError: true)
+            } else {
+                SettingsNote(text: Text("Could not safely remove Hachibu Helper. Check the charge limit and try again.", bundle: .module), isError: true)
+            }
+        }
+    }
 
-    func body(content: Content) -> some View {
-        content.alert(Text("Install Background Item?", bundle: .module), isPresented: $isPresented) {
-            Button { helper.register() } label: { Text("Install", bundle: .module) }
-            Button(role: .cancel) {} label: { Text("Not Now", bundle: .module) }
-        } message: {
-            Text("Charge limits below 80% and battery calibration need a background item that runs as root. It can only change the charge limit. After installing, approve Hachibu in System Settings → General → Login Items & Extensions. Until then, Hachibu uses 80%.", bundle: .module)
+    private var reinstallButton: some View {
+        Button {
+            removalFailed = false
+            Task {
+                await helper.reinstall()
+                // 状态没变（仍是“已允许”）时 `.task(id:)` 不会重新运行，这里再检查一次连接。
+                if helper.state == .enabled { await checkHelper() }
+            }
+        } label: {
+            Text("Reinstall", bundle: .module)
+        }
+        .settingsButtonStyle()
+        .focusable(false)
+        .disabled(isHelperBusy || monitor.isWritingChargeLimit)
+    }
+
+    /// 移除成功后，低于 80% 的目标已无法生效，改为 80%；失败时目标不变。
+    private func remove() {
+        removalFailed = false
+        Task {
+            let removed = await monitor.removeChargeHelper()
+            removalFailed = !removed
+            if removed, settings.managedChargeLimit < ManagedChargeLimit.helperThreshold {
+                settings.managedChargeLimit = ManagedChargeLimit.helperThreshold
+            }
+        }
+    }
+
+    /// 按状态检查连接或等待用户在系统设置里允许。状态变化时 `.task(id:)` 取消并重新运行。
+    private func watchHelper() async {
+        switch helper.state {
+        case .enabled:
+            await checkHelper()
+            // 刚允许时立即按目标重新判断，不等下一次读数。
+            if helperStatus != nil { monitor.publishChargeControl() }
+        case .requiresApproval:
+            helperStatus = nil
+            helperCheckFinished = false
+            // 用户在系统设置里打开开关后，菜单栏 App 不一定会收到激活通知，所以定时刷新状态。
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(2))
+                guard !Task.isCancelled else { return }
+                helper.refresh()
+            }
+        case .notRegistered, .unavailable:
+            helperStatus = nil
+            helperCheckFinished = false
+        }
+    }
+
+    private func checkHelper() async {
+        helperCheckFinished = false
+        let status = await helper.connectedStatus()
+        guard !Task.isCancelled else { return }
+        helperStatus = status
+        helperCheckFinished = true
+    }
+
+    @ViewBuilder private var helperPill: some View {
+        if monitor.isRemovingChargeHelper {
+            StatusPill(text: Text("Removing…", bundle: .module))
+        } else if helper.isBusy {
+            StatusPill(text: Text("Installing…", bundle: .module))
+        } else {
+            switch helper.state {
+            case .notRegistered: StatusPill(text: Text("Not Installed", bundle: .module))
+            case .requiresApproval: StatusPill(text: Text("Needs Permission", bundle: .module), tint: .orange)
+            case .enabled:
+                if !helperCheckFinished {
+                    StatusPill(text: Text("Checking…", bundle: .module))
+                } else if helperStatus == nil {
+                    StatusPill(text: Text("Not Responding", bundle: .module), tint: .red)
+                } else {
+                    StatusPill(text: Text("Enabled", bundle: .module), tint: .green)
+                }
+            case .unavailable: StatusPill(text: Text("Unavailable", bundle: .module), tint: .red)
+            }
         }
     }
 }
@@ -211,12 +326,11 @@ struct RegistrationSubtitle {
 struct CalibrationSettingsGroup: View {
     @Bindable var settings: AppSettings
     let monitor: BatteryMonitor
-    @Binding var pendingHelperInstall: Bool
     @State private var startStep: CalibrationStep?
     @State private var suggestedStep: CalibrationStep = .chargeToFull
     @State private var pendingStart = false
     @State private var runs: [CalibrationRun] = []
-    @State private var lastFullCharge: Date?
+    @State private var lastCalibration: CalibrationRun?
     @State private var showsAllRecords = false
     @Environment(\.locale) private var locale
 
@@ -243,9 +357,14 @@ struct CalibrationSettingsGroup: View {
                 )
             }
             SettingsRowDivider()
-            SettingsRow(Text("macOS Last Charged to Full", bundle: .module)) {
-                Text(verbatim: lastFullCharge.map { $0.formatted(.dateTime.year().month(.abbreviated).day().hour().minute().locale(locale)) } ?? DisplayFormat.missing)
-                    .foregroundStyle(.secondary)
+            SettingsRow(Text("Last Calibration", bundle: .module)) {
+                HStack(spacing: 8) {
+                    Text(verbatim: lastCalibration?.endedAt.map { $0.formatted(.dateTime.year().month(.abbreviated).day().hour().minute().locale(locale)) } ?? DisplayFormat.missing)
+                        .foregroundStyle(.secondary)
+                    if let lastCalibration {
+                        CalibrationResultPill(result: lastCalibration.result)
+                    }
+                }
             }
             if !runs.isEmpty {
                 SettingsRowDivider()
@@ -295,24 +414,18 @@ struct CalibrationSettingsGroup: View {
         SettingsRowDivider()
         SettingsPanelFooter {
             Button {
-                if monitor.helperService.isReady {
-                    Task {
-                        suggestedStep = await monitor.suggestedCalibrationStart()
-                        pendingStart = true
-                    }
-                } else if monitor.helperService.state == .requiresApproval {
-                    monitor.helperService.openLoginItems()
-                } else {
-                    pendingHelperInstall = true
+                Task {
+                    suggestedStep = await monitor.suggestedCalibrationStart()
+                    pendingStart = true
                 }
             } label: {
                 Text("Start Calibration…", bundle: .module)
             }
             .settingsButtonStyle()
-            .disabled(monitor.isChargeControlAppRunning || !ChargeHelperService.isBelowThresholdSupported)
+            .disabled(monitor.isChargeControlAppRunning || !monitor.helperService.isReady)
         }
         if !monitor.helperService.isReady {
-            SettingsNote(text: Text("Calibration needs the background item to discharge to 15%.", bundle: .module))
+            SettingsNote(text: Text("Calibration needs Hachibu Helper to discharge to 15%. Set it up under Battery Charging first.", bundle: .module))
         }
     }
 
@@ -355,9 +468,17 @@ struct CalibrationSettingsGroup: View {
     }
 
     private func reload() async {
-        runs = await monitor.calibrationHistory(limit: showsAllRecords ? Int.max : 5)
-        lastFullCharge = await monitor.lastFullChargeDate()
+        // 进度结束时先等记录写入，避免界面读到尚未结束的旧数据。
+        _ = await monitor.calibrationRecordTask?.value
+        let history = await monitor.calibrationHistory(limit: Int.max)
+        lastCalibration = Self.latestFinishedCalibration(in: history)
+        runs = showsAllRecords ? history : Array(history.prefix(5))
         suggestedStep = await monitor.suggestedCalibrationStart()
+    }
+
+    static func latestFinishedCalibration(in runs: [CalibrationRun]) -> CalibrationRun? {
+        runs.filter { $0.endedAt != nil && $0.result != nil }
+            .max { ($0.endedAt ?? .distantPast) < ($1.endedAt ?? .distantPast) }
     }
 }
 
@@ -438,7 +559,7 @@ struct CalibrationRecordRows: View {
                         .foregroundStyle(.secondary)
                         .monospacedDigit()
                 }
-                result(run)
+                CalibrationResultPill(result: run.result)
             }
             .font(.system(size: 12))
             .frame(minHeight: 26)
@@ -457,9 +578,13 @@ struct CalibrationRecordRows: View {
         return "\(delta >= 0 ? "+" : "−")\(abs(delta)) mAh"
     }
 
-    @ViewBuilder
-    private func result(_ run: CalibrationRun) -> some View {
-        switch run.result {
+}
+
+private struct CalibrationResultPill: View {
+    let result: CalibrationResult?
+
+    var body: some View {
+        switch result {
         case .completed?: StatusPill(text: Text("Completed", bundle: .module), tint: .green)
         case .cancelled?: StatusPill(text: Text("Cancelled", bundle: .module))
         case .interrupted?: StatusPill(text: Text("Interrupted", bundle: .module), tint: .orange)

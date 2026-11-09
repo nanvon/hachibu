@@ -65,7 +65,7 @@ Requires macOS 26.4 or later. The default, Follow System Settings, changes the s
 - **When above the limit** — By default, Discharge to Limit: macOS runs on battery until the charge drops to the limit. With Hold Current Charge, Hachibu temporarily sets the system limit to the current level (up to 99%), so the charger powers your Mac and the battery stops discharging. Your limit is restored when you unplug, switch back to the default, or quit Hachibu.
 - **Other charge control apps** — The charge limit is not changed while another charge control app is running.
 
-Charge control uses the native macOS limit without writing SMC keys or cutting adapter power. System calibration, forced full charges and Optimized Battery Charging remain under macOS control. If you have used the background item, remove it in Settings before quitting and deleting the app. See the [validation steps (Chinese)](docs/充电接管与校准验收.md).
+Charge control uses the native macOS limit without writing SMC keys or cutting adapter power. System calibration, forced full charges and Optimized Battery Charging remain under macOS control. If you have used Hachibu Helper, remove it in Settings before quitting and deleting the app. See the [validation steps (Chinese)](docs/充电接管与校准验收.md).
 
 ### History
 

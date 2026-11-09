@@ -58,7 +58,7 @@ public final class SystemAlertNotifier: NSObject, AlertNotifier, UNUserNotificat
             case .writeFailed:
                 content.body = String(localized: "Calibration paused because the charge limit could not be changed. Hachibu will retry.", bundle: .module)
             case .helperUnavailable:
-                content.body = String(localized: "Calibration paused. Approve the Hachibu background item in Login Items to continue.", bundle: .module)
+                content.body = String(localized: "Calibration paused. Allow Hachibu Helper in Settings to continue.", bundle: .module)
             case .user, .systemPolicy:
                 return
             }

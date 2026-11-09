@@ -42,7 +42,6 @@ struct SettingsPageContent: View {
     @State private var loginItem = LoginItem()
     @State private var isExporting = false
     @State private var couldNotOpenBatterySettings = false
-    @State private var pendingHelperInstall = false
 
     var body: some View {
         // 充电上限最常用，放在最前；导入、诊断和关于用得少，放在后面。
@@ -50,7 +49,7 @@ struct SettingsPageContent: View {
             chargingGroup
             if settings.chargeControlMode == .managed, chargeLimitControl != nil {
                 SettingsGroupDivider()
-                CalibrationSettingsGroup(settings: settings, monitor: monitor, pendingHelperInstall: $pendingHelperInstall)
+                CalibrationSettingsGroup(settings: settings, monitor: monitor)
             }
             SettingsGroupDivider()
             menuBarGroup
@@ -68,29 +67,15 @@ struct SettingsPageContent: View {
         .onAppear {
             loginItem.refresh()
             monitor.helperService.refresh()
-            promptHelperInstallIfNeeded()
         }
         // 用户可能在系统设置里批准或关闭登录项后切回来。
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             loginItem.refresh()
             monitor.helperService.refresh()
         }
-        .onChange(of: settings.managedChargeLimit) { promptHelperInstallIfNeeded() }
-        .onChange(of: settings.chargeControlMode) { promptHelperInstallIfNeeded() }
-        .modifier(ChargeHelperInstallAlert(isPresented: $pendingHelperInstall, helper: monitor.helperService))
     }
 
     // MARK: 电池充电
-
-    /// 接管模式下选了低于 80% 的目标而后台组件还没安装时，先说明再安装。
-    private func promptHelperInstallIfNeeded() {
-        guard settings.chargeControlMode == .managed,
-              settings.managedChargeLimit < ManagedChargeLimit.helperThreshold,
-              monitor.helperService.state.canInstall,
-              ChargeHelperService.isBelowThresholdSupported
-        else { return }
-        pendingHelperInstall = true
-    }
 
     private var chargingDescription: Text {
         if chargeLimitControl == nil {
@@ -122,14 +107,15 @@ struct SettingsPageContent: View {
                     ChargeControlModeRow(settings: settings, snapshot: snapshot, isDisabled: control.isBlocked)
                     SettingsRowDivider()
                     if control.mode == .managed {
-                        ManagedChargeLimitRows(
-                            settings: settings, control: control, snapshot: snapshot, monitor: monitor,
-                            pendingHelperInstall: $pendingHelperInstall
-                        )
+                        ManagedChargeLimitRows(settings: settings, control: control, monitor: monitor)
                     } else {
                         ChargeLimitControlRows(control: control) { change in
                             Task { await monitor.setChargeLimit(change) }
                         }
+                    }
+                    if control.mode == .managed || monitor.helperService.state != .notRegistered {
+                        SettingsRowDivider()
+                        ChargeHelperRows(settings: settings, monitor: monitor)
                     }
                     if control.isEnabled {
                         SettingsRowDivider()

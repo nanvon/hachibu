@@ -89,7 +89,7 @@ extension CalibrationPauseReason {
         case .systemPolicy: Text("Paused while macOS charges to full. Continues afterwards.", bundle: .module)
         case .otherTool: Text("Paused because another charge control app is running.", bundle: .module)
         case .writeFailed: Text("Paused because the charge limit could not be changed. Retrying.", bundle: .module)
-        case .helperUnavailable: Text("Paused. Approve the Hachibu background item in Settings to continue.", bundle: .module)
+        case .helperUnavailable: Text("Paused. Allow Hachibu Helper in Settings to continue.", bundle: .module)
         }
     }
 }
@@ -124,7 +124,7 @@ struct ManagedLimitNote: View {
         case .awaitingRegistration: Text("Waiting for macOS to apply the limit.", bundle: .module)
         case .appliesWhenPluggedIn: Text("Takes effect when you plug in.", bundle: .module)
         case .awaitingHelperApproval(let effective):
-            Text("Waiting for the background item to be approved. Using \(effective)% for now.", bundle: .module)
+            Text("Limits below 80% need Hachibu Helper, which you can set up in Settings. Using \(effective)% for now.", bundle: .module)
         case .systemPolicy(let policy, let limit):
             switch policy {
             case .systemCalibration, .fullChargeOverride:

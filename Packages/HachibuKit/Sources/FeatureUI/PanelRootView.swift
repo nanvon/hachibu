@@ -32,15 +32,14 @@ public struct PanelRootView: View {
             highTemperatureCelsius: settings.temperatureAlertThreshold,
             chargeLimitControl: ChargeLimitControl(monitor: monitor),
             isFlowAnimating: monitor.isPanelVisible,
-            onChangeChargeLimit: { [monitor, settings, onOpenSettings] change in
+            onChangeChargeLimit: { [monitor, settings] change in
                 guard monitor.chargeControl.mode == .managed else {
                     Task { await monitor.setChargeLimit(change) }
                     return
                 }
-                // 接管模式改的是 Hachibu 的目标。低于 80% 需要后台组件，未批准时打开设置页说明和批准，面板里不弹窗。
+                // 接管模式改的是 Hachibu 的目标。低于 80% 而 Hachibu Helper 不可用时，目标照常保存，由说明行提示。
                 let percent = if case .limit(let percent) = change { percent } else { 100 }
                 settings.managedChargeLimit = percent
-                if percent < ManagedChargeLimit.helperThreshold, !monitor.helperService.isReady { onOpenSettings() }
             },
             onOpenMainWindow: onOpenMainWindow,
             onOpenSettings: onOpenSettings,
@@ -48,8 +47,12 @@ public struct PanelRootView: View {
             calibration: CalibrationDisplay(monitor: monitor),
             onCalibrationAction: { action in
                 if action == .startAfterSystemFullCharge {
-                    if monitor.helperService.isReady { confirmsCalibration = true }
-                    else { onOpenSettings() }
+                    if monitor.helperService.isReady {
+                        confirmsCalibration = true
+                    } else {
+                        // 用户主动点了按钮，打开设置页，由 Hachibu Helper 行说明下一步。
+                        onOpenSettings()
+                    }
                 } else {
                     monitor.perform(action)
                 }

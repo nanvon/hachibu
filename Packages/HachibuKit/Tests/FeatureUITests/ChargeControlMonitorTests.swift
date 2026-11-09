@@ -21,6 +21,138 @@ import Testing
     }
 }
 
+@MainActor
+final class FakeHelperRegistration: ChargeHelperRegistration {
+    var status: SMAppService.Status = .notRegistered
+    var registrationError: Error?
+    var removalError: Error?
+    var statusOnRemovalError: SMAppService.Status?
+    var statusAfterRegister: SMAppService.Status?
+    var registrations = 0
+    var unregistrations = 0
+
+    func register() throws {
+        registrations += 1
+        if let registrationError { throw registrationError }
+        if let statusAfterRegister { status = statusAfterRegister }
+    }
+
+    func unregister() async throws {
+        unregistrations += 1
+        if let removalError {
+            if let statusOnRemovalError { status = statusOnRemovalError }
+            throw removalError
+        }
+        status = .notRegistered
+    }
+}
+
+@MainActor
+@Test func helperRegistrationWaitsForSystemPermission() {
+    let backend = FakeHelperRegistration()
+    let service = ChargeHelperService(registration: backend)
+    backend.statusAfterRegister = .requiresApproval
+    service.register()
+    #expect(service.state == .requiresApproval)
+    #expect(service.registrationError == nil)
+    #expect(!service.isReady)
+    backend.status = .enabled
+    service.refresh()
+    #expect(service.state == .enabled)
+}
+
+@MainActor
+@Test func helperRevocationAndRemovalFailurePreserveSystemState() async {
+    let backend = FakeHelperRegistration()
+    backend.status = .enabled
+    let service = ChargeHelperService(registration: backend)
+    backend.status = .requiresApproval
+    service.refresh()
+    #expect(service.state == .requiresApproval)
+
+    backend.status = .enabled
+    service.refresh()
+    backend.removalError = NSError(domain: "test", code: 1)
+    await service.unregister()
+    #expect(service.state == .enabled)
+    #expect(service.lastError != nil)
+    backend.removalError = nil
+    await service.unregister()
+    #expect(service.state == .notRegistered)
+    #expect(service.lastError == nil)
+}
+
+@MainActor
+@Test func helperRegistrationDeniedByUserNeedsPermissionNotFailure() {
+    // 用户在系统设置里关过开关后，register() 报“不允许”，状态为需要允许：引导允许，不报安装失败。
+    let backend = FakeHelperRegistration()
+    backend.status = .requiresApproval
+    backend.registrationError = NSError(domain: "SMAppServiceErrorDomain", code: 1)
+    let service = ChargeHelperService(registration: backend)
+    service.register()
+    #expect(service.state == .requiresApproval)
+    #expect(service.registrationError == nil)
+    #expect(service.lastError != nil)
+}
+
+@MainActor
+@Test func helperRegistrationFailureRemainsVisibleUntilRetried() {
+    let backend = FakeHelperRegistration()
+    let service = ChargeHelperService(registration: backend)
+    backend.registrationError = NSError(domain: "test", code: 2)
+    service.register()
+    #expect(service.state == .notRegistered)
+    #expect(service.registrationError != nil)
+    service.refresh()
+    #expect(service.registrationError != nil)
+
+    backend.registrationError = nil
+    backend.statusAfterRegister = .enabled
+    service.register()
+    #expect(backend.registrations == 2)
+    #expect(service.state == .enabled)
+    #expect(service.registrationError == nil)
+}
+
+@MainActor
+@Test func helperReinstallUnregistersThenRegisters() async {
+    let backend = FakeHelperRegistration()
+    backend.status = .requiresApproval
+    backend.statusAfterRegister = .requiresApproval
+    let service = ChargeHelperService(registration: backend)
+    await service.reinstall()
+    #expect(backend.unregistrations == 1)
+    #expect(backend.registrations == 1)
+    #expect(service.state == .requiresApproval)
+    #expect(!service.isBusy)
+
+    // 注销失败也继续注册，结果以注册后的状态为准。
+    backend.removalError = NSError(domain: "test", code: 1)
+    backend.statusAfterRegister = .enabled
+    await service.reinstall()
+    #expect(backend.registrations == 2)
+    #expect(service.state == .enabled)
+}
+
+@MainActor
+@Test func unreachableEnabledHelperIsRegisteredAgainOnce() async {
+    // 已允许但连不上（launchd 没有加载）时重新注册一次，让系统再加载 helper。
+    let backend = FakeHelperRegistration()
+    backend.status = .enabled
+    let service = ChargeHelperService(registration: backend)
+    let status = await service.connectedStatus(retryDelay: .zero)
+    #expect(status == nil)
+    #expect(backend.registrations == 1)
+    #expect(service.state == .enabled)
+    #expect(service.registrationError == nil)
+
+    // 需要允许时不重新注册，等用户在系统设置里允许。
+    backend.status = .requiresApproval
+    service.refresh()
+    _ = await service.connectedStatus(retryDelay: .zero)
+    #expect(backend.registrations == 1)
+}
+
 /// 所有写入只发生在内存假系统中，不注册 helper、不修改本机充电设置。
 private final class ManagedTestSystem: BatteryDataSource, ChargeLimitWriter, @unchecked Sendable {
     private let lock = NSLock()
@@ -92,6 +224,42 @@ private struct ManagedTestProfiler: SystemProfilerSource {
             try? await Task.sleep(for: .milliseconds(5))
         }
         Issue.record("Managed write did not settle")
+    }
+
+    @Test func removingHelperDefersAutomaticWritesUntilRemovalFinishes() async {
+        let monitor = monitor()
+        monitor.chargeControl = ChargeControlConfiguration(mode: .managed, target: 80)
+        await monitor.read()
+        await settle(monitor)
+        let existingWrites = system.writes.count
+        monitor.isRemovingChargeHelper = true
+        monitor.chargeControl.target = 90
+        await monitor.read()
+        #expect(system.writes.count == existingWrites)
+        monitor.isRemovingChargeHelper = false
+        monitor.publishChargeControl()
+        await settle(monitor)
+        #expect(system.setting == .on(percent: 90))
+    }
+
+    @Test func failedHelperRemovalDoesNotCancelCalibration() async {
+        let backend = FakeHelperRegistration()
+        backend.status = .requiresApproval
+        backend.removalError = NSError(domain: "test", code: 1)
+        backend.statusOnRemovalError = .notRegistered
+        let helper = ChargeHelperService(registration: backend)
+        let monitor = BatteryMonitor(
+            sampler: BatterySampler(dataSource: system, systemProfiler: ManagedTestProfiler(), chargeLimitWriter: system, store: nil),
+            powerSourceReader: { nil }, smcReader: { _ in nil }, holdDefaults: defaults, helperService: helper
+        )
+        monitor.chargeControl = ChargeControlConfiguration(mode: .managed, target: 80)
+        await monitor.read()
+        await settle(monitor)
+        monitor.calibration = CalibrationProgress(start: .manual, step: .holdFull, at: Date(), percent: 100)
+        let removed = await monitor.removeChargeHelper()
+        #expect(!removed)
+        #expect(monitor.calibration != nil)
+        #expect(!monitor.isRemovingChargeHelper)
     }
 
     @Test func takeoverRestoresOriginalOnSwitchAndExit() async {

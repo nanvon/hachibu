@@ -2,6 +2,7 @@ import AppKit
 import BatteryCore
 import Foundation
 import HistoryStore
+import ServiceManagement
 import SwiftUI
 import Testing
 @testable import FeatureUI
@@ -16,6 +17,18 @@ import Testing
     @Test func durationUsesRequestedLanguage() {
         #expect(DisplayFormat.duration(minutes: 180, locale: Locale(identifier: "en")).contains("hr"))
         #expect(DisplayFormat.duration(minutes: 180, locale: Locale(identifier: "zh-Hans")).contains("小时"))
+    }
+
+    @Test func lastCalibrationUsesLatestFinishedRecord() {
+        let base = Date(timeIntervalSince1970: 1_800_000_000)
+        let records = [
+            CalibrationRun(id: 1, startedAt: base, endedAt: base.addingTimeInterval(100), trigger: .manual, result: .completed),
+            CalibrationRun(id: 2, startedAt: base.addingTimeInterval(10), endedAt: base.addingTimeInterval(50), trigger: .manual, result: .cancelled),
+            CalibrationRun(id: 3, startedAt: base.addingTimeInterval(200), trigger: .manual),
+        ]
+        #expect(CalibrationSettingsGroup.latestFinishedCalibration(in: records)?.id == 1)
+        #expect(CalibrationSettingsGroup.latestFinishedCalibration(in: [records[2]]) == nil)
+        #expect(CalibrationSettingsGroup.latestFinishedCalibration(in: []) == nil)
     }
 
     @Test(.enabled(if: ProcessInfo.processInfo.environment["HACHIBU_RENDER_DIR"] != nil))
@@ -67,6 +80,54 @@ import Testing
                 .background(scheme == .dark ? Color(white: 0.07) : .white)
                 try render(panel, scheme: scheme, locale: locale, name: "charge-panel-\(name)-\(variant)")
             }
+        }
+    }
+
+    @Test(.enabled(if: ProcessInfo.processInfo.environment["HACHIBU_RENDER_DIR"] != nil))
+    func renderHelperApprovalAndFailure() async throws {
+        let defaults = UserDefaults(suiteName: "ChargeHelperRenderTests.\(UUID().uuidString)")!
+        let settings = AppSettings(defaults: defaults)
+        settings.chargeControlMode = .managed
+        settings.managedChargeLimit = 60
+        let registration = FakeHelperRegistration()
+        registration.status = .requiresApproval
+        let helper = ChargeHelperService(registration: registration)
+        let monitor = BatteryMonitor(
+            sampler: BatterySampler(dataSource: RenderBattery(), systemProfiler: RenderProfiler(), chargeLimitWriter: RenderBattery(), store: nil),
+            powerSourceReader: { nil }, smcReader: { _ in nil }, holdDefaults: defaults, helperService: helper
+        )
+        await monitor.read()
+        monitor.chargeControl = settings.chargeControlConfiguration
+        // 未安装、安装失败、需要允许、已允许（检查连接中）。静态渲染不运行 `.task`，连接结果无法出图。
+        let states: [(String, SMAppService.Status, Error?)] = [
+            ("not-installed", .notRegistered, nil),
+            ("failure", .notRegistered, NSError(domain: "SMAppServiceErrorDomain", code: 3, userInfo: [NSLocalizedDescriptionKey: "Invalid signature"])),
+            ("permission", .requiresApproval, nil),
+            ("enabled", .enabled, nil),
+        ]
+        for (name, status, error) in states {
+            registration.status = status
+            registration.registrationError = error
+            if error != nil { helper.register() } else { helper.refresh() }
+            for (scheme, locale, variant) in variants {
+                let content = SettingsPageContent(settings: settings, onExportDiagnostics: {}, onCheckForUpdates: nil)
+                    .environment(monitor)
+                    .frame(width: 968)
+                    .background(scheme == .dark ? Color(white: 0.12) : Color(white: 0.96))
+                try render(content, scheme: scheme, locale: locale, name: "charge-helper-\(name)-\(variant)")
+            }
+        }
+        // 装过后切回跟随系统设置，仍显示 Hachibu Helper 行，保证能移除。
+        settings.chargeControlMode = .followSystem
+        monitor.chargeControl = settings.chargeControlConfiguration
+        registration.status = .enabled
+        helper.refresh()
+        for (scheme, locale, variant) in variants {
+            let content = SettingsPageContent(settings: settings, onExportDiagnostics: {}, onCheckForUpdates: nil)
+                .environment(monitor)
+                .frame(width: 968)
+                .background(scheme == .dark ? Color(white: 0.12) : Color(white: 0.96))
+            try render(content, scheme: scheme, locale: locale, name: "charge-helper-follow-system-\(variant)")
         }
     }
 

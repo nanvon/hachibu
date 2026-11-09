@@ -202,6 +202,7 @@ extension BatteryMonitor {
         guard case .battery(let snapshot)? = reading else { return }
         trackPolicies(snapshot)
         refreshHelperIfNeeded()
+        guard !isRemovingChargeHelper else { return }
         evaluateCalibration(snapshot)
         guard !isWritingChargeLimit else { return }
         switch chargeControl.mode {
@@ -391,16 +392,20 @@ extension BatteryMonitor {
         }
     }
 
-    /// 先经 helper 释放、读回确认，再移除后台组件。调用前由设置页把低于 80% 的目标改成 80%。
-    /// 返回 false 表示释放失败，helper 保留。
+    /// 先经 helper 释放、读回确认，再移除后台组件。释放时写回不低于 80% 的目标；
+    /// 期间暂停自动写入和校准判断，结束后重新判断。返回 false 表示没有移除，helper 保留。
     @discardableResult
     public func removeChargeHelper() async -> Bool {
-        guard !isWritingChargeLimit else { return false }
+        guard !isWritingChargeLimit, !isRemovingChargeHelper else { return false }
+        isRemovingChargeHelper = true
+        defer {
+            isRemovingChargeHelper = false
+            publishChargeControl()
+        }
         // 标记可能在系统充满或外部改值后仍存在，不能只靠当前上限判断是否需要释放。
         let status = await helperService.helperStatus()
         if helperService.state == .enabled, status == nil { return false }
         if status?.isMarkerCorrupt == true { return false }
-        if calibration != nil { finishCalibration(.cancelled) }
         let below = if case .battery(let snapshot)? = reading, let percent = snapshot.chargeLimitPercent {
             percent < ManagedChargeLimit.helperThreshold
         } else { false }
@@ -425,8 +430,11 @@ extension BatteryMonitor {
             else { return false }
         }
         await helperService.unregister()
-        let removed = helperService.state == .notRegistered
-        if removed { logger.info("Helper removed") }
+        let removed = helperService.lastError == nil && helperService.state == .notRegistered
+        if removed {
+            if calibration != nil { finishCalibration(.cancelled) }
+            logger.info("Helper removed")
+        }
         return removed
     }
 

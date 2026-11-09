@@ -42,6 +42,8 @@ public final class BatteryMonitor {
     public private(set) var health: BatteryHealthInfo?
     /// 正在修改系统充电上限。
     public internal(set) var isWritingChargeLimit = false
+    /// 正在移除后台组件。期间暂停自动写入，避免释放与重新应用目标交错。
+    public internal(set) var isRemovingChargeHelper = false
     /// 最近一次修改失败，或读回的设置与修改不符。下一次修改开始时清除。
     public private(set) var chargeLimitWriteFailed = false
     /// AlDente 等充电控制工具正在运行。此时不提供充电上限控制，避免两套工具同时控制充电。
@@ -443,7 +445,7 @@ public final class BatteryMonitor {
     /// 上限关闭时选低于 100% 的档位：先开启再写入档位，`setMCLLimit:error:` 只在已开启时调用。
     public func setChargeLimit(_ change: ChargeLimitChange) async {
         // 接管模式下界面改的是 AppSettings 里的目标，由 `chargeControl` 同步过来后写入。
-        guard !isWritingChargeLimit, chargeControl.mode == .followSystem else { return }
+        guard !isWritingChargeLimit, !isRemovingChargeHelper, chargeControl.mode == .followSystem else { return }
         var changes = [change]
         if let hold = chargeLimitHold {
             switch change {
