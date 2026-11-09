@@ -1,6 +1,7 @@
 name: CI
 
-# 推送到 main 和提交 PR 时编译、测试 HachibuKit，并编译 App（不签名）。
+# PR 和 main 推送时验证 HachibuKit 的全部测试与 App 编译。
+# 纯文档改动只跑轻量的 changes / ci-success 两个 Ubuntu job，不占用 macOS runner。
 on:
   push:
     branches: [main]
@@ -8,10 +9,58 @@ on:
 
 permissions:
   contents: read
+  pull-requests: read
+
+# 同一 PR 连续推送时只保留最新一次，旧运行直接取消。
+# main 上每个提交都必须完整跑过一遍，不能取消。
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  XCODEGEN_VERSION: 2.46.0
 
 jobs:
-  build-and-test:
+  # 判断是否只有文档变动。这个 job 始终运行，保证 paths 过滤后仍有一个
+  # 可以设为必需检查的 ci-success 结果，不会让 PR 卡在 Expected。
+  changes:
+    name: 检查改动范围
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: dorny/paths-filter@v4
+        id: filter
+        with:
+          # 用 some-with-excludes：命中任一正向规则且不命中任何排除规则才算代码改动。
+          # 默认的 some 会把 docs 改动也当成命中。
+          predicate-quantifier: 'some-with-excludes'
+          filters: |
+            code:
+              - '**'
+              - '!**/*.md'
+              - '!docs/**'
+              - '!release-notes/**'
+              - '!design/**'
+              - '!LICENSE'
+
+  # 三套测试按 target 拆到三台 macOS runner 上并行跑。每个 job 只跑一套，
+  # 由 ci-success 汇总结果；不依赖其他测试 job，也不互相传数据。
+  test:
+    name: 测试 ${{ matrix.target }}
     runs-on: macos-15
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [BatteryCoreTests, HistoryStoreTests, FeatureUITests]
     steps:
       - uses: actions/checkout@v4
 
@@ -20,20 +69,92 @@ jobs:
         with:
           xcode-version: latest-stable
 
-      - name: 安装 XcodeGen
-        run: brew install xcodegen
+      # 每个 shard 只缓存自己 target 的构建，避免三个 job 抢同一个缓存键。
+      - name: 缓存 SwiftPM 构建
+        uses: actions/cache@v4
+        with:
+          path: Packages/HachibuKit/.build
+          key: spm-${{ runner.os }}-${{ matrix.target }}-${{ hashFiles('Packages/HachibuKit/Package.resolved') }}-v1
+          restore-keys: |
+            spm-${{ runner.os }}-${{ matrix.target }}-${{ hashFiles('Packages/HachibuKit/Package.resolved') }}-
 
-      - name: 编译并测试 HachibuKit
+      - name: 编译并测试 ${{ matrix.target }}
         run: |
-          swift build --package-path Packages/HachibuKit --build-tests
-          swift test --package-path Packages/HachibuKit
+          set -euo pipefail
+          swift build --package-path Packages/HachibuKit --target ${{ matrix.target }}
+          swift test --package-path Packages/HachibuKit --skip-build --filter ${{ matrix.target }}
 
-      - name: 编译 App
+  # App 编译与测试并行，只缓存 Xcode 自己的 DerivedData，不拉 SwiftPM 测试缓存。
+  build_app:
+    name: 编译 App
+    runs-on: macos-15
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 选择最新 Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: 安装 XcodeGen（预编译）
+        shell: bash
         run: |
+          set -euo pipefail
+          curl -fsSL --retry 3 \
+            "https://github.com/yonaskolb/XcodeGen/releases/download/${XCODEGEN_VERSION}/xcodegen.zip" \
+            -o "$RUNNER_TEMP/xcodegen.zip"
+          unzip -q "$RUNNER_TEMP/xcodegen.zip" -d "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/xcodegen/bin" >> "$GITHUB_PATH"
+
+      # 只缓存 App 构建目录；DerivedData 内含 Sparkle / GRDB 的 SourcePackages，
+      # 恢复后只需增量编译仓库自己的代码。
+      - name: 缓存 Xcode 构建
+        uses: actions/cache@v4
+        with:
+          path: build/DerivedData
+          key: xcode-${{ runner.os }}-${{ hashFiles('project.yml', 'Config/**', 'Packages/HachibuKit/Package.resolved') }}-v1
+          restore-keys: |
+            xcode-${{ runner.os }}-${{ hashFiles('project.yml', 'Config/**', 'Packages/HachibuKit/Package.resolved') }}-
+
+      - name: 生成工程并编译 App
+        run: |
+          set -euo pipefail
           xcodegen generate
           xcodebuild \
             -project Hachibu.xcodeproj \
             -scheme Hachibu \
             -configuration Debug \
+            -derivedDataPath build/DerivedData \
             CODE_SIGNING_ALLOWED=NO \
             build
+
+  # 必需检查统一指向这个 job。文档改动时上面的 macOS job 全部 skipped，
+  # 这里仍然成功，PR 不会因为跳过的检查一直卡住。
+  ci-success:
+    name: ci-success
+    if: always()
+    needs: [changes, test, build_app]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: 汇总必需 job 结果
+        env:
+          CHANGES: ${{ needs.changes.result }}
+          TEST: ${{ needs.test.result }}
+          BUILD_APP: ${{ needs.build_app.result }}
+        run: |
+          set -euo pipefail
+          echo "changes=$CHANGES test=$TEST build_app=$BUILD_APP"
+          if [[ "$CHANGES" != "success" ]]; then
+            echo "changes job 未成功" >&2
+            exit 1
+          fi
+          for result in "$TEST" "$BUILD_APP"; do
+            if [[ "$result" != "success" && "$result" != "skipped" ]]; then
+              echo "必需 job 未通过：$result" >&2
+              exit 1
+            fi
+          done
