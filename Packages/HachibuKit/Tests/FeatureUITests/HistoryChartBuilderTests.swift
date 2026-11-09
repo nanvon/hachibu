@@ -18,6 +18,55 @@ private let utc: Calendar = {
 }()
 
 @Suite struct SegmentTests {
+    @Test func movingAverageKeepsSampleDatesAndUsesOnlyNearbySamples() {
+        let points = [(0, 10.0), (1, 20), (2, 30), (3, 40), (4, 50), (5, 60), (6, 70)].map {
+            ChartPoint(date: minute($0.0), value: $0.1)
+        }
+        let averaged = HistoryChartBuilder.movingAverage(points, window: 5 * 60)
+        #expect(averaged.map(\.date) == points.map(\.date))
+        // 中间取前后各 2 个样本；两端只有一侧。
+        #expect(averaged.map(\.value) == [20, 25, 30, 40, 50, 55, 60])
+    }
+
+    @Test func movingAverageDoesNotReachAcrossGaps() {
+        // 睡眠中唤醒记下的孤立样本保持原值，也不影响缺口两侧的平均。
+        let points = [(0, 10.0), (1, 20), (60, -5), (120, 30), (121, 40)].map {
+            ChartPoint(date: minute($0.0), value: $0.1)
+        }
+        let averaged = HistoryChartBuilder.movingAverage(points, window: 5 * 60)
+        #expect(averaged.map(\.value) == [15, 15, -5, 35, 35])
+        #expect(HistoryChartBuilder.movingAverage([], window: 5 * 60).isEmpty)
+    }
+
+    @Test func thinningKeepsEndsAndGapEdges() {
+        let minutes = Array(0...12) + [60] + Array(120...126)
+        let points = minutes.map { ChartPoint(date: minute($0), value: Double($0)) }
+        let thinned = HistoryChartBuilder.thinned(points, interval: 5 * 60, maxGap: 180)
+        #expect(thinned.map(\.date) == [0, 5, 10, 12, 60, 120, 125, 126].map { minute($0) })
+    }
+
+    @Test func runsSplitOnlyAtLongGaps() {
+        let points = [0, 5, 30, 65, 70].map { ChartPoint(date: minute($0), value: 1) }
+        let runs = HistoryChartBuilder.runs(points, maxGap: 30 * 60)
+        #expect(runs.map { $0.map(\.date) } == [[0, 5, 30].map { minute($0) }, [65, 70].map { minute($0) }])
+        #expect(HistoryChartBuilder.runs([], maxGap: 60).isEmpty)
+    }
+
+    @Test func powerSeriesDropsShortWakeFragmentsButKeepsLatest() {
+        // 0–9 分钟醒着；60、61 和 120 是睡眠中的唤醒；200–202 是刚唤醒、仍在记录的最后一段。
+        let minutes = Array(0...9) + [60, 61, 120] + [200, 201, 202]
+        let series = HistoryChartBuilder.powerSeries(minutes.map { ChartPoint(date: minute($0), value: 10) })
+        #expect(series.points.map(\.date) == (Array(0...9) + [200, 201, 202]).map { minute($0) })
+        #expect(series.reading(at: minute(60)) == nil)
+    }
+
+    @Test func powerSeriesReadsEveryMinuteButPlotsThinnedPoints() {
+        let points = (0..<30).map { ChartPoint(date: minute($0), value: 10) }
+        let series = HistoryChartBuilder.powerSeries(points)
+        #expect(series.points.map(\.date) == points.map(\.date))
+        #expect(series.plotPoints.map(\.date) == [0, 5, 10, 15, 20, 25, 29].map { minute($0) })
+    }
+
     @Test func missingValuesProduceNoPoints() {
         let points = HistoryChartBuilder.linePoints(
             [(minute(0), nil), (minute(1), 1), (minute(2), nil), (minute(3), nil), (minute(4), 2), (minute(600), 3)]

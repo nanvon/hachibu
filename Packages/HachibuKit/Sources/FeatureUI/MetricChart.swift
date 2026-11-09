@@ -1,9 +1,26 @@
 import Charts
 import SwiftUI
 
+/// 同一张图里的第二条曲线，例如功率图里的电池功率。
+struct PlotLine: Equatable {
+    let series: ChartSeries
+    let style: MetricChart.Style
+
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.series.plotID == rhs.series.plotID && lhs.style == rhs.style
+    }
+}
+
+/// 第二条曲线和它的读数，读数显示在主读数右侧。
+struct MetricLine {
+    let title: Text
+    let line: PlotLine
+    let formatValue: (Double) -> String
+}
+
 /// 一个指标的历史曲线：上方是指标名和大号读数，下方卡片里是曲线和渐变面积。
 /// 读数平时显示最新点；悬停时显示选中采样时刻的值，缺失显示“—”。同组的几张图共享 `hoverDate`。
-/// 样式见 docs/v1技术设计.md 19.3。
+/// 可带第二条曲线（`secondary`），两条线共用纵轴。样式见 docs/v1技术设计.md 19.3。
 struct MetricChart: View {
     enum YScale: Equatable {
         case fixed(ClosedRange<Double>)
@@ -33,6 +50,9 @@ struct MetricChart: View {
     var threshold: Double?
     var yScale: YScale = .automatic(includesZero: false)
     let style: Style
+    var secondary: MetricLine?
+    /// 有值时，曲线上超过这个间隔的缺口画淡色直虚线，不画实线。
+    var dashedGap: TimeInterval?
     let formatValue: (Double) -> String
     let formatDate: (Date) -> String
     var chartHeight: CGFloat = 200
@@ -45,7 +65,8 @@ struct MetricChart: View {
             MetricChartCard(
                 series: series, threshold: threshold, hoverPoints: hoverPoints,
                 domain: domain, maxGap: maxGap, bands: bands, policyBands: policyBands, calibrationBands: calibrationBands,
-                notRecorded: notRecorded, yScale: yScale, style: style, height: chartHeight, hoverDate: $hoverDate
+                notRecorded: notRecorded, yScale: yScale, style: style, secondary: secondary?.line,
+                dashedGap: dashedGap, height: chartHeight, hoverDate: $hoverDate
             )
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -53,40 +74,49 @@ struct MetricChart: View {
 
     // MARK: - 读数
 
-    private var hoveredPoint: ChartPoint? {
-        guard let hoverDate else { return nil }
-        return series.reading(at: hoverDate)
+    /// 悬停处至少一条曲线有值。
+    private var hasHoveredPoint: Bool {
+        guard let hoverDate else { return false }
+        return series.reading(at: hoverDate) != nil || secondary?.line.series.reading(at: hoverDate) != nil
     }
 
     private var header: some View {
         let shown = series.reading(at: hoverDate)
-        return HStack(alignment: .lastTextBaseline) {
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 6) {
-                    legendDot
-                    title
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
-                }
-                Text(verbatim: shown.map { formatValue($0.value) } ?? DisplayFormat.missing)
-                    .font(.system(size: 26, weight: .semibold, design: .rounded))
-                    .monospacedDigit()
-                    .contentTransition(.numericText())
+        let secondaryShown = secondary?.line.series.reading(at: hoverDate)
+        return HStack(alignment: .lastTextBaseline, spacing: 24) {
+            reading(title: title, style: style, text: shown.map { formatValue($0.value) })
+            if let secondary {
+                reading(title: secondary.title, style: secondary.line.style, text: secondaryShown.map { secondary.formatValue($0.value) })
             }
             Spacer(minLength: 8)
-            if let shownDate = hoverDate ?? shown?.date {
+            if let shownDate = hoverDate ?? shown?.date ?? secondaryShown?.date {
                 Text(verbatim: formatDate(shownDate))
                     .font(.system(size: 11.5))
-                    .fontWeight(hoveredPoint == nil ? .regular : .medium)
-                    .foregroundStyle(hoveredPoint == nil ? HierarchicalShapeStyle.tertiary : .primary)
+                    .fontWeight(hasHoveredPoint ? .medium : .regular)
+                    .foregroundStyle(hasHoveredPoint ? HierarchicalShapeStyle.primary : .tertiary)
                     .monospacedDigit()
             }
         }
         .lineLimit(1)
     }
 
+    private func reading(title: Text, style: Style, text: String?) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 6) {
+                Self.legendDot(style)
+                title
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+            }
+            Text(verbatim: text ?? DisplayFormat.missing)
+                .font(.system(size: 26, weight: .semibold, design: .rounded))
+                .monospacedDigit()
+                .contentTransition(.numericText())
+        }
+    }
+
     @ViewBuilder
-    private var legendDot: some View {
+    private static func legendDot(_ style: Style) -> some View {
         switch style {
         case .line(let color):
             Circle().fill(color).frame(width: 8, height: 8)
@@ -127,6 +157,8 @@ struct MetricChartCard: View {
     var yScale: MetricChart.YScale = .automatic(includesZero: false)
     var integerYTicks = false
     let style: MetricChart.Style
+    var secondary: PlotLine?
+    var dashedGap: TimeInterval?
     var height: CGFloat = 200
     @Binding var hoverDate: Date?
 
@@ -134,13 +166,15 @@ struct MetricChartCard: View {
         MetricPlot(
             series: series, trend: trend, threshold: threshold, domain: domain,
             bands: bands, policyBands: policyBands, calibrationBands: calibrationBands, markers: markers,
-            notRecorded: notRecorded, yScale: yScale, integerYTicks: integerYTicks, style: style
+            notRecorded: notRecorded, yScale: yScale, integerYTicks: integerYTicks, style: style, secondary: secondary,
+            dashedGap: dashedGap
         )
         .equatable()
         .chartOverlay { proxy in
             MetricChartInteraction(
-                proxy: proxy, points: series.points, hoverPoints: hoverPoints.isEmpty ? series.points : hoverPoints,
-                maxGap: maxGap, style: style, hoverDate: $hoverDate
+                proxy: proxy, lines: [PlotLine(series: series, style: style)] + (secondary.map { [$0] } ?? []),
+                hoverPoints: hoverPoints.isEmpty ? series.points : hoverPoints,
+                maxGap: maxGap, hoverDate: $hoverDate
             )
         }
         .frame(height: height)
@@ -168,6 +202,8 @@ private struct MetricPlot: View, Equatable {
     let yScale: MetricChart.YScale
     let integerYTicks: Bool
     let style: MetricChart.Style
+    let secondary: PlotLine?
+    let dashedGap: TimeInterval?
     private let interpolation: InterpolationMethod = .monotone
     private static let bandColor = Color.green.opacity(0.05)
     /// 系统充电策略：中性灰；校准：品牌蓝。两者都与插电的绿色底色区分。
@@ -178,6 +214,10 @@ private struct MetricPlot: View, Equatable {
     private static let dailyLineWidth: CGFloat = 1
     private static let dailyLineOpacity = 0.35
     private static let referenceDash: [CGFloat] = [4, 3]
+    /// 长缺口上的连线：直线、细虚线、淡色。
+    private static let gapLineWidth: CGFloat = 1.5
+    private static let gapDash: [CGFloat] = [3, 4]
+    private static let gapOpacity = 0.45
     private static let notRecordedLabelMinFraction = 0.12
 
     nonisolated static func == (lhs: Self, rhs: Self) -> Bool {
@@ -186,13 +226,15 @@ private struct MetricPlot: View, Equatable {
             && lhs.domain == rhs.domain && lhs.bands == rhs.bands && lhs.policyBands == rhs.policyBands
             && lhs.calibrationBands == rhs.calibrationBands && lhs.markers == rhs.markers && lhs.notRecorded == rhs.notRecorded
             && lhs.yScale == rhs.yScale && lhs.integerYTicks == rhs.integerYTicks && lhs.style == rhs.style
+            && lhs.secondary == rhs.secondary && lhs.dashedGap == rhs.dashedGap
     }
 
     var body: some View { scaledChart }
 
-    /// 参与纵轴范围的点：曲线和趋势线。
+    /// 参与纵轴范围的点：曲线、趋势线和第二条曲线。
     private var valueRange: ClosedRange<Double>? {
         let values = series.plotPoints.map(\.value) + (trend?.plotPoints.map(\.value) ?? [])
+            + (secondary?.series.plotPoints.map(\.value) ?? [])
         guard let low = values.min(), let high = values.max() else { return nil }
         return low...high
     }
@@ -261,28 +303,25 @@ private struct MetricPlot: View, Equatable {
                     .foregroundStyle(Color.orange.opacity(0.8))
                     .lineStyle(StrokeStyle(lineWidth: 1, dash: Self.referenceDash))
             }
-            switch style {
-            case .line(let color):
-                if let trend {
-                    ForEach(series.plotPoints) { point in
-                        LineMark(x: .value("Time", point.date), y: .value("Value", point.value), series: .value("Line", "daily"))
-                            .interpolationMethod(interpolation)
-                            .lineStyle(StrokeStyle(lineWidth: Self.dailyLineWidth, lineCap: .round, lineJoin: .round))
-                            .foregroundStyle(color.opacity(Self.dailyLineOpacity))
-                    }
-                    lineMarks(trend.plotPoints, series: "trend", color: color)
-                } else {
-                    lineMarks(series.plotPoints, series: "value", color: color)
-                }
-            case .signed:
+            if style == .signed || secondary?.style == .signed {
                 RuleMark(y: .value("Zero", 0.0))
                     .foregroundStyle(Color.primary.opacity(0.25))
                     .lineStyle(StrokeStyle(lineWidth: 1))
-                ForEach(HistoryChartBuilder.signedRuns(series.plotPoints)) { run in
-                    lineMarks(run.points, series: "\(run.id)", color: run.isPositive ? .green : .orange)
-                }
             }
-
+            if case .line(let color) = style, let trend {
+                ForEach(series.plotPoints) { point in
+                    LineMark(x: .value("Time", point.date), y: .value("Value", point.value), series: .value("Line", "daily"))
+                        .interpolationMethod(interpolation)
+                        .lineStyle(StrokeStyle(lineWidth: Self.dailyLineWidth, lineCap: .round, lineJoin: .round))
+                        .foregroundStyle(color.opacity(Self.dailyLineOpacity))
+                }
+                lineMarks(trend.plotPoints, series: "trend", color: color)
+            } else {
+                seriesMarks(series, style: style, name: "value")
+            }
+            if let secondary {
+                seriesMarks(secondary.series, style: secondary.style, name: "secondary")
+            }
         }
         .chartXScale(domain: domain)
         .chartXAxis {
@@ -307,11 +346,61 @@ private struct MetricPlot: View, Equatable {
             }
         }
         .overlay {
-            if series.points.isEmpty {
+            if series.points.isEmpty && secondary?.series.points.isEmpty ?? true {
                 Text("No Data", bundle: .module)
                     .font(.callout)
                     .foregroundStyle(.secondary)
             }
+        }
+    }
+
+    /// 长缺口上的一条连线，连接前一段的末点和后一段的首点。
+    private struct GapLine: Identifiable {
+        let id: Int
+        let points: [ChartPoint]
+        let color: Color
+    }
+
+    /// 单色曲线，或正值绿色、负值橙色的分段曲线。`name` 区分同一张图里的不同曲线。
+    /// 设置了 `dashedGap` 时按长缺口切段，段内照常平滑，缺口上画直虚线。
+    @ChartContentBuilder
+    private func seriesMarks(_ series: ChartSeries, style: MetricChart.Style, name: String) -> some ChartContent {
+        let runs = dashedGap.map { HistoryChartBuilder.runs(series.plotPoints, maxGap: $0) } ?? [series.plotPoints]
+        ForEach(runs.indices, id: \.self) { index in
+            runMarks(runs[index], style: style, name: "\(name)-\(index)")
+        }
+        ForEach(gapLines(runs, style: style)) { gap in
+            ForEach(gap.points) { point in
+                LineMark(x: .value("Time", point.date), y: .value("Value", point.value), series: .value("Line", "\(name)-gap-\(gap.id)"))
+                    .interpolationMethod(.linear)
+                    .lineStyle(StrokeStyle(lineWidth: Self.gapLineWidth, lineCap: .round, dash: Self.gapDash))
+                    .foregroundStyle(gap.color.opacity(Self.gapOpacity))
+            }
+        }
+    }
+
+    @ChartContentBuilder
+    private func runMarks(_ points: [ChartPoint], style: MetricChart.Style, name: String) -> some ChartContent {
+        switch style {
+        case .line(let color):
+            lineMarks(points, series: name, color: color)
+        case .signed:
+            ForEach(HistoryChartBuilder.signedRuns(points)) { run in
+                lineMarks(run.points, series: "\(name)-\(run.id)", color: run.isPositive ? .green : .orange)
+            }
+        }
+    }
+
+    /// 相邻两段之间的连线。正负着色的曲线两端同号时用对应颜色，异号时用中性色。
+    private func gapLines(_ runs: [[ChartPoint]], style: MetricChart.Style) -> [GapLine] {
+        zip(runs, runs.dropFirst()).enumerated().compactMap { index, pair in
+            guard let from = pair.0.last, let to = pair.1.first else { return nil }
+            let color: Color = switch style {
+            case .line(let color): color
+            case .signed:
+                from.value >= 0 && to.value >= 0 ? .green : from.value < 0 && to.value < 0 ? .orange : .secondary
+            }
+            return GapLine(id: index, points: [from, to], color: color)
         }
     }
 
@@ -343,10 +432,10 @@ private struct MetricPlot: View, Equatable {
 /// 悬停标记作为独立叠层绘制，不把高频鼠标事件传进曲线的 ChartContent。
 private struct MetricChartInteraction: View {
     let proxy: ChartProxy
-    let points: [ChartPoint]
+    /// 每条曲线在悬停处画一个圆点。
+    let lines: [PlotLine]
     let hoverPoints: [ChartPoint]
     let maxGap: TimeInterval
-    let style: MetricChart.Style
     @Binding var hoverDate: Date?
 
     var body: some View {
@@ -361,12 +450,14 @@ private struct MetricChartInteraction: View {
                         path.addLine(to: CGPoint(x: frame.minX + x, y: frame.maxY))
                     }
                     .stroke(Color.primary.opacity(0.3), lineWidth: 1)
-                    if let point = HistoryChartBuilder.nearest(in: points, to: hoverDate, within: 0),
-                       let y = proxy.position(forY: point.value) {
-                        Circle()
-                            .fill(pointColor(point))
-                            .frame(width: 8, height: 8)
-                            .position(x: frame.minX + x, y: frame.minY + y)
+                    ForEach(lines.indices, id: \.self) { index in
+                        if let point = HistoryChartBuilder.nearest(in: lines[index].series.points, to: hoverDate, within: 0),
+                           let y = proxy.position(forY: point.value) {
+                            Circle()
+                                .fill(Self.pointColor(point, style: lines[index].style))
+                                .frame(width: 8, height: 8)
+                                .position(x: frame.minX + x, y: frame.minY + y)
+                        }
                     }
                 }
                 Rectangle()
@@ -395,7 +486,7 @@ private struct MetricChartInteraction: View {
         }
     }
 
-    private func pointColor(_ point: ChartPoint) -> Color {
+    private static func pointColor(_ point: ChartPoint, style: MetricChart.Style) -> Color {
         switch style {
         case .line(let color): color
         case .signed: point.value >= 0 ? .green : .orange

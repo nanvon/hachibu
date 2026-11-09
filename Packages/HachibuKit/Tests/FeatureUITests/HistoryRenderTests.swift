@@ -166,16 +166,25 @@ import Testing
         let store = try HistoryStore.inMemory()
         let now = Date()
         for minute in 0..<2880 {
-            // 留出 5 小时缺口，确认曲线连过去、插电底色仍然断开。
-            guard !(900..<1200).contains(minute) else { continue }
+            // 留出 5 小时缺口，确认曲线连过去、插电底色仍然断开；缺口里每小时有一条睡眠唤醒的孤立样本。
+            guard !(900..<1200).contains(minute) || minute % 60 == 0 else { continue }
             let phase = Double(minute) / 90
             let isExternal = (minute / 240) % 2 == 1
+            let isCharging = isExternal && sin(phase) < 0.5
+            // 功率带分钟级起伏和偶尔的尖峰（幅度参照本机实测）：放电时电池功率约为系统功率的负值，插电未充电时为 0。
+            let spike = minute % 37 == 0 ? 9_000.0 : 0
+            let systemLoad = 15_000 + 6_000 * sin(phase) + 700 * sin(Double(minute) * 1.7) + spike
+            let batteryPower = isCharging
+                ? 28_000 + 6_000 * cos(phase) + 500 * sin(Double(minute) * 2.3)
+                : isExternal ? 0 : -systemLoad
             // 中途改变充电上限，确认历史图不再显示上限线。
             try await store.record(
                 BatterySnapshot(
                     percent: Int(65 + 15 * sin(phase)),
                     isExternalPower: isExternal,
-                    isCharging: isExternal && sin(phase) < 0.5,
+                    isCharging: isCharging,
+                    batteryPowerMW: Int(batteryPower),
+                    systemLoadMW: Int(systemLoad),
                     temperatureCelsius: 31 + 5 * sin(phase + 0.8),
                     chargeLimit: .on(percent: minute < 2000 ? 80 : 90)
                 ),
@@ -201,16 +210,18 @@ import Testing
         await model.reloadAll()
         let variants: [(ColorScheme, String, String)] = [(.light, "zh-Hans", "light"), (.dark, "zh-Hans", "dark"), (.light, "en", "light-en")]
         for (scheme, locale, name) in variants {
-            // 宽度按默认窗口 1200pt 减去侧栏。
+          for width in [728.0, 968.0] {
+            // 分别对应最小和默认窗口宽度减去侧栏。
             let renderer = ImageRenderer(content: HistoryChartsContent(model: model, temperatureThreshold: 40)
-                .frame(width: 968)
+                .frame(width: width)
                 .background(scheme == .dark ? Color(white: 0.12) : Color(white: 0.96))
                 .environment(\.colorScheme, scheme)
                 .environment(\.locale, Locale(identifier: locale)))
             renderer.scale = 2
             let image = try #require(renderer.cgImage)
             let data = try #require(NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:]))
-            try data.write(to: directory.appendingPathComponent("history-\(name).png"))
+            try data.write(to: directory.appendingPathComponent("history-\(Int(width))-\(name).png"))
+          }
         }
     }
 

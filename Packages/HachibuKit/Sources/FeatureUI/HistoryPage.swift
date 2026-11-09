@@ -396,10 +396,41 @@ private struct RecentSection: View {
                         }
                     }
                 }
+                VStack(alignment: .leading, spacing: 10) {
+                    chart(
+                        Text("System Power", bundle: .module), data.systemPowerWatts, data: data,
+                        yScale: .automatic(includesZero: true), style: .line(.systemPower),
+                        secondary: MetricLine(
+                            title: Text("Battery Power", bundle: .module),
+                            line: PlotLine(series: data.batteryPowerWatts, style: .signed),
+                            formatValue: Self.signedWatts
+                        ),
+                        dashedGap: HistoryChartBuilder.powerDashedGap,
+                        formatDate: formatDate
+                    ) {
+                        Self.watts($0)
+                    }
+                    Text("15-minute average", bundle: .module)
+                        .font(.system(size: 11.5))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 4)
+                }
+                .padding(.top, 6)
             } else {
                 LoadingPlaceholder()
             }
         }
+    }
+
+    private static func watts(_ value: Double) -> String {
+        "\(value.formatted(.number.precision(.fractionLength(1)))) W"
+    }
+
+    /// 电池功率读数带符号：充电“+”，放电“−”（减号），四舍五入后为 0 时不带符号。
+    private static func signedWatts(_ value: Double) -> String {
+        let rounded = (value * 10).rounded() / 10
+        let sign = rounded > 0 ? "+" : rounded < 0 ? "−" : ""
+        return sign + watts(abs(rounded))
     }
 
     private func threshold(_ data: RecentChartData) -> Double? {
@@ -416,6 +447,8 @@ private struct RecentSection: View {
         threshold: Double? = nil,
         yScale: MetricChart.YScale = .automatic(includesZero: false),
         style: MetricChart.Style,
+        secondary: MetricLine? = nil,
+        dashedGap: TimeInterval? = nil,
         formatDate: @escaping (Date) -> String,
         showsPolicyBands: Bool = false,
         formatValue: @escaping (Double) -> String
@@ -433,6 +466,8 @@ private struct RecentSection: View {
             threshold: threshold,
             yScale: yScale,
             style: style,
+            secondary: secondary,
+            dashedGap: dashedGap,
             formatValue: formatValue,
             formatDate: formatDate,
             chartHeight: Self.chartHeight,

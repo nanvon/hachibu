@@ -206,6 +206,16 @@
         }
       }
     },
+    "15-minute average" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "15 分钟平均值"
+          }
+        }
+      }
+    },
     "24 Hours" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -234,6 +244,36 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "关于"
+          }
+        }
+      }
+    },
+    "About %@ left" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "预计还需 %@"
+          }
+        }
+      }
+    },
+    "After macOS Charges to Full" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "系统充满后"
+          }
+        }
+      }
+    },
+    "After Quitting Hachibu" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "退出 Hachibu 后"
           }
         }
       }
@@ -278,6 +318,16 @@
         }
       }
     },
+    "Alerts about the charge limit and battery calibration." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "充电上限和电池校准的相关提醒。"
+          }
+        }
+      }
+    },
     "Alerts are checked only while notifications are allowed." : {
       "localizations" : {
         "zh-Hans" : {
@@ -318,12 +368,42 @@
         }
       }
     },
+    "Another charge control app is running. macOS settings apply until it quits." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "其他充电控制工具正在运行，退出前使用系统设置。"
+          }
+        }
+      }
+    },
     "Another charge control app is running. Quit it to change the charge limit here." : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "另一个充电控制应用正在运行，退出后才能修改。"
+          }
+        }
+      }
+    },
+    "Applying. Takes effect in about a second." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在应用，约 1 秒后生效。"
+          }
+        }
+      }
+    },
+    "Automatic (Step %lld)" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自动判断（第 %lld 步）"
           }
         }
       }
@@ -354,6 +434,36 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "电池"
+          }
+        }
+      }
+    },
+    "Battery Calibration" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "电池校准"
+          }
+        }
+      }
+    },
+    "Battery Calibration Complete" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "电池校准已完成"
+          }
+        }
+      }
+    },
+    "Battery Calibration Paused" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "电池校准已暂停"
           }
         }
       }
@@ -400,23 +510,11 @@
       }
     },
     "Battery Power" : {
-      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "电池功率"
-          }
-        }
-      }
-    },
-    "Battery Power (Charging +, Draining −)" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "电池功率（充电为正，放电为负）"
           }
         }
       }
@@ -452,12 +550,142 @@
         }
       }
     },
+    "Calibration" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "校准"
+          }
+        }
+      }
+    },
+    "Calibration paused because another charge control app is running." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "校准已暂停，其他充电控制工具正在运行。"
+          }
+        }
+      }
+    },
+    "Calibration paused because the charge limit could not be changed. Hachibu will retry." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "校准已暂停，无法修改充电上限。Hachibu 会重试。"
+          }
+        }
+      }
+    },
+    "Calibration paused. Plug in the power adapter to continue." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "校准已暂停，请接入电源适配器后继续。"
+          }
+        }
+      }
+    },
+    "Calibration Records" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "校准记录"
+          }
+        }
+      }
+    },
+    "Calibration was not finished when Hachibu quit." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上次退出 Hachibu 时，校准尚未完成。"
+          }
+        }
+      }
+    },
+    "Calibration was not finished when Hachibu quit. Open Hachibu to continue or discard it." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上次退出 Hachibu 时，校准尚未完成。请打开 Hachibu，选择继续或放弃。"
+          }
+        }
+      }
+    },
+    "Calibration: Charging to 100%" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "校准：充电至 100%"
+          }
+        }
+      }
+    },
+    "Calibration: Discharging to %lld%%" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "校准：放电至 %lld%%"
+          }
+        }
+      }
+    },
+    "Calibration: Holding at 100%" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "校准：保持在 100%"
+          }
+        }
+      }
+    },
+    "Calibration: Returning to Limit" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "校准：回到充电上限"
+          }
+        }
+      }
+    },
     "Cancel" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "取消"
+          }
+        }
+      }
+    },
+    "Cancel Calibration" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "取消校准"
+          }
+        }
+      }
+    },
+    "Cancelled" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已取消"
           }
         }
       }
@@ -482,6 +710,16 @@
         }
       }
     },
+    "Charge Control" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "充电控制"
+          }
+        }
+      }
+    },
     "Charge Limit" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -489,6 +727,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "充电上限"
+          }
+        }
+      }
+    },
+    "Charge Limit Control" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "充电上限管理"
+          }
+        }
+      }
+    },
+    "Charge Limit Not Applied" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "充电上限未生效"
+          }
+        }
+      }
+    },
+    "Charge to 100%" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "充电至 100%"
+          }
+        }
+      }
+    },
+    "Charge to 100% Again" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "再次充电至 100%"
           }
         }
       }
@@ -514,6 +792,16 @@
         }
       }
     },
+    "Charges to 100%, holds for an hour, discharges to 15% while plugged in, then charges to 100% again before returning to your limit. Takes about half a day and adds about one charge cycle. Macs with Apple silicon generally don't need manual calibration." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "充至 100% 并保持 1 小时，插电放至 15%，再次充至 100% 并保持后回到上限。约需半天，增加约一个充放电循环。Apple Silicon Mac 通常不需要手动校准。"
+          }
+        }
+      }
+    },
     "Charging" : {
       "localizations" : {
         "zh-Hans" : {
@@ -534,12 +822,52 @@
         }
       }
     },
+    "Completed" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已完成"
+          }
+        }
+      }
+    },
+    "Completed or paused" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "完成或暂停时"
+          }
+        }
+      }
+    },
+    "Continue" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "继续"
+          }
+        }
+      }
+    },
     "Could not change the charge limit." : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "未能修改充电上限。"
+          }
+        }
+      }
+    },
+    "Could not change the charge limit. Retrying." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法修改充电上限，稍后重试。"
           }
         }
       }
@@ -685,6 +1013,26 @@
         }
       }
     },
+    "Discard" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "放弃"
+          }
+        }
+      }
+    },
+    "Discharge to %lld%%" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "放电至 %lld%%"
+          }
+        }
+      }
+    },
     "Discharge to Limit" : {
       "localizations" : {
         "zh-Hans" : {
@@ -701,6 +1049,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "放电至 %lld%%"
+          }
+        }
+      }
+    },
+    "Enabled" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已启用"
           }
         }
       }
@@ -725,12 +1083,52 @@
         }
       }
     },
+    "Finish Calibration" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "接着完成校准"
+          }
+        }
+      }
+    },
+    "Finish Calibration Now" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "趁现在完成校准"
+          }
+        }
+      }
+    },
+    "Follow System Settings" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "跟随系统设置"
+          }
+        }
+      }
+    },
     "Full Charge Capacity" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "满充容量"
+          }
+        }
+      }
+    },
+    "Full charge capacity changes are for reference only." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "满充容量的变化仅供参考。"
           }
         }
       }
@@ -771,6 +1169,36 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "状态良好"
+          }
+        }
+      }
+    },
+    "Hachibu could not set the charge limit to %lld%%. It will retry." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hachibu 未能将充电上限设为 %lld%%，稍后会重试。"
+          }
+        }
+      }
+    },
+    "Hachibu keeps its own limit while it runs. Choose what happens when it quits below." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hachibu 运行期间使用自己的上限，退出后的处理可在下方选择。"
+          }
+        }
+      }
+    },
+    "Hachibu sets the charge limit while it runs, and changes made in System Settings are reverted. Below 80%, System Settings shows a 0% limit; the limit shown in Hachibu is the one in effect." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hachibu 运行期间管理充电上限，系统设置中的改动会被改回。低于 80% 时，系统设置会显示 0% 上限，请以 Hachibu 显示的上限为准。"
           }
         }
       }
@@ -841,6 +1269,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "历史数据不可用"
+          }
+        }
+      }
+    },
+    "Hold at 100%" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保持在 100%"
+          }
+        }
+      }
+    },
+    "Hold at 100% Again" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "再次保持在 100%"
           }
         }
       }
@@ -925,12 +1373,42 @@
         }
       }
     },
+    "In Progress" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "进行中"
+          }
+        }
+      }
+    },
     "Input Voltage · Current" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "输入电压 · 电流"
+          }
+        }
+      }
+    },
+    "Install…" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "安装…"
+          }
+        }
+      }
+    },
+    "Interrupted" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已中断"
           }
         }
       }
@@ -951,6 +1429,36 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "iOS"
+          }
+        }
+      }
+    },
+    "Keep Current Limit" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保留当前上限"
+          }
+        }
+      }
+    },
+    "Keep your Mac plugged in. Calibration takes about half a day and adds about one charge cycle. It continues from discharging to 15%, then charges to 100% again before returning to your limit." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请保持 Mac 接入电源。校准约需半天，增加约一个充放电循环。将从放电至 15% 开始，再充至 100% 并保持后回到上限。"
+          }
+        }
+      }
+    },
+    "Keep your Mac plugged in. Calibration takes about half a day; discharging to 15%% while plugged in can take 5 to 8 hours when the Mac is idle. It starts from step %lld. If you quit Hachibu, your limit is restored and you can continue later." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请保持 Mac 接入电源。校准约需半天，空闲时插电放至 15%% 可能需要 5–8 小时。将从第 %lld 步开始。退出 Hachibu 时会恢复上限，下次可继续。"
           }
         }
       }
@@ -1015,6 +1523,17 @@
         }
       }
     },
+    "Limits below 80% are not available on this version of macOS yet." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此 macOS 版本尚不支持低于 80% 的上限。"
+          }
+        }
+      }
+    },
+    "Line" : {},
     "Low Power Mode" : {
       "localizations" : {
         "zh-Hans" : {
@@ -1041,6 +1560,116 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "macOS"
+          }
+        }
+      }
+    },
+    "macOS Battery Calibration" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "系统电池校准"
+          }
+        }
+      }
+    },
+    "macOS has conflicting charge limits registered." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "系统登记的充电上限不一致。"
+          }
+        }
+      }
+    },
+    "macOS has no charge limit registered." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "系统未登记充电上限。"
+          }
+        }
+      }
+    },
+    "macOS Is Calibrating the Battery" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "系统正在校准电池"
+          }
+        }
+      }
+    },
+    "macOS is calibrating the battery." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "macOS 正在校准电池。"
+          }
+        }
+      }
+    },
+    "macOS is calibrating the battery. Returns to %lld%% afterwards." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "macOS 正在校准电池，结束后回到 %lld%%。"
+          }
+        }
+      }
+    },
+    "macOS is charging to 100% to calibrate the battery. Hachibu will return to your limit afterwards." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "macOS 正在充至 100% 以校准电池，结束后 Hachibu 会恢复你的上限。"
+          }
+        }
+      }
+    },
+    "macOS is enforcing %lld%%." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "系统实际登记的上限为 %lld%%。"
+          }
+        }
+      }
+    },
+    "macOS sometimes charges to 100% to calibrate the battery. Hachibu can use that full charge to finish a calibration." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "macOS 有时会充至 100% 以校准电池，Hachibu 可以利用这次充满接着完成校准。"
+          }
+        }
+      }
+    },
+    "Managed by Hachibu" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "由 Hachibu 管理"
+          }
+        }
+      }
+    },
+    "Managed by Hachibu." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当前由 Hachibu 管理。"
           }
         }
       }
@@ -1105,6 +1734,16 @@
         }
       }
     },
+    "More" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更多"
+          }
+        }
+      }
+    },
     "No Battery Detected" : {
       "localizations" : {
         "zh-Hans" : {
@@ -1131,6 +1770,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "未允许"
+          }
+        }
+      }
+    },
+    "Not Installed" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未安装"
           }
         }
       }
@@ -1290,32 +1939,32 @@
         }
       }
     },
+    "Optimized Battery Charging is on and may hold the charge lower. Turn it off in Battery settings." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "优化电池充电已开启，电量可能保持在更低水平。可在电池设置中关闭。"
+          }
+        }
+      }
+    },
+    "Optimized Battery Charging is on. It can hold the charge below your limit until macOS expects you to unplug. Turn it off in Battery settings if you want Hachibu's limit to apply on its own." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "优化电池充电已开启，macOS 可能在预计拔电前将电量保持在上限以下。如需仅按 Hachibu 的上限执行，请在电池设置中关闭此选项。"
+          }
+        }
+      }
+    },
     "Optimized Charging Paused" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "优化充电暂停"
-          }
-        }
-      }
-    },
-    "Over %lld months, the 30-day average full charge capacity fell by %@ (%@)." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$lld 个月里，满充容量的 30 天平均下降了 %2$@（%3$@）。"
-          }
-        }
-      }
-    },
-    "Over %lld months, the 30-day average full charge capacity held steady." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld 个月里，满充容量的 30 天平均基本没有变化。"
           }
         }
       }
@@ -1340,12 +1989,92 @@
         }
       }
     },
+    "Over %lld months, the 30-day average full charge capacity fell by %@ (%@)." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld 个月里，满充容量的 30 天平均下降了 %2$@（%3$@）。"
+          }
+        }
+      }
+    },
+    "Over %lld months, the 30-day average full charge capacity held steady." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 个月里，满充容量的 30 天平均基本没有变化。"
+          }
+        }
+      }
+    },
     "Over %lld months, the 30-day average full charge capacity rose by %@ (%@)." : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "%1$lld 个月里，满充容量的 30 天平均上升了 %2$@（%3$@）。"
+          }
+        }
+      }
+    },
+    "Pause" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "暂停"
+          }
+        }
+      }
+    },
+    "Paused because another charge control app is running." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已暂停，其他充电控制工具正在运行。"
+          }
+        }
+      }
+    },
+    "Paused because the charge limit could not be changed. Retrying." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已暂停，无法修改充电上限，稍后重试。"
+          }
+        }
+      }
+    },
+    "Paused while macOS charges to full. Continues afterwards." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已暂停，macOS 正在充满电，结束后继续。"
+          }
+        }
+      }
+    },
+    "Paused. Plug in the power adapter to continue." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已暂停，请接入电源适配器后继续。"
+          }
+        }
+      }
+    },
+    "Paused. Your charge limit applies until you resume." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已暂停，继续前使用你的充电上限。"
           }
         }
       }
@@ -1410,6 +2139,36 @@
         }
       }
     },
+    "Redo This Step" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重做当前步骤"
+          }
+        }
+      }
+    },
+    "Remove" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移除"
+          }
+        }
+      }
+    },
+    "Remove…" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移除…"
+          }
+        }
+      }
+    },
     "Reported by macOS. Same as Battery Health in System Settings." : {
       "localizations" : {
         "zh-Hans" : {
@@ -1426,6 +2185,36 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "需要在系统设置中批准。"
+          }
+        }
+      }
+    },
+    "Restore System Settings" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "恢复系统设置"
+          }
+        }
+      }
+    },
+    "Resume" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "继续"
+          }
+        }
+      }
+    },
+    "Return to Charge Limit" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "回到充电上限"
           }
         }
       }
@@ -1460,12 +2249,42 @@
         }
       }
     },
+    "Show All Records" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "查看全部记录"
+          }
+        }
+      }
+    },
     "Show in Menu Bar" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "菜单栏显示"
+          }
+        }
+      }
+    },
+    "Show Recent Records" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示最近记录"
+          }
+        }
+      }
+    },
+    "Skip This Step" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "跳过当前步骤"
           }
         }
       }
@@ -1490,12 +2309,72 @@
         }
       }
     },
+    "Start Battery Calibration?" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开始电池校准？"
+          }
+        }
+      }
+    },
+    "Start Calibration…" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开始校准…"
+          }
+        }
+      }
+    },
+    "Start From" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开始步骤"
+          }
+        }
+      }
+    },
     "Status" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "状态"
+          }
+        }
+      }
+    },
+    "Step %lld" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "第 %lld 步"
+          }
+        }
+      }
+    },
+    "Step %lld of %lld" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "第 %1$lld 步，共 %2$lld 步"
+          }
+        }
+      }
+    },
+    "Step %lld: %@" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "第 %1$lld 步：%2$@"
           }
         }
       }
@@ -1530,6 +2409,16 @@
         }
       }
     },
+    "System Charging Policy" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "系统充电策略"
+          }
+        }
+      }
+    },
     "System Notifications" : {
       "localizations" : {
         "zh-Hans" : {
@@ -1546,6 +2435,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "系统功率"
+          }
+        }
+      }
+    },
+    "Takes effect when you plug in." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "接入电源后生效。"
           }
         }
       }
@@ -1576,6 +2475,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "临时充满"
+          }
+        }
+      }
+    },
+    "Temporary full charge." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在临时充满。"
+          }
+        }
+      }
+    },
+    "Temporary full charge. Returns to %lld%% afterwards." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在临时充满，结束后回到 %lld%%。"
           }
         }
       }
@@ -1614,6 +2533,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "电池温度已连续 3 分钟高于 %lld °C，当前 %@。"
+          }
+        }
+      }
+    },
+    "The charge limit is back to your setting." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "充电上限已恢复为你的设置。"
+          }
+        }
+      }
+    },
+    "The charge limit is managed by Hachibu. Changes in System Settings are reverted." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "充电上限由 Hachibu 管理，系统设置中的改动会被改回。"
           }
         }
       }
@@ -1759,6 +2698,16 @@
         }
       }
     },
+    "Unavailable" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "不可用"
+          }
+        }
+      }
+    },
     "Updated %llds ago" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -1812,6 +2761,16 @@
         }
       }
     },
+    "Waiting for macOS to apply the limit." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "等待 macOS 应用上限。"
+          }
+        }
+      }
+    },
     "When Above Limit" : {
       "localizations" : {
         "zh-Hans" : {
@@ -1822,77 +2781,17 @@
         }
       }
     },
+    "When macOS starts it" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "系统开始校准时"
+          }
+        }
+      }
+    },
     "Zero" : {},
-    "About %@ left" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "预计还需 %@"
-          }
-        }
-      }
-    },
-    "After Quitting Hachibu" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "退出 Hachibu 后"
-          }
-        }
-      }
-    },
-    "After macOS Charges to Full" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "系统充满后"
-          }
-        }
-      }
-    },
-    "Alerts about the charge limit and battery calibration." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "充电上限和电池校准的相关提醒。"
-          }
-        }
-      }
-    },
-    "Another charge control app is running. macOS settings apply until it quits." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "其他充电控制工具正在运行，退出前使用系统设置。"
-          }
-        }
-      }
-    },
-    "Applying. Takes effect in about a second." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "正在应用，约 1 秒后生效。"
-          }
-        }
-      }
-    },
-    "Automatic (Step %lld)" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "自动判断（第 %lld 步）"
-          }
-        }
-      }
-    },
     "Background Item" : {
       "localizations" : {
         "zh-Hans" : {
@@ -1913,82 +2812,12 @@
         }
       }
     },
-    "Battery Calibration" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "电池校准"
-          }
-        }
-      }
-    },
-    "Battery Calibration Complete" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "电池校准已完成"
-          }
-        }
-      }
-    },
-    "Battery Calibration Paused" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "电池校准已暂停"
-          }
-        }
-      }
-    },
-    "Calibration" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "校准"
-          }
-        }
-      }
-    },
-    "Calibration Records" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "校准记录"
-          }
-        }
-      }
-    },
     "Calibration needs the background item to discharge to 15%." : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "校准需要后台组件将电量放至 15%。"
-          }
-        }
-      }
-    },
-    "Calibration paused because another charge control app is running." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "校准已暂停，其他充电控制工具正在运行。"
-          }
-        }
-      }
-    },
-    "Calibration paused because the charge limit could not be changed. Hachibu will retry." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "校准已暂停，无法修改充电上限。Hachibu 会重试。"
           }
         }
       }
@@ -2003,202 +2832,12 @@
         }
       }
     },
-    "Calibration paused. Plug in the power adapter to continue." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "校准已暂停，请接入电源适配器后继续。"
-          }
-        }
-      }
-    },
-    "Calibration was not finished when Hachibu quit." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "上次退出 Hachibu 时，校准尚未完成。"
-          }
-        }
-      }
-    },
-    "Calibration was not finished when Hachibu quit. Open Hachibu to continue or discard it." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "上次退出 Hachibu 时，校准尚未完成。请打开 Hachibu，选择继续或放弃。"
-          }
-        }
-      }
-    },
-    "Calibration: Charging to 100%" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "校准：充电至 100%"
-          }
-        }
-      }
-    },
-    "Calibration: Discharging to %lld%%" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "校准：放电至 %lld%%"
-          }
-        }
-      }
-    },
-    "Calibration: Holding at 100%" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "校准：保持在 100%"
-          }
-        }
-      }
-    },
-    "Calibration: Returning to Limit" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "校准：回到充电上限"
-          }
-        }
-      }
-    },
-    "Cancel Calibration" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "取消校准"
-          }
-        }
-      }
-    },
-    "Cancelled" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已取消"
-          }
-        }
-      }
-    },
-    "Charge Control" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "充电控制"
-          }
-        }
-      }
-    },
-    "Charge Limit Control" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "充电上限管理"
-          }
-        }
-      }
-    },
-    "Charge Limit Not Applied" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "充电上限未生效"
-          }
-        }
-      }
-    },
     "Charge limits below 80% and battery calibration need a background item that runs as root. It can only change the charge limit. After installing, approve Hachibu in System Settings → General → Login Items & Extensions. Until then, Hachibu uses 80%." : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "低于 80% 的上限和电池校准需要以 root 运行的后台组件，它只能修改充电上限。安装后，请在“系统设置 → 通用 → 登录项与扩展”中批准 Hachibu。批准前仍按 80% 执行。"
-          }
-        }
-      }
-    },
-    "Charge to 100%" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "充电至 100%"
-          }
-        }
-      }
-    },
-    "Charge to 100% Again" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "再次充电至 100%"
-          }
-        }
-      }
-    },
-    "Charges to 100%, holds for an hour, discharges to 15% while plugged in, then charges to 100% again before returning to your limit. Takes about half a day and adds about one charge cycle. Macs with Apple silicon generally don't need manual calibration." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "充至 100% 并保持 1 小时，插电放至 15%，再次充至 100% 并保持后回到上限。约需半天，增加约一个充放电循环。Apple Silicon Mac 通常不需要手动校准。"
-          }
-        }
-      }
-    },
-    "Completed" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已完成"
-          }
-        }
-      }
-    },
-    "Completed or paused" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "完成或暂停时"
-          }
-        }
-      }
-    },
-    "Continue" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "继续"
-          }
-        }
-      }
-    },
-    "Could not change the charge limit. Retrying." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "无法修改充电上限，稍后重试。"
           }
         }
       }
@@ -2213,142 +2852,12 @@
         }
       }
     },
-    "Discard" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "放弃"
-          }
-        }
-      }
-    },
-    "Discharge to %lld%%" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "放电至 %lld%%"
-          }
-        }
-      }
-    },
-    "Enabled" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已启用"
-          }
-        }
-      }
-    },
-    "Finish Calibration" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "接着完成校准"
-          }
-        }
-      }
-    },
-    "Finish Calibration Now" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "趁现在完成校准"
-          }
-        }
-      }
-    },
-    "Follow System Settings" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "跟随系统设置"
-          }
-        }
-      }
-    },
-    "Full charge capacity changes are for reference only." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "满充容量的变化仅供参考。"
-          }
-        }
-      }
-    },
-    "Hachibu could not set the charge limit to %lld%%. It will retry." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Hachibu 未能将充电上限设为 %lld%%，稍后会重试。"
-          }
-        }
-      }
-    },
     "Hachibu first returns the charge limit to 80% or higher, then removes the background item. Limits below 80% and calibration will no longer be available." : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Hachibu 会先将充电上限恢复至 80% 或更高，再移除后台组件。移除后将无法使用低于 80% 的上限和校准功能。"
-          }
-        }
-      }
-    },
-    "Hachibu keeps its own limit while it runs. Choose what happens when it quits below." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Hachibu 运行期间使用自己的上限，退出后的处理可在下方选择。"
-          }
-        }
-      }
-    },
-    "Hachibu sets the charge limit while it runs, and changes made in System Settings are reverted. Below 80%, System Settings shows a 0% limit; the limit shown in Hachibu is the one in effect." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Hachibu 运行期间管理充电上限，系统设置中的改动会被改回。低于 80% 时，系统设置会显示 0% 上限，请以 Hachibu 显示的上限为准。"
-          }
-        }
-      }
-    },
-    "Hold at 100%" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "保持在 100%"
-          }
-        }
-      }
-    },
-    "Hold at 100% Again" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "再次保持在 100%"
-          }
-        }
-      }
-    },
-    "In Progress" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "进行中"
           }
         }
       }
@@ -2373,102 +2882,12 @@
         }
       }
     },
-    "Install…" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "安装…"
-          }
-        }
-      }
-    },
-    "Interrupted" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已中断"
-          }
-        }
-      }
-    },
-    "Keep Current Limit" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "保留当前上限"
-          }
-        }
-      }
-    },
-    "Keep your Mac plugged in. Calibration takes about half a day and adds about one charge cycle. It continues from discharging to 15%, then charges to 100% again before returning to your limit." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "请保持 Mac 接入电源。校准约需半天，增加约一个充放电循环。将从放电至 15% 开始，再充至 100% 并保持后回到上限。"
-          }
-        }
-      }
-    },
-    "Limits below 80% are not available on this version of macOS yet." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "此 macOS 版本尚不支持低于 80% 的上限。"
-          }
-        }
-      }
-    },
-    "Managed by Hachibu" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "由 Hachibu 管理"
-          }
-        }
-      }
-    },
-    "Managed by Hachibu." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "当前由 Hachibu 管理。"
-          }
-        }
-      }
-    },
-    "More" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "更多"
-          }
-        }
-      }
-    },
     "Needed for limits below 80% and battery calibration. It runs as root and can only change the charge limit." : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "低于 80% 的上限和电池校准需要此组件。它以 root 运行，只能修改充电上限。"
-          }
-        }
-      }
-    },
-    "Not Installed" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "未安装"
           }
         }
       }
@@ -2483,112 +2902,12 @@
         }
       }
     },
-    "Optimized Battery Charging is on and may hold the charge lower. Turn it off in Battery settings." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "优化电池充电已开启，电量可能保持在更低水平。可在电池设置中关闭。"
-          }
-        }
-      }
-    },
-    "Optimized Battery Charging is on. It can hold the charge below your limit until macOS expects you to unplug. Turn it off in Battery settings if you want Hachibu's limit to apply on its own." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "优化电池充电已开启，macOS 可能在预计拔电前将电量保持在上限以下。如需仅按 Hachibu 的上限执行，请在电池设置中关闭此选项。"
-          }
-        }
-      }
-    },
-    "Pause" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "暂停"
-          }
-        }
-      }
-    },
-    "Paused because another charge control app is running." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已暂停，其他充电控制工具正在运行。"
-          }
-        }
-      }
-    },
-    "Paused because the charge limit could not be changed. Retrying." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已暂停，无法修改充电上限，稍后重试。"
-          }
-        }
-      }
-    },
-    "Paused while macOS charges to full. Continues afterwards." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已暂停，macOS 正在充满电，结束后继续。"
-          }
-        }
-      }
-    },
     "Paused. Approve the Hachibu background item in Settings to continue." : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "已暂停，请在设置中批准 Hachibu 后台组件后继续。"
-          }
-        }
-      }
-    },
-    "Paused. Plug in the power adapter to continue." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已暂停，请接入电源适配器后继续。"
-          }
-        }
-      }
-    },
-    "Paused. Your charge limit applies until you resume." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已暂停，继续前使用你的充电上限。"
-          }
-        }
-      }
-    },
-    "Redo This Step" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "重做当前步骤"
-          }
-        }
-      }
-    },
-    "Remove" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "移除"
           }
         }
       }
@@ -2603,192 +2922,12 @@
         }
       }
     },
-    "Remove…" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "移除…"
-          }
-        }
-      }
-    },
-    "Restore System Settings" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "恢复系统设置"
-          }
-        }
-      }
-    },
-    "Resume" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "继续"
-          }
-        }
-      }
-    },
-    "Return to Charge Limit" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "回到充电上限"
-          }
-        }
-      }
-    },
-    "Skip This Step" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "跳过当前步骤"
-          }
-        }
-      }
-    },
-    "Start Battery Calibration?" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "开始电池校准？"
-          }
-        }
-      }
-    },
-    "Start Calibration…" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "开始校准…"
-          }
-        }
-      }
-    },
-    "Start From" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "开始步骤"
-          }
-        }
-      }
-    },
-    "Step %lld" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "第 %lld 步"
-          }
-        }
-      }
-    },
-    "Step %lld of %lld" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "第 %1$lld 步，共 %2$lld 步"
-          }
-        }
-      }
-    },
-    "Step %lld: %@" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "第 %1$lld 步：%2$@"
-          }
-        }
-      }
-    },
-    "System Charging Policy" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "系统充电策略"
-          }
-        }
-      }
-    },
-    "Takes effect when you plug in." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "接入电源后生效。"
-          }
-        }
-      }
-    },
-    "Temporary full charge." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "正在临时充满。"
-          }
-        }
-      }
-    },
-    "Temporary full charge. Returns to %lld%% afterwards." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "正在临时充满，结束后回到 %lld%%。"
-          }
-        }
-      }
-    },
-    "The charge limit is back to your setting." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "充电上限已恢复为你的设置。"
-          }
-        }
-      }
-    },
-    "The charge limit is managed by Hachibu. Changes in System Settings are reverted." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "充电上限由 Hachibu 管理，系统设置中的改动会被改回。"
-          }
-        }
-      }
-    },
     "The saved system limit could not be read. Check the charge limit in System Settings before removing the background item." : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "无法读取保存的系统上限。移除后台组件前，请先在系统设置中检查充电上限。"
-          }
-        }
-      }
-    },
-    "Unavailable" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "不可用"
           }
         }
       }
@@ -2803,16 +2942,6 @@
         }
       }
     },
-    "Waiting for macOS to apply the limit." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "等待 macOS 应用上限。"
-          }
-        }
-      }
-    },
     "Waiting for the background item to be approved. Using %lld%% for now." : {
       "localizations" : {
         "zh-Hans" : {
@@ -2823,142 +2952,12 @@
         }
       }
     },
-    "When macOS starts it" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "系统开始校准时"
-          }
-        }
-      }
-    },
-    "macOS Battery Calibration" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "系统电池校准"
-          }
-        }
-      }
-    },
-    "macOS Is Calibrating the Battery" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "系统正在校准电池"
-          }
-        }
-      }
-    },
     "macOS Last Charged to Full" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "系统上次充满"
-          }
-        }
-      }
-    },
-    "macOS has conflicting charge limits registered." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "系统登记的充电上限不一致。"
-          }
-        }
-      }
-    },
-    "macOS has no charge limit registered." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "系统未登记充电上限。"
-          }
-        }
-      }
-    },
-    "macOS is calibrating the battery." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "macOS 正在校准电池。"
-          }
-        }
-      }
-    },
-    "macOS is calibrating the battery. Returns to %lld%% afterwards." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "macOS 正在校准电池，结束后回到 %lld%%。"
-          }
-        }
-      }
-    },
-    "macOS is charging to 100% to calibrate the battery. Hachibu will return to your limit afterwards." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "macOS 正在充至 100% 以校准电池，结束后 Hachibu 会恢复你的上限。"
-          }
-        }
-      }
-    },
-    "macOS is enforcing %lld%%." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "系统实际登记的上限为 %lld%%。"
-          }
-        }
-      }
-    },
-    "macOS sometimes charges to 100% to calibrate the battery. Hachibu can use that full charge to finish a calibration." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "macOS 有时会充至 100% 以校准电池，Hachibu 可以利用这次充满接着完成校准。"
-          }
-        }
-      }
-    },
-    "Show Recent Records" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "显示最近记录"
-          }
-        }
-      }
-    },
-    "Show All Records" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "查看全部记录"
-          }
-        }
-      }
-    },
-    "Keep your Mac plugged in. Calibration takes about half a day; discharging to 15%% while plugged in can take 5 to 8 hours when the Mac is idle. It starts from step %lld. If you quit Hachibu, your limit is restored and you can continue later." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "请保持 Mac 接入电源。校准约需半天，空闲时插电放至 15%% 可能需要 5–8 小时。将从第 %lld 步开始。退出 Hachibu 时会恢复上限，下次可继续。"
           }
         }
       }

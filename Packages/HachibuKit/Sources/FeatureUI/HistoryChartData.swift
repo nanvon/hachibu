@@ -27,6 +27,12 @@ struct ChartSeries: Equatable, Sendable {
         plotPoints = HistoryChartBuilder.downsample(points)
     }
 
+    /// 绘图点另行指定，例如功率曲线只画抽稀后的点。
+    init(_ points: [ChartPoint], plotPoints: [ChartPoint]) {
+        self.points = points
+        self.plotPoints = plotPoints
+    }
+
     /// 没有悬停时显示最新值；悬停时只读选中时刻，缺失值不借用其他时刻。
     func reading(at selection: Date?) -> ChartPoint? {
         guard let selection else { return points.last }
@@ -54,8 +60,9 @@ struct RecentChartData: Equatable, Sendable {
     var calibration: [Range<Date>] = []
     var percent: ChartSeries
     var temperatureCelsius: ChartSeries
+    /// 系统功率的滑动平均，见 `HistoryChartBuilder.powerSeries(_:)`。
     var systemPowerWatts: ChartSeries
-    /// 电池功率，充电为正、放电为负。
+    /// 电池功率的滑动平均，充电为正、放电为负。
     var batteryPowerWatts: ChartSeries
     var powerInWatts: ChartSeries
     var voltageVolts: ChartSeries
@@ -119,6 +126,16 @@ enum HistoryChartBuilder {
 
     /// 插电底色的连续判断和悬停范围外的容差：3 个采样周期。曲线不受它影响。
     static let maxGapIntervals: Double = 3
+
+    /// 功率曲线的平均窗口：以每个样本为中心，前后各取一半。
+    static let powerAverageWindow: TimeInterval = 15 * 60
+    /// 功率曲线的绘图点间隔，读数和悬停仍用每个分钟样本。
+    static let powerPlotInterval: TimeInterval = 5 * 60
+    /// 功率曲线只保留至少这么多个连续样本的片段。睡眠期间系统定时唤醒，每次只记下 1–3 条样本，
+    /// 它们当作睡眠的一部分，不画也不读，避免把一整夜切成很多段。
+    static let powerMinimumRunSamples = 5
+    /// 功率图里超过这个间隔的缺口画淡色直虚线：睡眠时功率接近 0，实线连过去会像一直在耗电。
+    static let powerDashedGap: TimeInterval = 30 * 60
 
     private struct RecentRow {
         var date: Date
@@ -200,8 +217,8 @@ enum HistoryChartBuilder {
             calibration: mergedRanges(calibrationRuns.map { ($0.startedAt, $0.endedAt) }, in: domain),
             percent: ChartSeries(linePoints(rows.map { ($0.date, $0.percent) })),
             temperatureCelsius: ChartSeries(linePoints(rows.map { ($0.date, $0.temperatureCelsius) })),
-            systemPowerWatts: ChartSeries(linePoints(rows.map { ($0.date, $0.systemLoadMW.map { $0 / 1000 }) })),
-            batteryPowerWatts: ChartSeries(linePoints(rows.map { ($0.date, $0.batteryPowerMW.map { $0 / 1000 }) })),
+            systemPowerWatts: powerSeries(linePoints(rows.map { ($0.date, $0.systemLoadMW.map { $0 / 1000 }) })),
+            batteryPowerWatts: powerSeries(linePoints(rows.map { ($0.date, $0.batteryPowerMW.map { $0 / 1000 }) })),
             powerInWatts: ChartSeries(linePoints(rows.map { ($0.date, $0.powerInMW.map { $0 / 1000 }) })),
             voltageVolts: ChartSeries(linePoints(rows.map { ($0.date, $0.voltageMV.map { $0 / 1000 }) })),
             chargeLimitPercent: ChartSeries(chargeLimitSteps(chargeLimitEvents, in: domain)),
@@ -371,6 +388,64 @@ enum HistoryChartBuilder {
     static func linePoints(_ values: [(date: Date, value: Double?)]) -> [ChartPoint] {
         values.compactMap { date, value in
             value.map { ChartPoint(date: date, value: $0) }
+        }
+    }
+
+    /// 功率曲线：每个分钟样本取滑动平均作为读数，绘图只取抽稀后的点，让曲线更平滑。
+    /// 先去掉短于 `powerMinimumRunSamples` 的片段；最后一段正在记录，不论长短都保留。
+    static func powerSeries(_ points: [ChartPoint]) -> ChartSeries {
+        let maxGap = sampleInterval * maxGapIntervals
+        let segments = runs(points, maxGap: maxGap)
+        let kept = segments.enumerated().flatMap { index, run in
+            run.count >= powerMinimumRunSamples || index == segments.count - 1 ? run : []
+        }
+        let averaged = movingAverage(kept, window: powerAverageWindow)
+        return ChartSeries(averaged, plotPoints: thinned(averaged, interval: powerPlotInterval, maxGap: maxGap))
+    }
+
+    /// 按缺口切段：相邻两点间隔超过 `maxGap` 时断开。`points` 按时间排序。
+    static func runs(_ points: [ChartPoint], maxGap: TimeInterval) -> [[ChartPoint]] {
+        var result: [[ChartPoint]] = []
+        for point in points {
+            if let last = result.last?.last, point.date.timeIntervalSince(last.date) <= maxGap {
+                result[result.count - 1].append(point)
+            } else {
+                result.append([point])
+            }
+        }
+        return result
+    }
+
+    /// 抽稀：与上一个保留点相隔不少于 `interval` 的点才保留。首尾点和缺口（相邻间隔超过 `maxGap`）两侧的点
+    /// 总是保留，跨缺口的连线仍从真实的首尾样本画起。`points` 按时间排序。
+    static func thinned(_ points: [ChartPoint], interval: TimeInterval, maxGap: TimeInterval) -> [ChartPoint] {
+        var result: [ChartPoint] = []
+        for (index, point) in points.enumerated() {
+            let isLast = index == points.count - 1
+            let beforeGap = !isLast && points[index + 1].date.timeIntervalSince(point.date) > maxGap
+            let afterGap = index > 0 && point.date.timeIntervalSince(points[index - 1].date) > maxGap
+            guard let kept = result.last else {
+                result.append(point)
+                continue
+            }
+            if isLast || beforeGap || afterGap || point.date.timeIntervalSince(kept.date) >= interval {
+                result.append(point)
+            }
+        }
+        return result
+    }
+
+    /// 滑动平均：每个点取前后各 `window / 2` 内所有点的平均值，日期不变，所以读数和悬停仍对准采样时刻。
+    /// 只用窗口内真实存在的点，缺口不补值；孤立的点保持原值。`points` 按时间排序。
+    static func movingAverage(_ points: [ChartPoint], window: TimeInterval) -> [ChartPoint] {
+        let half = window / 2
+        var lower = 0
+        var upper = 0
+        return points.map { point in
+            while point.date.timeIntervalSince(points[lower].date) > half { lower += 1 }
+            while upper < points.count, points[upper].date.timeIntervalSince(point.date) <= half { upper += 1 }
+            let values = points[lower..<upper].map(\.value)
+            return ChartPoint(date: point.date, value: values.reduce(0, +) / Double(values.count))
         }
     }
 
