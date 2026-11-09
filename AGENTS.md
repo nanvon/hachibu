@@ -8,7 +8,7 @@ Hachibu 是 macOS 菜单栏电池监控应用，定位为 AlDente 的平替，�
 
 文档：
 
-- `docs/v1技术设计.md`：v1 写代码的依据，包括已定决策、数据来源、状态规则、存储结构。与其他文档冲突时以它为准。其中第 19 节是界面视觉：原则、颜色含义、平台约束和改视觉的流程，不写像素值；实现状态和待办见 19.8，改完一项要更新 19.8。
+- `docs/v1技术设计.md`：v1 写代码的依据，包括已定决策、数据来源、状态规则、存储结构；v2 的接管模式、低于 80% 上限和电池校准在第 21 节。与其他文档冲突时以它为准。其中第 19 节是界面视觉：原则、颜色含义、平台约束和改视觉的流程，不写像素值；实现状态和待办见 19.8，改完一项要更新 19.8。
 - `design/brand/README.md`：品牌素材（应用图标、菜单栏图标、logo、宣传图、DMG 背景）的来源和导出方式，素材由 `scripts/generate-brand-assets.swift` 生成。
 - `docs/新功能需求.md`：用户提出的功能、可行性判断和进度；决定要做后再写进设计文档。
 - `docs/打包发布.md`：`scripts/build.sh` 打包、GitHub Actions 发布、Sparkle 密钥配置。
@@ -18,7 +18,7 @@ Hachibu 是 macOS 菜单栏电池监控应用，定位为 AlDente 的平替，�
 版本规划：
 
 - v1：只做数据展示（本文件描述的范围）。
-- v2：充电控制。以控制系统原生充电上限（80%–100%）为主，经 PowerUI 写入；档位已在面板和设置页实现（选 100% 即关闭上限，不单独提供开关）；电量高于上限时，设置页可选放电到上限（系统默认）或保持当前电量（把系统上限临时写成当前电量，最高 99，拔电、关闭选项、退出或启动时写回用户的上限），规则见设计文档第 6 节。临时充满一次暂不做。低于 80%、航行模式、强制放电（插电放电、校准模式）不做：2026-10-26 实验确认 root 下也无法暂停充电，不做 SMC 后端和特权 helper，原因见 `docs/新功能需求.md` 5.3、5.4。本机传统限充 SMC key 已不可用，见 `docs/v1技术设计.md` 第 18 节和 `docs/v2充电控制技术调研.md`。
+- v2：充电控制，全部基于系统原生充电上限，不写 SMC。已实现：80%–100% 档位，经 PowerUI 写入，在面板和设置页（选 100% 即关闭上限，不单独提供开关）；电量高于上限时，设置页可选放电到上限（系统默认）或保持当前电量（把系统上限临时写成当前电量，最高 99，拔电、关闭选项、退出或启动时写回用户的上限），规则见设计文档第 6 节。未实现（2026-11-09 定方案，设计文档第 21 节）：“由 Hachibu 管理”的接管模式（默认仍跟随系统设置）、低于 80% 的上限（经 `SMAppService.daemon` 特权 helper 以 root 写 PowerUIAgent 偏好）、电池校准及校准记录。仍然不做：SMC 后端、切断充电器供电的强制放电（`CHIE`）、自定义恢复充电回差、临时充满一次。2026-10-26 实验确认 root 下也无法经 SMC 暂停充电，本机传统限充 SMC key 已不可用，见 `docs/v1技术设计.md` 第 18 节和 `docs/v2充电控制技术调研.md`。
 - v3：导入历史数据（已实现）。通用 JSON 格式，只导入每日的满充容量、循环次数、系统最大容量等健康数据，不导入高频数据；不提供解密 AlDente 数据库的方法或指引，见设计文档第 20 节。
 
 旧的视觉设计稿（Liquid Glass 风格的 HTML 近似稿）已废弃，不作参考，按它定的像素规格也已从设计文档删除。菜单栏面板和主窗口的样式已于 2026-10-26 定稿（设计文档 19.2、19.3）。改界面样式按设计文档 19.1 的流程：先写渲染测试出图，自己看过再发给用户，用户确认后定稿；以确认过的渲染图和代码为准。
@@ -48,6 +48,7 @@ Hachibu 是 macOS 菜单栏电池监控应用，定位为 AlDente 的平替，�
 - 材质：macOS 26+ 用 `NSGlassEffectView`，更早系统用 `NSVisualEffectView`。
 - 界面语言：英文和简体中文，文案用 String Catalog（`.xcstrings`），源语言为英文。界面文字不要硬编码在 `BatteryCore`、`HistoryStore` 里。
 - 工程：XcodeGen（`project.yml`）生成 Xcode 工程，`.xcodeproj` 不提交；逻辑放在本地 Swift Package `HachibuKit`，分 `BatteryCore`、`HistoryStore`、`FeatureUI` 三个 target。
+- 特权 helper：只用于接管模式下低于 80% 的上限和电池校准（未实现），`SMAppService.daemon` 注册，用到时才请求用户批准；XPC 只提供读取状态、设置目标（1–99）、释放、续约，不开放 SMC 或任意命令；App 崩溃时由 helper 按续约超时恢复系统原值。见设计文档 21.3。
 - 依赖：GRDB（HachibuKit）；Sparkle 2（App target，`project.yml` 引入）。EdDSA 公钥未填写前不启用更新。
 - 仓库里不放密钥和证书。Sparkle 私钥只放在本机钥匙串和 GitHub secret 里；公钥写在 `Config/Base.xcconfig`。想用自己证书编译时，Team ID、签名身份放在不提交的 `Config/Local.xcconfig`，别人 clone 后不改工程就能用本地签名编译。
 
@@ -61,7 +62,7 @@ Hachibu 是 macOS 菜单栏电池监控应用，定位为 AlDente 的平替，�
 - 读 SMC 用于实时显示，只发 KeyInfo 和 Read，读取模块里没有写入代码。IORegistry 和 IOPS 的充电状态、功率约每 60 秒才更新，切换充电上限后要等下一个刷新点才报告；SMC 每秒更新。用到的 key（CHSC 充电状态、B0AP 电池功率（充电为正、放电为负）、PDTR 输入功率、PSTR 系统功率、VD0R / ID0R 输入电压电流、TB0T 温度等）的类型、字节序（本机为小端）、单位、合理范围和读不到时退回 IORegistry / IOPS 的规则，见设计文档 5.1。每个数值直接取自对应的 key，不做配平；数据库仍写完整采样的 IOPS / IORegistry 读数。
 - 最大容量两种计算方式分开命名、分开存储：系统最大容量（`system_profiler`，本机 95%）和容量比 `FullChargeCapacity / DesignCapacity`（本机 91.4%）。
 - 设计循环次数用 IORegistry 的 `DesignCycleCount9C`，不用 IOPS 的 `DesignCycleCount`（两者不一致）。
-- 系统充电上限优先用私有框架 PowerUI 读取（校验方法类型编码），不可用时退回读私有文件 `/Library/Preferences/com.apple.powerd.charging.plist`，格式不符就视为未知。写入只用 PowerUI 的 `setMCLLimit:error:`、`enableMCL:`、`disableMCL:`，同样校验类型编码，以 PowerUI 读回为准；不直接改 powerd 文件。规则见设计文档第 6 节。`NotChargingReason` 不参与状态判断。
+- 系统充电上限优先用私有框架 PowerUI 读取（校验方法类型编码），不可用时退回读私有文件 `/Library/Preferences/com.apple.powerd.charging.plist`，格式不符就视为未知。80%–100% 的写入只用 PowerUI 的 `setMCLLimit:error:`、`enableMCL:`、`disableMCL:`，同样校验类型编码，以 PowerUI 读回为准；不直接改 powerd 文件。低于 80% 由 helper 写 PowerUIAgent 偏好域 `com.apple.smartcharging.topoffprotection` 并发重载通知，释放仍经 PowerUI，生效以 PowerUI 读回和 `pmset -g battlimit` 登记为准（设计文档 21.2）。规则见设计文档第 6 节。`NotChargingReason` 不参与状态判断。
 - 缺失的指标显示“—”，数据库存 `NULL`，不存 0；休眠期间保留数据缺口，不补数据。
 - AlDente 等充电控制工具会改变充电行为，影响充电状态读数；测试充电相关逻辑前先退出这类工具。
 
