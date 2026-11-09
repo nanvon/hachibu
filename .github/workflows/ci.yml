@@ -49,10 +49,10 @@ jobs:
               - '!design/**'
               - '!LICENSE'
 
-  # 三套测试按 target 拆到三台 macOS runner 上并行跑。每个 job 只跑一套，
-  # 由 ci-success 汇总结果；不依赖其他测试 job，也不互相传数据。
+  # 单元测试和 UI 测试分到两台 macOS runner 并行；App 编译也不依赖它们。
+  # macOS runner 免费额度有限，shard 太多反而排不到机器，这里只拆成两组。
   test:
-    name: 测试 ${{ matrix.target }}
+    name: 测试 ${{ matrix.name }}
     runs-on: macos-15
     needs: changes
     if: needs.changes.outputs.code == 'true'
@@ -60,7 +60,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: [BatteryCoreTests, HistoryStoreTests, FeatureUITests]
+        include:
+          - name: 单元测试
+            targets: BatteryCoreTests HistoryStoreTests
+          - name: UI 测试
+            targets: FeatureUITests
     steps:
       - uses: actions/checkout@v4
         with:
@@ -77,7 +81,7 @@ jobs:
           xcode-version: latest-stable
 
       # .build 里包含 GRDB 的 checkout 和编译产物，是本仓库最耗时的一段。
-      # 三个 shard 都构建完整测试 bundle，缓存键保持一致；先完成的 job 保存一次即可复用。
+      # 每个 shard 都构建完整测试 bundle，缓存键保持一致；先完成的 job 保存一次即可复用。
       - name: 缓存 SwiftPM 构建
         uses: actions/cache@v4
         with:
@@ -86,11 +90,13 @@ jobs:
           restore-keys: |
             spm-${{ runner.os }}-${{ hashFiles('Packages/HachibuKit/Package.resolved') }}-
 
-      - name: 编译并测试 ${{ matrix.target }}
+      - name: 编译并测试 ${{ matrix.name }}
         run: |
           set -euo pipefail
           swift build --package-path Packages/HachibuKit --build-tests
-          swift test --package-path Packages/HachibuKit --skip-build --filter ${{ matrix.target }}
+          for target in ${{ matrix.targets }}; do
+            swift test --package-path Packages/HachibuKit --skip-build --filter "$target"
+          done
 
   # App 编译与测试并行，只缓存 Xcode 自己的 DerivedData，不拉 SwiftPM 测试缓存。
   build_app:
