@@ -1,3 +1,4 @@
+import BatteryCore
 import Foundation
 import Testing
 @testable import FeatureUI
@@ -15,7 +16,7 @@ import Testing
     @Test func usesDefaultsWhenNothingStored() {
         withDefaults { defaults in
             let settings = AppSettings(defaults: defaults)
-            #expect(settings.menuBarContent == .batteryLevel)
+            #expect(settings.menuBarContents == [.batteryLevel])
             #expect(settings.menuBarIconStyle == .battery)
             #expect(settings.temperatureAlertEnabled)
             #expect(settings.temperatureAlertThreshold == 40)
@@ -30,7 +31,7 @@ import Testing
     @Test func changesArePersisted() {
         withDefaults { defaults in
             let settings = AppSettings(defaults: defaults)
-            settings.menuBarContent = .temperature
+            settings.menuBarContents = [.temperature]
             settings.menuBarIconStyle = .battery
             settings.temperatureAlertEnabled = false
             settings.temperatureAlertThreshold = 45
@@ -38,7 +39,7 @@ import Testing
             settings.healthAlertThreshold = 70
 
             let reloaded = AppSettings(defaults: defaults)
-            #expect(reloaded.menuBarContent == .temperature)
+            #expect(reloaded.menuBarContents == [.temperature])
             #expect(reloaded.menuBarIconStyle == .battery)
             #expect(!reloaded.temperatureAlertEnabled)
             #expect(reloaded.temperatureAlertThreshold == 45)
@@ -55,7 +56,7 @@ import Testing
             defaults.set(10, forKey: "healthAlertThreshold")
 
             let settings = AppSettings(defaults: defaults)
-            #expect(settings.menuBarContent == .batteryLevel)
+            #expect(settings.menuBarContents == [.batteryLevel])
             #expect(settings.menuBarIconStyle == .battery)
             #expect(settings.temperatureAlertThreshold == AppSettings.temperatureThresholdRange.upperBound)
             #expect(settings.healthAlertThreshold == AppSettings.healthThresholdRange.lowerBound)
@@ -68,12 +69,12 @@ import Testing
             defaults.set("systemPower", forKey: "menuBarContent")
             let settings = AppSettings(defaults: defaults)
             #expect(settings.menuBarIconStyle == .battery)
-            #expect(settings.menuBarContent == .systemPower)
+            #expect(settings.menuBarContents == [.systemPower])
 
             settings.menuBarIconStyle = .ios
             let reloaded = AppSettings(defaults: defaults)
             #expect(reloaded.menuBarIconStyle == .ios)
-            #expect(reloaded.menuBarContent == .systemPower)
+            #expect(reloaded.menuBarContents == [.systemPower])
         }
     }
 
@@ -84,7 +85,7 @@ import Testing
             defaults.set("systemPower", forKey: "menuBarContent")
             let settings = AppSettings(defaults: defaults)
             #expect(settings.menuBarIconStyle == .battery)
-            #expect(settings.menuBarContent == .systemPower)
+            #expect(settings.menuBarContents == [.systemPower])
         }
     }
 
@@ -97,7 +98,40 @@ import Testing
 
             let reloaded = AppSettings(defaults: defaults)
             #expect(reloaded.menuBarIconStyle == style)
-            #expect(reloaded.menuBarContent == .temperature)
+            #expect(reloaded.menuBarContents == [.temperature])
         }
+    }
+    @Test func multipleMenuBarContentsKeepFixedOrderAndWriteLegacyKey() {
+        withDefaults { defaults in
+            defaults.set("systemPower", forKey: "menuBarContent")
+            let settings = AppSettings(defaults: defaults)
+            settings.menuBarContents = [.temperature, .batteryLevel, .temperature]
+
+            let reloaded = AppSettings(defaults: defaults)
+            #expect(reloaded.menuBarContents == [.batteryLevel, .temperature])
+            #expect(defaults.string(forKey: "menuBarContent") == "batteryLevel")
+
+            settings.menuBarContents = []
+            #expect(AppSettings(defaults: defaults).menuBarContents.isEmpty)
+            // 都不选时旧键保留上一次的值。
+            #expect(defaults.string(forKey: "menuBarContent") == "batteryLevel")
+        }
+    }
+
+    @Test func unknownStoredContentsAreDropped() {
+        withDefaults { defaults in
+            defaults.set(["temperature", "unknown"], forKey: "menuBarContents")
+            #expect(AppSettings(defaults: defaults).menuBarContents == [.temperature])
+        }
+    }
+
+    @Test func menuBarTitleJoinsReadings() {
+        let reading = BatteryReading.battery(BatterySnapshot(percent: 80, systemLoadMW: 12_300, temperatureCelsius: 31.2))
+        let all = MenuBarTitle.string(for: reading, contents: [.batteryLevel, .systemPower, .temperature])
+        #expect(all == [
+            DisplayFormat.percent(80), DisplayFormat.watts(milliwatts: 12_300), DisplayFormat.celsius(31.2),
+        ].joined(separator: "  "))
+        #expect(MenuBarTitle.string(for: nil, contents: [.batteryLevel, .temperature]) == DisplayFormat.missing)
+        #expect(MenuBarTitle.string(for: reading, contents: [.temperature], separator: ", ") == DisplayFormat.celsius(31.2))
     }
 }

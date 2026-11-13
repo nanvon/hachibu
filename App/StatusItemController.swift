@@ -3,7 +3,7 @@ import BatteryCore
 import FeatureUI
 import Observation
 
-/// 菜单栏图标：显示设置里选择的读数，点击切换面板的显示。
+/// 菜单栏图标：显示设置里选择的读数（可多项），点击切换面板的显示。
 @MainActor
 final class StatusItemController: NSObject {
     private let statusItem: NSStatusItem
@@ -39,7 +39,7 @@ final class StatusItemController: NSObject {
     private func observePresentationChanges() {
         withObservationTracking {
             _ = monitor.reading
-            _ = settings.menuBarContent
+            _ = settings.menuBarContents
             _ = settings.menuBarIconStyle
         } onChange: { [weak self] in
             Task { @MainActor in
@@ -64,21 +64,18 @@ final class StatusItemController: NSObject {
     /// 相同值不写回按钮，避免菜单栏重绘产生外观通知后再次触发布局。
     private func updatePresentation() {
         guard let button = statusItem.button else { return }
-        let presentation = (
-            title: MenuBarTitle.string(for: monitor.reading, content: settings.menuBarContent),
-            content: settings.menuBarContent,
-            icon: MenuBarIcon(style: settings.menuBarIconStyle, reading: monitor.reading, appearance: button.effectiveAppearance)
-        )
-        let title = presentation.icon.style == .ios && presentation.content == .batteryLevel && presentation.icon.percent != nil
-            ? "" : presentation.title
+        let contents = settings.menuBarContents
+        let icon = MenuBarIcon(style: settings.menuBarIconStyle, reading: monitor.reading, appearance: button.effectiveAppearance)
+        // iOS 样式的电量已经画在电池里，文字里不再重复。
+        let isLevelInIcon = icon.style == .ios && icon.percent != nil
+        let visible = isLevelInIcon ? contents.filter { $0 != .batteryLevel } : contents
+        let title = visible.isEmpty ? "" : MenuBarTitle.string(for: monitor.reading, contents: visible)
         if button.title != title {
             button.title = title
         }
-        // iOS 样式可以只显示图片，仍通过原始读数提供无障碍文字。
-        let batteryTitle = MenuBarTitle.string(for: monitor.reading, content: .batteryLevel)
-        let accessibilityTitle = presentation.icon.style == .ios && presentation.content != .batteryLevel
-            ? "\(batteryTitle), \(presentation.title)" : presentation.title
-        let accessibilityLabel = "Hachibu, \(accessibilityTitle)"
+        // 文字可以为空，无障碍文字仍读出电量和全部选中的读数。
+        let spoken = contents.contains(.batteryLevel) ? contents : [.batteryLevel] + contents
+        let accessibilityLabel = "Hachibu, \(MenuBarTitle.string(for: monitor.reading, contents: spoken, separator: ", "))"
         if lastAccessibilityLabel != accessibilityLabel {
             button.setAccessibilityLabel(accessibilityLabel)
             lastAccessibilityLabel = accessibilityLabel
@@ -87,9 +84,9 @@ final class StatusItemController: NSObject {
         if button.imagePosition != imagePosition {
             button.imagePosition = imagePosition
         }
-        if lastIcon != presentation.icon {
-            button.image = presentation.icon.image()
-            lastIcon = presentation.icon
+        if lastIcon != icon {
+            button.image = icon.image()
+            lastIcon = icon
         }
     }
 

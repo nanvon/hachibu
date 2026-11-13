@@ -48,7 +48,7 @@ For a laptop that stays plugged in most of the time, keeping the charge around 8
 
 ### Menu Bar and Panel
 
-- **Menu bar** — A battery icon in macOS or iOS style, optionally followed by battery level (%), system power (W), or battery temperature (°C). Click to open the panel.
+- **Menu bar** — A battery icon in macOS or iOS style, optionally followed by any combination of battery level (%), system power (W), and battery temperature (°C). Click to open the panel.
 - **Charging status** — Distinguishes On Battery, Charging, Fully Charged, Charge Limit Reached, Above Charge Limit, Holding at the current level, Plugged In Not Charging, and Plugged In Draining, with time remaining or time until full.
 - **Power flow** — Input power, system power, and battery power between the charger, the computer, and the battery. While the panel is open, the SMC is read every 2.5 seconds, and every second after you change the charge limit or plug in or unplug the charger. If the SMC can't be read, Hachibu falls back to IORegistry, which updates about every 60 seconds.
 - **Reading cards** — Battery level, battery temperature (marked "High" at the alert threshold), and system power.

@@ -175,21 +175,29 @@ struct SettingsPageContent: View {
     private var menuBarGroup: some View {
         SettingsGroup(
             Text("Menu Bar", bundle: .module),
-            description: Text("Icons turn yellow in Low Power Mode. The iOS style shows the percentage inside the battery.", bundle: .module)
+            description: Text("Readings that are on appear next to the icon in this order; with none on, only the icon is shown. Icons turn yellow in Low Power Mode. The iOS style shows the percentage inside the battery.", bundle: .module)
         ) {
             SettingsRow(Text("Menu Bar Icon", bundle: .module)) {
                 MenuBarIconChoice(selection: $settings.menuBarIconStyle)
             }
-            SettingsRowDivider()
-            SettingsRow(Text("Show in Menu Bar", bundle: .module)) {
-                SettingsMenu(
-                    selection: $settings.menuBarContent,
-                    options: MenuBarContent.allCases,
-                    title: \.title,
-                    label: Text("Show in Menu Bar", bundle: .module)
-                )
+            ForEach(MenuBarContent.allCases, id: \.self) { content in
+                SettingsRowDivider()
+                SettingsRow(content.title) {
+                    SettingsSwitch(isOn: menuBarContentBinding(content), label: content.title)
+                }
             }
         }
+    }
+
+    private func menuBarContentBinding(_ content: MenuBarContent) -> Binding<Bool> {
+        Binding(
+            get: { settings.menuBarContents.contains(content) },
+            set: { isOn in
+                var contents = settings.menuBarContents.filter { $0 != content }
+                if isOn { contents.append(content) }
+                settings.menuBarContents = MenuBarContent.ordered(contents)
+            }
+        )
     }
 
     // MARK: 通用

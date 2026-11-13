@@ -11,8 +11,17 @@ public final class AppSettings {
     /// 保留旧接口；最大容量提醒已移除。
     public static let healthThresholdRange = 50...95
 
-    public var menuBarContent: MenuBarContent {
-        didSet { defaults.set(menuBarContent.rawValue, forKey: Key.menuBarContent) }
+    /// 菜单栏图标旁显示的读数，按 `MenuBarContent.allCases` 的固定顺序排列，可以为空（只显示图标）。
+    /// 存在新键里；旧键 `menuBarContent` 同时写入第一项，装回旧版本时仍有合理的单项选择。
+    public var menuBarContents: [MenuBarContent] {
+        didSet {
+            // 调用方保证顺序（设置页按固定顺序写入）；这里只按固定顺序保存，读取时同样排序。
+            let ordered = MenuBarContent.ordered(menuBarContents)
+            defaults.set(ordered.map(\.rawValue), forKey: Key.menuBarContents)
+            if let first = ordered.first {
+                defaults.set(first.rawValue, forKey: Key.menuBarContent)
+            }
+        }
     }
     public var menuBarIconStyle: MenuBarIconStyle {
         didSet { defaults.set(menuBarIconStyle.rawValue, forKey: Key.menuBarIconStyle) }
@@ -91,7 +100,12 @@ public final class AppSettings {
 
     public init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
-        menuBarContent = defaults.string(forKey: Key.menuBarContent).flatMap(MenuBarContent.init(rawValue:)) ?? .batteryLevel
+        if let stored = defaults.stringArray(forKey: Key.menuBarContents) {
+            menuBarContents = MenuBarContent.ordered(stored.compactMap(MenuBarContent.init(rawValue:)))
+        } else {
+            // 旧版本只存一项；未知值回退电量。
+            menuBarContents = [defaults.string(forKey: Key.menuBarContent).flatMap(MenuBarContent.init(rawValue:)) ?? .batteryLevel]
+        }
         menuBarIconStyle = defaults.string(forKey: Key.menuBarIconStyle).flatMap(MenuBarIconStyle.init(rawValue:)) ?? .battery
         temperatureAlertEnabled = defaults.object(forKey: Key.temperatureAlertEnabled) as? Bool ?? true
         temperatureAlertThreshold = Self.integer(defaults, Key.temperatureAlertThreshold, default: 40, in: Self.temperatureThresholdRange)
@@ -124,6 +138,7 @@ public final class AppSettings {
 
     private enum Key {
         static let menuBarContent = "menuBarContent"
+        static let menuBarContents = "menuBarContents"
         static let menuBarIconStyle = "menuBarIconStyle"
         static let temperatureAlertEnabled = "temperatureAlertEnabled"
         static let temperatureAlertThreshold = "temperatureAlertThreshold"
@@ -174,15 +189,28 @@ public enum MenuBarIconStyle: String, CaseIterable, Sendable {
     case ios
 }
 
-/// 菜单栏显示的读数。
+/// 菜单栏显示的读数。声明顺序就是菜单栏里的显示顺序。
 public enum MenuBarContent: String, CaseIterable, Sendable {
     case batteryLevel
     case systemPower
     case temperature
+
+    /// 去重并按固定顺序排列。
+    static func ordered(_ contents: [MenuBarContent]) -> [MenuBarContent] {
+        allCases.filter(contents.contains)
+    }
 }
 
 /// 菜单栏文字。数值格式与面板一致，缺失时显示“—”。
 public enum MenuBarTitle {
+    /// 多项读数按给定顺序拼接。没有读数或没有电池时只显示一次“—”或提示文字。
+    public static func string(for reading: BatteryReading?, contents: [MenuBarContent], separator: String = "  ") -> String {
+        guard case .battery = reading, !contents.isEmpty else {
+            return string(for: reading, content: contents.first ?? .batteryLevel)
+        }
+        return contents.map { string(for: reading, content: $0) }.joined(separator: separator)
+    }
+
     public static func string(for reading: BatteryReading?, content: MenuBarContent) -> String {
         switch reading {
         case nil:
