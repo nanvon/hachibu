@@ -7,7 +7,7 @@ import Testing
 private final class HoldTestSystem: BatteryDataSource, ChargeLimitWriter, @unchecked Sendable {
     private let lock = NSLock()
     private var state = (
-        percent: 90, external: true, charging: false, uiState: 0, enabled: true, limit: 80, failsWrites: false
+        percent: 90, external: true, charging: false, uiState: 14, enabled: true, limit: 80, failsWrites: false
     )
     private var log: [ChargeLimitChange] = []
 
@@ -43,7 +43,7 @@ private final class HoldTestSystem: BatteryDataSource, ChargeLimitWriter, @unche
                     limit: state.enabled ? state.limit : 100, availableLimits: [80, 85, 90, 95, 100],
                     uiState: state.uiState
                 ),
-                lowPowerModeEnabled: false
+                fullChargeOverrideActive: false, lowPowerModeEnabled: false
             )
         }
     }
@@ -118,6 +118,24 @@ private struct NoProfiler: SystemProfilerSource {
         #expect(control.percent == 80)
     }
 
+    @Test func unknownPolicyDoesNotStartHoldingButRestoresOwnedTemporaryLimit() async {
+        system.set(uiState: 42)
+        let monitor = makeMonitor()
+        await monitor.read()
+        #expect(system.writes.isEmpty)
+
+        system.set(uiState: 14)
+        await monitor.read()
+        await settle(monitor)
+        #expect(system.writes == [.limit(90)])
+
+        system.set(external: false, uiState: 42)
+        await monitor.read()
+        await settle(monitor)
+        #expect(system.writes == [.limit(90), .limit(80)])
+        #expect(savedHold == nil)
+    }
+
     @Test func calibrationDoesNotWriteUntilChargingStops() async throws {
         system.set(percent: 94, charging: true, uiState: 18)
         let monitor = makeMonitor()
@@ -128,7 +146,7 @@ private struct NoProfiler: SystemProfilerSource {
         #expect(ChargeStatus(try #require(snapshot(monitor))) == .calibrating)
 
         // 校准结束：充电停止后按当时的电量保持。
-        system.set(percent: 100, charging: false, uiState: 0)
+        system.set(percent: 100, charging: false, uiState: 14)
         await monitor.read()
         await settle(monitor)
         #expect(system.writes == [.limit(99)])
@@ -150,7 +168,7 @@ private struct NoProfiler: SystemProfilerSource {
         #expect(ChargeStatus(calibrating) == .calibrating)
         #expect(ChargeLimitControl(snapshot: calibrating, canWrite: true, isBlocked: false)?.percent == 80)
 
-        system.set(percent: 96, charging: false, uiState: 0)
+        system.set(percent: 96, charging: false, uiState: 14)
         await monitor.read()
         await settle(monitor)
         #expect(system.writes == [.limit(90), .limit(80), .limit(96)])
@@ -186,7 +204,7 @@ private struct NoProfiler: SystemProfilerSource {
         #expect(ChargeLimitControl(snapshot: charging, canWrite: true, isBlocked: false)?.percent == 80)
 
         // 结束后系统恢复临时值，继续保持，拔电时写回用户的上限。
-        system.set(percent: 100, charging: false, uiState: 0, limit: 90)
+        system.set(percent: 100, charging: false, uiState: 14, limit: 90)
         await monitor.read()
         await settle(monitor)
         #expect(system.writes == [.limit(90)])
@@ -212,7 +230,7 @@ private struct NoProfiler: SystemProfilerSource {
         #expect(savedHold == ChargeLimitHold(userLimit: 80, heldLimit: 90))
 
         // 下次启动时临时充满已结束，系统恢复了临时值：先写回用户的上限，不把临时值当成用户的上限。
-        system.set(percent: 90, charging: false, uiState: 0, limit: 90)
+        system.set(percent: 90, charging: false, uiState: 14, limit: 90)
         let next = makeMonitor()
         await next.read()
         await settle(next)

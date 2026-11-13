@@ -133,6 +133,7 @@ public final class BatteryMonitor {
     @ObservationIgnored var restoredForOtherTool = false
     /// 进行中的系统策略时段及其数据库记录。
     @ObservationIgnored var policyPeriods: [ChargePolicyKind: Task<Int64?, Never>] = [:]
+    @ObservationIgnored var wasSystemFullChargeActive = false
     @ObservationIgnored var calibrationRecordIDs = CalibrationRecordIDs()
     @ObservationIgnored var calibrationRecordTask: Task<CalibrationRecordIDs, Never>?
     @ObservationIgnored var calibrationSavedAt: Date?
@@ -509,11 +510,14 @@ public final class BatteryMonitor {
         case .none:
             return
         case .forget:
+            guard snapshot.isChargePolicyKnown
+                || chargeLimitHold.map({ snapshot.chargeLimit == .on(percent: $0.userLimit) }) == true
+            else { return }
             setChargeLimitHold(nil)
             publish()
             return
         case .hold(let hold):
-            guard !isChargeLimitHoldPaused else { return }
+            guard snapshot.isChargePolicyKnown, !isChargeLimitHoldPaused else { return }
             // 先保存再写入，崩溃后下次启动也能恢复。
             setChargeLimitHold(hold)
             change = .limit(hold.heldLimit)

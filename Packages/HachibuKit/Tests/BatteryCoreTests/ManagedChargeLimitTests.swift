@@ -92,6 +92,38 @@ import Testing
         #expect(ChargeHelperMarker(featureState: 0, limitValue: 80).restoredLimit == nil)
     }
 
+    @Test func helperLeaseExpiresAndRenewalExtendsItsDeadline() {
+        let start = SuspendingClock.now
+        var lease = ChargeHelperLease()
+        #expect(lease.remainingSeconds(at: start) == nil)
+        lease.renew(at: start)
+        #expect(lease.remainingSeconds(at: start) == 300)
+        #expect(!lease.hasExpired(at: start.advanced(by: .seconds(299))))
+        #expect(lease.hasExpired(at: start.advanced(by: .seconds(300))))
+
+        let renewedAt = start.advanced(by: .seconds(30))
+        lease.renew(at: renewedAt)
+        #expect(lease.remainingSeconds(at: start.advanced(by: .seconds(300))) == 30)
+        #expect(lease.hasExpired(at: renewedAt.advanced(by: .seconds(300))))
+        #expect(lease.remainingSeconds(at: renewedAt.advanced(by: .seconds(301))) == 0)
+    }
+
+    @Test func helperLeaseClampsRenewalAndCanBeClearedOrKept() {
+        let now = SuspendingClock.now
+        var lease = ChargeHelperLease()
+        lease.renew(seconds: 1, at: now)
+        #expect(lease.remainingSeconds(at: now) == 60)
+        lease.renew(seconds: 1_000, at: now)
+        #expect(lease.remainingSeconds(at: now) == 900)
+        lease.clear()
+        #expect(lease.remainingSeconds(at: now) == nil)
+
+        lease.renew(at: now)
+        lease.renew(seconds: 0, at: now)
+        #expect(lease.remainingSeconds(at: now) == nil)
+        #expect(!lease.hasExpired(at: now.advanced(by: .seconds(1_000))))
+    }
+
     @Test func helperLabelsCarryVersionSuffix() {
         #expect(ChargeHelper.isValidLabel("io.github.nanvon.hachibu.helper"))
         #expect(ChargeHelper.isValidLabel("io.github.nanvon.hachibu.helper.0.1.11"))

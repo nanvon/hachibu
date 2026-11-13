@@ -131,6 +131,30 @@ public enum ManualChargeLimitPreferences {
     }
 }
 
+/// Helper 租约只累计清醒时间。时刻由调用方传入，便于验证截止与续约。
+public struct ChargeHelperLease {
+    private var deadline: SuspendingClock.Instant?
+
+    public init() {}
+
+    /// 0 表示保留上限。非零续约限制在 60–900 秒。
+    public mutating func renew(seconds: Int = Int(ChargeHelper.leaseTimeout), at now: SuspendingClock.Instant) {
+        deadline = seconds == 0 ? nil : now.advanced(by: .seconds(min(max(seconds, 60), 900)))
+    }
+
+    public mutating func clear() {
+        deadline = nil
+    }
+
+    public func remainingSeconds(at now: SuspendingClock.Instant) -> Int? {
+        deadline.map { Int(max(now.duration(to: $0), .zero).components.seconds) }
+    }
+
+    public func hasExpired(at now: SuspendingClock.Instant) -> Bool {
+        deadline.map { now >= $0 } == true
+    }
+}
+
 /// helper 第一次覆盖前保存的原值，写在 root 所有的标记文件里。
 public struct ChargeHelperMarker: Sendable, Equatable, Codable {
     public var featureState: Int?

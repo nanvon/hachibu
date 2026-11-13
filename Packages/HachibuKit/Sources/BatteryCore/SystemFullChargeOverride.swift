@@ -15,6 +15,10 @@ public enum SystemFullChargeOverride {
         defer { notify_cancel(token) }
         var state: UInt64 = 0
         guard notify_get_state(token, &state) == UInt32(NOTIFY_STATUS_OK) else { return nil }
-        return state == 1
+        switch state {
+        case 0: return false
+        case 1: return true
+        default: return nil
+        }
     }
 }

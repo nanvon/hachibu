@@ -66,6 +66,8 @@ public struct BatterySnapshot: Sendable, Equatable {
     public var chargeLimitOptions: [Int]?
     /// PowerUI 报告的系统充电状态，只记录面板要说明的几种，其他情况或读不到时为 nil。
     public var systemChargeState: SystemChargeState?
+    /// PowerUI 原始状态码。保留它以区分已识别的普通状态和未知状态。
+    public private(set) var powerUIStateCode: Int?
     /// 系统正在强制充满（长期未充满时为校准电量计充到 100%），读不到时为 nil。规则见 docs/v1技术设计.md 21.5。
     public var isFullChargeOverrideActive: Bool?
     /// 本次插电期间电量已在未充电时到达当前充电上限。不是读数，由 `ChargeLimitHoldTracker` 根据连续读数推导，解析结果为 false。
@@ -215,6 +217,7 @@ extension BatterySnapshot {
             },
             isFullChargeOverrideActive: raw.fullChargeOverrideActive
         )
+        powerUIStateCode = raw.powerUIChargeLimit?.uiState
     }
 
     /// 序列号的 SHA-256，小写十六进制。去掉首尾空白后为空时为 nil。导入历史数据时用同一规则。

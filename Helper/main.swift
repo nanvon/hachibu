@@ -13,8 +13,8 @@ final class Daemon: NSObject, NSXPCListenerDelegate, ChargeHelperProtocol, @unch
     /// 所有状态只在这个队列上读写。
     private let queue = DispatchQueue(label: "io.github.nanvon.hachibu.helper")
     private var timer: DispatchSourceTimer?
-    private var leaseDeadline: Date?
-    private var lastActivity = Date()
+    private var lease = ChargeHelperLease()
+    private var lastActivity = SuspendingClock.now
     private var connectionCount = 0
     /// 最近一次释放时标记文件格式不对，没有恢复原值。下一次成功设置后清除。
     private var skippedCorruptRestore = false
@@ -25,7 +25,7 @@ final class Daemon: NSObject, NSXPCListenerDelegate, ChargeHelperProtocol, @unch
     private let ownFileID: FileID?
 
     /// 没有标记文件、没有连接且空闲这么久后退出，下次由 launchd 按需启动。
-    private static let idleExitInterval: TimeInterval = 120
+    private static let idleExitInterval: Duration = .seconds(120)
     private static let tickInterval: DispatchTimeInterval = .seconds(15)
 
     override init() {
@@ -53,7 +53,7 @@ final class Daemon: NSObject, NSXPCListenerDelegate, ChargeHelperProtocol, @unch
         queue.sync {
             // 开机或崩溃后重新启动：有未恢复的覆盖时给 App 一个续约周期，超时再恢复。
             if case .valid(let marker)? = readMarker(), !marker.keepsLimit {
-                leaseDeadline = Date().addingTimeInterval(ChargeHelper.leaseTimeout)
+                lease.renew(at: .now)
                 logger.info("Started with marker; lease deadline set")
             }
         }
@@ -82,7 +82,7 @@ final class Daemon: NSObject, NSXPCListenerDelegate, ChargeHelperProtocol, @unch
             guard let self else { return }
             self.queue.async {
                 self.connectionCount -= 1
-                self.lastActivity = Date()
+                self.lastActivity = .now
             }
         }
         queue.sync { connectionCount += 1 }
@@ -92,7 +92,7 @@ final class Daemon: NSObject, NSXPCListenerDelegate, ChargeHelperProtocol, @unch
 
     func status(reply: @escaping @Sendable (Data?) -> Void) {
         let status = queue.sync { () -> ChargeHelperStatus in
-            lastActivity = Date()
+            lastActivity = .now
             let values = Self.readPreferences()
             let marker = readMarker()
             return ChargeHelperStatus(
@@ -106,7 +106,7 @@ final class Daemon: NSObject, NSXPCListenerDelegate, ChargeHelperProtocol, @unch
                 hasMarker: marker != nil,
                 isMarkerCorrupt: skippedCorruptRestore || marker == .corrupt,
                 keepsLimit: { if case .valid(let m)? = marker { m.keepsLimit } else { false } }(),
-                leaseRemainingSeconds: leaseDeadline.map { max(Int($0.timeIntervalSinceNow), 0) }
+                leaseRemainingSeconds: lease.remainingSeconds(at: .now)
             )
         }
         reply(try? JSONEncoder().encode(status))
@@ -122,9 +122,9 @@ final class Daemon: NSObject, NSXPCListenerDelegate, ChargeHelperProtocol, @unch
 
     func renewLease(seconds: Int, reply: @escaping @Sendable (String?) -> Void) {
         reply(queue.sync { () -> String? in
-            lastActivity = Date()
+            lastActivity = .now
             guard case .valid(var marker)? = readMarker() else {
-                leaseDeadline = nil
+                lease.clear()
                 return nil
             }
             let keeps = seconds == 0
@@ -133,7 +133,7 @@ final class Daemon: NSObject, NSXPCListenerDelegate, ChargeHelperProtocol, @unch
                 if let error = writeMarker(marker) { return error }
                 logger.info("Keeps limit after quit: \(keeps, privacy: .public)")
             }
-            leaseDeadline = keeps ? nil : Date().addingTimeInterval(TimeInterval(min(max(seconds, 60), 900)))
+            lease.renew(seconds: seconds, at: .now)
             return nil
         })
     }
@@ -141,7 +141,7 @@ final class Daemon: NSObject, NSXPCListenerDelegate, ChargeHelperProtocol, @unch
     // MARK: - 操作
 
     private func performSetLimit(_ percent: Int) -> String? {
-        lastActivity = Date()
+        lastActivity = .now
         guard ChargeHelper.limitRange.contains(percent) else { return "Limit out of range: \(percent)" }
         guard ManualChargeLimitPreferences.isSchemaSupported else { return "Unverified macOS version" }
         let values = Self.readPreferences()
@@ -170,9 +170,9 @@ final class Daemon: NSObject, NSXPCListenerDelegate, ChargeHelperProtocol, @unch
         }
         skippedCorruptRestore = false
         if case .valid(let marker)? = readMarker(), marker.keepsLimit {
-            leaseDeadline = nil
+            lease.clear()
         } else {
-            leaseDeadline = Date().addingTimeInterval(ChargeHelper.leaseTimeout)
+            lease.renew(at: .now)
         }
         logger.info("Set limit \(percent, privacy: .public)")
         return nil
@@ -180,7 +180,7 @@ final class Daemon: NSObject, NSXPCListenerDelegate, ChargeHelperProtocol, @unch
 
     /// 经 PowerUI 清掉登记：Agent 读回为关闭时会忽略 `disableMCL:`，先开启再关闭。然后按原值恢复。
     private func performRelease(reason: String) -> String? {
-        lastActivity = Date()
+        lastActivity = .now
         let marker = readMarker()
         guard marker != .corrupt else {
             skippedCorruptRestore = true
@@ -221,7 +221,7 @@ final class Daemon: NSObject, NSXPCListenerDelegate, ChargeHelperProtocol, @unch
                 return "Could not remove restored marker"
             }
         }
-        leaseDeadline = nil
+        lease.clear()
         logger.info("Released limit (\(reason, privacy: .public))")
         return nil
     }
@@ -234,18 +234,17 @@ final class Daemon: NSObject, NSXPCListenerDelegate, ChargeHelperProtocol, @unch
             exit(0)
         }
         let marker = readMarker()
+        let now = SuspendingClock.now
         if case .valid(let marker)? = marker, !marker.keepsLimit {
-            guard let deadline = leaseDeadline else {
-                leaseDeadline = Date().addingTimeInterval(ChargeHelper.leaseTimeout)
-                return
-            }
-            if Date() > deadline {
+            if lease.hasExpired(at: now) {
                 logger.error("Lease expired; restoring original limit")
                 _ = performRelease(reason: "lease expired")
+            } else if lease.remainingSeconds(at: now) == nil {
+                lease.renew(at: now)
             }
             return
         }
-        if marker == nil, connectionCount <= 0, Date().timeIntervalSince(lastActivity) > Self.idleExitInterval {
+        if marker == nil, connectionCount <= 0, lastActivity.duration(to: now) > Self.idleExitInterval {
             logger.info("Idle; exiting")
             exit(0)
         }

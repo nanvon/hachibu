@@ -271,18 +271,25 @@ final class FakeHelperRegistration: ChargeHelperRegistration {
 /// 所有写入只发生在内存假系统中，不注册 helper、不修改本机充电设置。
 private final class ManagedTestSystem: BatteryDataSource, ChargeLimitWriter, @unchecked Sendable {
     private let lock = NSLock()
-    private var state = (percent: 90, enabled: true, limit: 80, uiState: 0, fails: false)
+    private var state = (percent: 90, enabled: true, limit: 80, uiState: 14, fails: false)
     private var log: [ChargeLimitChange] = []
+    private var policyReadFails = false
+    private var overrideReadFails = false
 
     var writes: [ChargeLimitChange] { lock.withLock { log } }
     var setting: ChargeLimitSetting { lock.withLock { state.enabled ? .on(percent: state.limit) : .off } }
 
-    func set(percent: Int? = nil, limit: Int? = nil, uiState: Int? = nil, fails: Bool? = nil) {
+    func set(
+        percent: Int? = nil, limit: Int? = nil, uiState: Int? = nil, fails: Bool? = nil,
+        policyReadFails: Bool? = nil, overrideReadFails: Bool? = nil
+    ) {
         lock.withLock {
             if let percent { state.percent = percent }
             if let limit { state.limit = limit; state.enabled = limit < 100 }
             if let uiState { state.uiState = uiState }
             if let fails { state.fails = fails }
+            if let policyReadFails { self.policyReadFails = policyReadFails }
+            if let overrideReadFails { self.overrideReadFails = overrideReadFails }
         }
     }
 
@@ -296,8 +303,8 @@ private final class ManagedTestSystem: BatteryDataSource, ChargeLimitWriter, @un
                 smartBattery: nil, smartBatteryPack: nil, adapterDetails: nil, chargeLimitArchive: nil,
                 powerUIChargeLimit: PowerUIChargeLimit(
                     isSupported: true, isEnabled: state.enabled, limit: state.limit,
-                    availableLimits: [80, 85, 90, 95, 100], uiState: state.uiState
-                ), lowPowerModeEnabled: false
+                    availableLimits: [80, 85, 90, 95, 100], uiState: policyReadFails ? nil : state.uiState
+                ), fullChargeOverrideActive: overrideReadFails ? nil : false, lowPowerModeEnabled: false
             )
         }
     }
@@ -404,7 +411,7 @@ private struct ManagedTestProfiler: SystemProfilerSource {
         await monitor.read()
         await settle(monitor)
         #expect(system.writes.isEmpty)
-        system.set(uiState: 0)
+        system.set(uiState: 14)
         await monitor.read()
         await settle(monitor)
         #expect(system.writes.first == .limit(85))
@@ -418,6 +425,96 @@ private struct ManagedTestProfiler: SystemProfilerSource {
         await monitor.read()
         await settle(monitor)
         #expect(system.writes.isEmpty)
+    }
+
+    @Test func unknownSystemPolicyDefersManagedWriteUntilBothReadsRecover() async {
+        let monitor = monitor()
+        monitor.chargeControl = ChargeControlConfiguration(mode: .managed, target: 85)
+        system.set(policyReadFails: true)
+        await monitor.read()
+        #expect(system.writes.isEmpty)
+
+        system.set(uiState: 42, policyReadFails: false)
+        await monitor.read()
+        #expect(system.writes.isEmpty)
+
+        system.set(uiState: 0)
+        await monitor.read()
+        #expect(system.writes.isEmpty)
+
+        system.set(uiState: 14, overrideReadFails: true)
+        await monitor.read()
+        #expect(system.writes.isEmpty)
+
+        system.set(overrideReadFails: false)
+        await monitor.read()
+        await settle(monitor)
+        #expect(system.writes == [.limit(85)])
+    }
+
+    @Test func unknownReadingDoesNotEndSystemFullChargeOrStartCalibration() async {
+        let monitor = monitor()
+        monitor.chargeControl = ChargeControlConfiguration(
+            mode: .managed, continuesCalibrationAfterSystemFullCharge: true
+        )
+        system.set(percent: 100, uiState: 18)
+        await monitor.read()
+        #expect(monitor.policyPeriods[.systemCalibration] != nil)
+
+        system.set(policyReadFails: true)
+        await monitor.read()
+        #expect(monitor.policyPeriods[.systemCalibration] != nil)
+        #expect(monitor.calibration == nil)
+
+        system.set(uiState: 14, policyReadFails: false, overrideReadFails: true)
+        await monitor.read()
+        #expect(monitor.calibration == nil)
+
+        system.set(overrideReadFails: false)
+        await monitor.read()
+        #expect(monitor.calibration?.step == .dischargeToLow)
+    }
+
+    @Test func cancellingCalibrationCanRestoreItsLowLimitWithUnknownPolicy() async {
+        let monitor = monitor()
+        monitor.chargeControl = ChargeControlConfiguration(mode: .managed, target: 85)
+        await monitor.read()
+        await settle(monitor)
+        monitor.calibration = CalibrationProgress(start: .manual, step: .dischargeToLow, at: Date(), percent: 90)
+        monitor.managedAppliedLimit = CalibrationStep.dischargeTarget
+        system.set(limit: CalibrationStep.dischargeTarget, policyReadFails: true)
+        await monitor.read()
+        #expect(system.setting == .on(percent: 15))
+        #expect(monitor.calibration?.pauseReason == nil)
+
+        monitor.cancelCalibration()
+        await settle(monitor)
+        #expect(system.setting == .on(percent: 85))
+    }
+
+    @Test func leaseUsesTargetCalibrationOrMarkerDuringSystemTemporaryFullCharge() async {
+        let monitor = monitor()
+        monitor.chargeControl = ChargeControlConfiguration(mode: .managed, target: 60)
+        system.set(limit: 100, uiState: 3)
+        await monitor.read()
+        let timeout = Int(ChargeHelper.leaseTimeout)
+        #expect(system.setting == .off)
+        #expect(monitor.helperLeaseSeconds(hasMarker: false) == timeout)
+
+        monitor.chargeControl.target = 85
+        #expect(monitor.helperLeaseSeconds(hasMarker: false) == nil)
+        #expect(monitor.helperLeaseSeconds(hasMarker: true) == timeout)
+
+        monitor.chargeControl.keepsLimitOnQuit = true
+        #expect(monitor.helperLeaseSeconds(hasMarker: true) == 0)
+        monitor.calibration = CalibrationProgress(start: .manual, step: .chargeToFull, at: Date(), percent: 90)
+        #expect(monitor.helperLeaseSeconds(hasMarker: false) == timeout)
+
+        monitor.isRemovingChargeHelper = true
+        #expect(monitor.helperLeaseSeconds(hasMarker: true) == nil)
+        monitor.chargeControl.mode = .followSystem
+        monitor.isRemovingChargeHelper = false
+        #expect(monitor.helperLeaseSeconds(hasMarker: true) == nil)
     }
 
     @Test func helperApprovalFallbackPreservesRequestedTarget() async {
