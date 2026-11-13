@@ -4,8 +4,10 @@ import Foundation
 /// 面板和设置页中充电上限控制的显示内容。规则见 docs/v1技术设计.md 第 6、13 节和 21.7。
 /// 为 nil 时不提供控制，只读显示上限。
 struct ChargeLimitControl: Equatable {
-    /// 接管模式下面板档位，设置页另有步进器（精确到 1%）。目标不在档位上时作为额外的选中档位显示。
-    static let managedOptions = [20, 40, 60, 80, 100]
+    /// 接管模式下可新选的目标范围。已有目标可低于这个范围。
+    static let managedSelectionRange = 70...100
+    /// 面板快捷档。目标不在档位上时作为额外的选中档位显示。
+    static let managedOptions = [managedSelectionRange.lowerBound, 80, 90, managedSelectionRange.upperBound]
     /// 读回被别处改过后，提示“充电上限由 Hachibu 管理”的时长。
     static let externalChangeNoticeDuration: TimeInterval = 600
 

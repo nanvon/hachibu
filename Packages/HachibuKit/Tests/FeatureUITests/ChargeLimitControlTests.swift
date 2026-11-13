@@ -80,14 +80,20 @@ import Testing
         #expect(!writing.isInteractive)
     }
 
-    @Test func managedOptionsCoverRangeAndKeepExactRequestedTarget() throws {
+    @Test(arguments: [63, 70, 83, 100])
+    func managedOptionsCoverRangeAndKeepExactRequestedTarget(target: Int) throws {
         let control = try #require(ChargeLimitControl(
-            managedTarget: 63, snapshot: snapshot(.on(percent: 80)), canWrite: true,
+            managedTarget: target, snapshot: snapshot(.on(percent: 80)), canWrite: true,
             state: .awaitingHelperApproval(effective: 80), isBlocked: false
         ))
         #expect(control.mode == .managed)
-        #expect(control.percent == 63)
-        #expect(control.options == [20, 40, 60, 63, 80, 100])
+        #expect(control.percent == target)
+        let expectedOptions = switch target {
+        case 63: [63, 70, 80, 90, 100]
+        case 83: [70, 80, 83, 90, 100]
+        default: [70, 80, 90, 100]
+        }
+        #expect(control.options == expectedOptions)
         #expect(control.isInteractive)
     }
 }

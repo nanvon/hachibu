@@ -65,7 +65,7 @@ struct ChargeControlModeRow: View {
     }
 }
 
-/// 接管模式的充电上限：档位加步进器（精确到 1%），退出后的处理。
+/// 接管模式的充电上限（精确到 1%）和退出后的处理。
 struct ManagedChargeLimitRows: View {
     @Bindable var settings: AppSettings
     let control: ChargeLimitControl
@@ -75,18 +75,20 @@ struct ManagedChargeLimitRows: View {
     @State private var helperCheckFinished = false
 
     var body: some View {
+        let range = ChargeLimitControl.managedSelectionRange
         SettingsRow(Text("Charge Limit", bundle: .module)) {
             SettingsStepper(
-                value: $settings.managedChargeLimit,
-                range: ManagedChargeLimit.targetRange,
+                value: Binding(
+                    get: { settings.managedChargeLimit },
+                    set: { settings.managedChargeLimit = max($0, range.lowerBound) }
+                ),
+                // 旧目标低于 70% 时仍显示原值，首次按加号直接调到 70%。
+                range: min(settings.managedChargeLimit, range.lowerBound)...range.upperBound,
                 text: settings.managedChargeLimit >= 100 ? String(localized: "Off", bundle: .module) : DisplayFormat.percent(settings.managedChargeLimit),
                 label: Text("Charge Limit", bundle: .module)
             )
             .disabled(control.isBlocked || monitor.isRemovingChargeHelper)
         }
-        LimitSegments(options: control.options, selection: control.percent) { settings.managedChargeLimit = $0 }
-            .disabled(control.isBlocked || monitor.isRemovingChargeHelper)
-            .padding(.bottom, 10)
         ManagedLimitNote(control: control)
             .font(.system(size: 11.5))
             .frame(maxWidth: .infinity, alignment: .leading)

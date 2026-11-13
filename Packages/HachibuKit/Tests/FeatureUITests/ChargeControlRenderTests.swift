@@ -54,18 +54,19 @@ import Testing
 
     @Test(.enabled(if: ProcessInfo.processInfo.environment["HACHIBU_RENDER_DIR"] != nil))
     func renderManagedPanelStates() throws {
-        let states: [(String, ManagedLimitState, CalibrationDisplay?)] = [
-            ("applied", .applied, nil),
-            ("approval", .awaitingHelperApproval(effective: 80), nil),
-            ("policy", .systemPolicy(.systemCalibration, limit: 60), nil),
-            ("discharge", .applied, CalibrationDisplay(step: .dischargeToLow, fraction: 0.4, remainingMinutes: 180)),
-            ("paused", .applied, CalibrationDisplay(step: .holdFull, pauseReason: .appQuit, fraction: 0.4)),
+        let states: [(String, Int, ManagedLimitState, CalibrationDisplay?)] = [
+            ("applied", 80, .applied, nil),
+            ("approval", 70, .awaitingHelperApproval(effective: 80), nil),
+            ("policy", 60, .systemPolicy(.systemCalibration, limit: 60), nil),
+            ("discharge", 80, .applied, CalibrationDisplay(step: .dischargeToLow, fraction: 0.4, remainingMinutes: 180)),
+            ("paused", 80, .applied, CalibrationDisplay(step: .holdFull, pauseReason: .appQuit, fraction: 0.4)),
         ]
         for (scheme, locale, variant) in variants {
-            for (name, state, calibration) in states {
-                let snapshot = PanelPreviewData.snapshot(percent: 60, chargeLimit: .on(percent: 60))
+            for (name, target, state, calibration) in states {
+                let effectiveLimit = state == .awaitingHelperApproval(effective: 80) ? 80 : target
+                let snapshot = PanelPreviewData.snapshot(percent: effectiveLimit, chargeLimit: .on(percent: effectiveLimit))
                 let control = ChargeLimitControl(
-                    managedTarget: 60, snapshot: snapshot, canWrite: true, state: state, isBlocked: false
+                    managedTarget: target, snapshot: snapshot, canWrite: true, state: state, isBlocked: false
                 )
                 let shape = RoundedRectangle(cornerRadius: 28, style: .continuous)
                 let panel = PanelContent(

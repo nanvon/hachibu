@@ -8,7 +8,7 @@ public enum ChargeControlMode: String, Sendable, Equatable, CaseIterable, Codabl
 
 /// 接管模式的写入决策，不含任何读写。规则见 docs/v1技术设计.md 21.2、21.4。
 public enum ManagedChargeLimit {
-    /// 接管模式的目标范围（%），100 表示关闭上限。下限 20% 为暂定值。
+    /// 接管模式保存和执行的目标范围（%），含已有的低于 70% 的目标。100 表示关闭上限。
     public static let targetRange = 20...100
     /// 低于这个值的上限要经 helper 写入。
     public static let helperThreshold = RoutedChargeLimitWriter.powerUIMinimum
