@@ -75,6 +75,16 @@ public struct HourlySample: Sendable, Equatable {
     public var temperatureCelsius: Summary<Double>
     public var voltageMV: Summary<Int>
     public var amperageMA: Summary<Int>
+    /// 各电量区间的样本数，区间见 `percentBucketLowerBounds`。只计电量非 NULL 的样本，总和即有效样本数。
+    /// 迁移 v5 之前生成的行为 nil，表示未知，不等于 0。
+    public var percentBuckets: [Int]?
+    /// 各温度区间的样本数，区间见 `temperatureBucketLowerBounds`。规则同 `percentBuckets`。
+    public var temperatureBuckets: [Int]?
+
+    /// 电量区间的下界（%），每个区间到下一个下界之前为止：0–9、10–19 … 90–99、100。
+    public static let percentBucketLowerBounds = Array(stride(from: 0, through: 100, by: 10))
+    /// 温度区间的下界（°C）：低于 25、25–30、30–35、35–40、40–45、45 及以上，下界含、上界不含。
+    public static let temperatureBucketLowerBounds: [Double] = [-.infinity, 25, 30, 35, 40, 45]
 
     /// 一个指标在一小时内的平均值、最小值、最大值。
     public struct Summary<Value: Sendable & Equatable>: Sendable, Equatable {
@@ -100,7 +110,9 @@ public struct HourlySample: Sendable, Equatable {
         powerInMW: Summary<Int> = Summary(),
         temperatureCelsius: Summary<Double> = Summary(),
         voltageMV: Summary<Int> = Summary(),
-        amperageMA: Summary<Int> = Summary()
+        amperageMA: Summary<Int> = Summary(),
+        percentBuckets: [Int]? = nil,
+        temperatureBuckets: [Int]? = nil
     ) {
         self.hour = hour
         self.sampleCount = sampleCount
@@ -113,6 +125,8 @@ public struct HourlySample: Sendable, Equatable {
         self.temperatureCelsius = temperatureCelsius
         self.voltageMV = voltageMV
         self.amperageMA = amperageMA
+        self.percentBuckets = percentBuckets
+        self.temperatureBuckets = temperatureBuckets
     }
 }
 
@@ -304,6 +318,10 @@ extension HourlySample: FetchableRecord {
         func summary<Value: DatabaseValueConvertible & Sendable & Equatable>(_ prefix: String, _ unit: String) -> Summary<Value> {
             Summary(average: row["\(prefix)_avg\(unit)"], min: row["\(prefix)_min\(unit)"], max: row["\(prefix)_max\(unit)"])
         }
+        func buckets(_ columns: [String]) -> [Int]? {
+            let values: [Int?] = columns.map { row.hasColumn($0) ? row[$0] : nil }
+            return values.contains(nil) ? nil : values.compactMap { $0 }
+        }
         self.init(
             hour: UnixTime.date(row["hour_ts"]),
             sampleCount: row["sample_count"],
@@ -315,9 +333,15 @@ extension HourlySample: FetchableRecord {
             powerInMW: summary("power_in", "_mw"),
             temperatureCelsius: summary("temperature", "_c"),
             voltageMV: summary("voltage", "_mv"),
-            amperageMA: summary("amperage", "_ma")
+            amperageMA: summary("amperage", "_ma"),
+            percentBuckets: buckets(Self.percentBucketColumns),
+            temperatureBuckets: buckets(Self.temperatureBucketColumns)
         )
     }
+
+    /// `hourly_samples` 的分桶列名，顺序与区间下界一致。
+    static let percentBucketColumns = percentBucketLowerBounds.indices.map { "percent_bucket_\($0)" }
+    static let temperatureBucketColumns = temperatureBucketLowerBounds.indices.map { "temperature_bucket_\($0)" }
 }
 
 extension HourlyAverage: FetchableRecord {

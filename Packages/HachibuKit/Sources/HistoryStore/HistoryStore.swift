@@ -424,8 +424,22 @@ public final class HistoryStore: Sendable {
         power_in_avg_mw, power_in_min_mw, power_in_max_mw,
         temperature_avg_c, temperature_min_c, temperature_max_c,
         voltage_avg_mv, voltage_min_mv, voltage_max_mv,
-        amperage_avg_ma, amperage_min_ma, amperage_max_ma
+        amperage_avg_ma, amperage_min_ma, amperage_max_ma,
+        \((HourlySample.percentBucketColumns + HourlySample.temperatureBucketColumns).joined(separator: ", "))
         """
+
+    /// 每个区间一列 `SUM(CASE …)`：下界含、上界不含，最后一个区间没有上界。NULL 不落入任何区间。
+    private static func bucketSums<Bound: Comparable & CustomStringConvertible>(_ column: String, lowerBounds: [Bound]) -> String {
+        lowerBounds.indices.map { index in
+            var conditions: [String] = []
+            let lower = lowerBounds[index]
+            if index > 0 { conditions.append("\(column) >= \(lower)") }
+            if index + 1 < lowerBounds.count { conditions.append("\(column) < \(lowerBounds[index + 1])") }
+            if conditions.isEmpty { conditions.append("\(column) IS NOT NULL") }
+            return "SUM(CASE WHEN \(conditions.joined(separator: " AND ")) THEN 1 ELSE 0 END)"
+        }
+        .joined(separator: ",\n    ")
+    }
 
     /// SQLite 的 AVG、MIN、MAX 只统计非 NULL 的值，全部为 NULL 时结果为 NULL。
     private static let hourlySelect = """
@@ -440,7 +454,9 @@ public final class HistoryStore: Sendable {
             AVG(power_in_mw), MIN(power_in_mw), MAX(power_in_mw),
             AVG(temperature_c), MIN(temperature_c), MAX(temperature_c),
             AVG(voltage_mv), MIN(voltage_mv), MAX(voltage_mv),
-            AVG(amperage_ma), MIN(amperage_ma), MAX(amperage_ma)
+            AVG(amperage_ma), MIN(amperage_ma), MAX(amperage_ma),
+            \(bucketSums("percent", lowerBounds: HourlySample.percentBucketLowerBounds)),
+            \(bucketSums("temperature_c", lowerBounds: HourlySample.temperatureBucketLowerBounds))
         FROM minute_samples
         """
 }

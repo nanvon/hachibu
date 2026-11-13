@@ -188,6 +188,15 @@ extension HistoryStore {
             try db.create(indexOn: "calibration_pauses", columns: ["run_id"])
         }
 
+        // 小时汇总增加电量、温度分桶的样本数，用于长期统计，见 docs/v1技术设计.md 第 10 节。
+        // 已有的行这些列为 NULL，表示未知。列名写成字面量，不随代码里的区间定义变化。
+        migrator.registerMigration("v5") { db in
+            try db.alter(table: "hourly_samples") { t in
+                for index in 0...10 { t.add(column: "percent_bucket_\(index)", .integer) }
+                for index in 0...5 { t.add(column: "temperature_bucket_\(index)", .integer) }
+            }
+        }
+
         return migrator
     }
 }

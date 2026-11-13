@@ -119,10 +119,32 @@ private func minute(_ offset: Int) -> Date {
         powerInMW: .init(average: 12000, min: 12000, max: 12000),
         temperatureCelsius: .init(average: 31, min: 30, max: 32),
         voltageMV: .init(average: 12000, min: 12000, max: 12000),
-        amperageMA: .init(average: 160, min: 160, max: 160)
+        amperageMA: .init(average: 160, min: 160, max: 160),
+        percentBuckets: [0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0],
+        temperatureBuckets: [0, 0, 2, 0, 0, 0]
     )
 
-    private let secondHour = HourlySample(hour: base.addingTimeInterval(3600), sampleCount: 1, externalMinutes: 0, chargingMinutes: 0)
+    private let secondHour = HourlySample(
+        hour: base.addingTimeInterval(3600), sampleCount: 1, externalMinutes: 0, chargingMinutes: 0,
+        percentBuckets: Array(repeating: 0, count: 11), temperatureBuckets: Array(repeating: 0, count: 6)
+    )
+
+    /// 区间下界含、上界不含；100% 单独一档；NULL 不计入任何区间。
+    @Test func bucketBoundaries() async throws {
+        let store = try HistoryStore.inMemory()
+        let values: [(Int?, Double?)] = [
+            (0, 24.99), (9, 25), (10, 29.99), (79, 30), (80, 39.99), (99, 40), (100, 45), (nil, nil), (50, 60),
+        ]
+        for (offset, (percent, temperature)) in values.enumerated() {
+            try await store.write(MinuteSample(timestamp: minute(offset), percent: percent, temperatureCelsius: temperature))
+        }
+        try await store.aggregateMinuteSamples(now: minute(60).addingTimeInterval(HistoryStore.minuteRetention))
+
+        let hour = try #require(try store.hourlySamples().first)
+        #expect(hour.sampleCount == 9)
+        #expect(hour.percentBuckets == [2, 1, 0, 0, 0, 1, 0, 1, 1, 1, 1])
+        #expect(hour.temperatureBuckets == [1, 2, 1, 1, 1, 2])
+    }
 
     @Test func groupByHour() async throws {
         let store = try HistoryStore.inMemory()
@@ -373,7 +395,7 @@ private func batteryCount(_ store: HistoryStore) throws -> Int {
         let migrations = try await reopened.dbQueue.read { db in
             try HistoryStore.migrator.appliedIdentifiers(db)
         }
-        #expect(migrations == ["v1", "v2", "v3", "v4"])
+        #expect(migrations == ["v1", "v2", "v3", "v4", "v5"])
     }
 
     /// v1 的每日数据转入 `daily_health`，没有电池；第一次确定电池时归给它。旧的小时行新增列为 NULL。
