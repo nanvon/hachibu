@@ -1,3 +1,4 @@
+import BatteryCore
 import Foundation
 import Testing
 @testable import FeatureUI
@@ -101,5 +102,93 @@ import Testing
         #expect(rule.hasAlerted)
         _ = rule.update(temperature: 32, threshold: 35, at: start.addingTimeInterval(600))
         #expect(!rule.hasAlerted)
+    }
+}
+
+@Suite struct ChargeCompleteAlertRuleTests {
+    private func feed(_ rule: inout ChargeCompleteAlertRule, _ statuses: [ChargeStatus?], isCalibrating: Bool = false) -> [BatteryAlert?] {
+        statuses.map { rule.update(status: $0, isCalibrating: isCalibrating) }
+    }
+
+    @Test func alertsOnceAfterChargingReachesLimit() {
+        var rule = ChargeCompleteAlertRule()
+        let results = feed(&rule, [.onBattery, .charging, .charging, .chargeLimitReached(limit: 80), .chargeLimitReached(limit: 80)])
+        #expect(results == [nil, nil, nil, .chargeCompleted(limit: 80), nil])
+    }
+
+    @Test func fullChargeHasNoLimit() {
+        var rule = ChargeCompleteAlertRule()
+        let results = feed(&rule, [.charging, .fullyCharged])
+        #expect(results == [nil, .chargeCompleted(limit: nil)])
+    }
+
+    @Test func alreadyCompleteAtLaunchDoesNotAlert() {
+        var rule = ChargeCompleteAlertRule()
+        let results = feed(&rule, [.chargeLimitReached(limit: 80), .fullyCharged, nil])
+        #expect(results == [nil, nil, nil])
+    }
+
+    @Test func onlyOncePerPlugInAndResetsAfterUnplug() {
+        var rule = ChargeCompleteAlertRule()
+        let results = feed(&rule, [
+            .charging, .chargeLimitReached(limit: 80), .charging, .chargeLimitReached(limit: 80),
+            .onBattery, .charging, .chargeLimitReached(limit: 80),
+        ])
+        #expect(results == [nil, .chargeCompleted(limit: 80), nil, nil, nil, nil, .chargeCompleted(limit: 80)])
+    }
+
+    @Test func dischargingToLimitOrHoldingDoesNotAlert() {
+        var rule = ChargeCompleteAlertRule()
+        let results = feed(&rule, [.aboveChargeLimit(limit: 80), .chargeLimitReached(limit: 80), .holdingCharge(percent: 90)])
+        #expect(results == [nil, nil, nil])
+    }
+
+    @Test func calibrationClearsChargingSeen() {
+        var rule = ChargeCompleteAlertRule()
+        _ = rule.update(status: .charging, isCalibrating: false)
+        let duringCalibration = rule.update(status: .fullyCharged, isCalibrating: true)
+        let afterCalibration = rule.update(status: .chargeLimitReached(limit: 80), isCalibrating: false)
+        #expect(duringCalibration == nil)
+        #expect(afterCalibration == nil)
+    }
+
+    @Test func retriesAfterDeliveryFailure() {
+        var rule = ChargeCompleteAlertRule()
+        _ = rule.update(status: .charging, isCalibrating: false)
+        let first = rule.update(status: .fullyCharged, isCalibrating: false)
+        rule.deliveryFailed()
+        let retry = rule.update(status: .fullyCharged, isCalibrating: false)
+        #expect(first == .chargeCompleted(limit: nil))
+        #expect(retry == .chargeCompleted(limit: nil))
+    }
+}
+
+@Suite struct LowBatteryAlertRuleTests {
+    private func feed(_ rule: inout LowBatteryAlertRule, _ readings: [(Bool?, Int?)], threshold: Int = 20) -> [Bool] {
+        readings.map { rule.update(isExternalPower: $0.0, percent: $0.1, threshold: threshold) }
+    }
+
+    @Test func alertsOnceAtOrBelowThresholdOnBattery() {
+        var rule = LowBatteryAlertRule()
+        let results = feed(&rule, [(false, 22), (false, 21), (false, 20), (false, 19), (false, 15)])
+        #expect(results == [false, false, true, false, false])
+    }
+
+    @Test func pluggedInDoesNotAlertAndResets() {
+        var rule = LowBatteryAlertRule()
+        let results = feed(&rule, [(true, 10), (false, 18), (true, 18), (false, 18)])
+        #expect(results == [false, true, false, true])
+    }
+
+    @Test func recoversOnlyAboveMargin() {
+        var rule = LowBatteryAlertRule()
+        let results = feed(&rule, [(false, 20), (false, 24), (false, 20), (false, 25), (false, 20)])
+        #expect(results == [true, false, false, false, true])
+    }
+
+    @Test func missingReadingsChangeNothing() {
+        var rule = LowBatteryAlertRule()
+        let results = feed(&rule, [(nil, 10), (false, nil), (false, 10), (nil, nil), (false, 10)])
+        #expect(results == [false, false, true, false, false])
     }
 }

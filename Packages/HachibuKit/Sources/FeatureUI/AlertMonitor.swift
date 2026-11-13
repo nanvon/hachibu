@@ -22,6 +22,9 @@ public enum BatteryAlert: Sendable, Equatable {
     case calibrationPaused(CalibrationPauseReason)
     case limitNotApplied(limit: Int)
     case systemCalibrationStarted
+    /// 本次插电后充电完成：`limit` 为 nil 表示充满，否则为到达的充电上限。
+    case chargeCompleted(limit: Int?)
+    case lowBattery(percent: Int, threshold: Int)
 }
 
 /// 发送系统通知。App 里用 SystemAlertNotifier，测试里替换。
@@ -39,8 +42,8 @@ enum AlertStatus: Equatable {
     case alerted
 }
 
-/// 电池温度提醒，规则见 docs/v1技术设计.md 第 12 节。
-/// 是否已提醒存在 UserDefaults，重启后保留。系统通知未允许时不判定，允许后再开始。
+/// 按读数判定的提醒（电池温度、充电完成、低电量）和充电接管通知，规则见 docs/v1技术设计.md 第 12 节。
+/// 温度是否已提醒存在 UserDefaults，重启后保留。系统通知未允许时不判定，允许后再开始。
 @MainActor
 @Observable
 public final class AlertMonitor {
@@ -54,6 +57,9 @@ public final class AlertMonitor {
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private var temperatureRule: TemperatureAlertRule
     @ObservationIgnored private var isDeliveringTemperature = false
+    @ObservationIgnored private var chargeCompleteRule = ChargeCompleteAlertRule()
+    @ObservationIgnored private var lowBatteryRule = LowBatteryAlertRule()
+    @ObservationIgnored private var isDeliveringBatteryLevel = false
     /// 充电接管通知的去重：每个键最近一次发送成功的时间。
     @ObservationIgnored private var lastChargeControlDelivery: [String: Date] = [:]
     static let chargeControlDedupInterval: TimeInterval = 30 * 60
@@ -76,10 +82,15 @@ public final class AlertMonitor {
     public func start() {
         Task {
             await refreshAuthorization()
-            if authorization == .notDetermined, settings.temperatureAlertEnabled {
-                await requestAuthorization()
-            }
+            await requestAuthorizationIfNeeded()
         }
+    }
+
+    /// 有按读数判定的提醒打开且还没询问过时，请求授权。通知页打开提醒开关时也调用。
+    public func requestAuthorizationIfNeeded() async {
+        guard authorization == .notDetermined else { return }
+        guard settings.temperatureAlertEnabled || settings.chargeCompleteAlertEnabled || settings.lowBatteryAlertEnabled else { return }
+        await requestAuthorization()
     }
 
     /// 重新读取授权状态。用户可能在系统设置里改过。
@@ -92,13 +103,57 @@ public final class AlertMonitor {
     }
 
     /// 每次读取后调用，读数没变也要调用：温度提醒按持续时间判定。
-    public func handleReading(_ reading: BatteryReading?, at date: Date) async {
-        let temperature: Double?
-        if case .battery(let snapshot)? = reading {
-            temperature = snapshot.temperatureCelsius
+    /// `isCalibrating` 为 Hachibu 校准进行中（含暂停），这期间不发充电完成提醒。
+    public func handleReading(_ reading: BatteryReading?, at date: Date, isCalibrating: Bool = false) async {
+        let snapshot: BatterySnapshot?
+        if case .battery(let battery)? = reading {
+            snapshot = battery
         } else {
-            temperature = nil
+            snapshot = nil
         }
+        await handleBatteryLevel(snapshot, isCalibrating: isCalibrating)
+        await handleTemperature(snapshot?.temperatureCelsius, at: date)
+    }
+
+    /// 充电完成和低电量。两条规则都在通知允许且开关打开时才判定；关闭期间状态从头开始。
+    private func handleBatteryLevel(_ snapshot: BatterySnapshot?, isCalibrating: Bool) async {
+        guard !isDeliveringBatteryLevel else { return }
+        let allowed = authorization == .allowed
+        var alerts: [BatteryAlert] = []
+
+        if allowed, settings.chargeCompleteAlertEnabled {
+            if let alert = chargeCompleteRule.update(status: snapshot.flatMap(ChargeStatus.init), isCalibrating: isCalibrating) {
+                alerts.append(alert)
+            }
+        } else {
+            chargeCompleteRule = ChargeCompleteAlertRule()
+        }
+
+        if allowed, settings.lowBatteryAlertEnabled {
+            let threshold = settings.lowBatteryAlertThreshold
+            if lowBatteryRule.update(isExternalPower: snapshot?.isExternalPower, percent: snapshot?.percent, threshold: threshold),
+               let percent = snapshot?.percent {
+                alerts.append(.lowBattery(percent: percent, threshold: threshold))
+            }
+        } else {
+            lowBatteryRule = LowBatteryAlertRule()
+        }
+
+        guard !alerts.isEmpty else { return }
+        isDeliveringBatteryLevel = true
+        for alert in alerts {
+            do {
+                try await notifier.deliver(alert)
+            } catch {
+                // 下一次读数仍满足条件时重试。
+                if case .lowBattery = alert { lowBatteryRule.deliveryFailed() } else { chargeCompleteRule.deliveryFailed() }
+                logger.error("Failed to deliver battery level alert: \(String(describing: error), privacy: .public)")
+            }
+        }
+        isDeliveringBatteryLevel = false
+    }
+
+    private func handleTemperature(_ temperature: Double?, at date: Date) async {
         if latestTemperature != temperature { latestTemperature = temperature }
         guard !isDeliveringTemperature else {
             temperatureRule.resetTiming()

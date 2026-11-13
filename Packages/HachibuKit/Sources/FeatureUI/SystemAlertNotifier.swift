@@ -70,6 +70,22 @@ public final class SystemAlertNotifier: NSObject, AlertNotifier, UNUserNotificat
             identifier = "systemCalibrationStarted"
             content.title = String(localized: "macOS Is Calibrating the Battery", bundle: .module)
             content.body = String(localized: "macOS is charging to 100% to calibrate the battery. Hachibu will return to your limit afterwards.", bundle: .module)
+        case .chargeCompleted(let limit):
+            identifier = "chargeCompleted"
+            if let limit {
+                content.title = String(localized: "Charge Limit Reached", bundle: .module)
+                content.body = String(localized: "The battery has charged to your \(limit)% limit.", bundle: .module)
+            } else {
+                content.title = String(localized: "Battery Fully Charged", bundle: .module)
+                content.body = String(localized: "You can unplug the power adapter.", bundle: .module)
+            }
+        case let .lowBattery(percent, threshold):
+            identifier = "lowBattery"
+            content.title = String(localized: "Low Battery", bundle: .module)
+            content.body = String(
+                localized: "Battery is at \(percent)%, at or below your \(threshold)% alert level. Plug in the power adapter.",
+                bundle: .module
+            )
         case .lowHealth:
             // 保留旧接口，但不再发送最大容量提醒。
             return

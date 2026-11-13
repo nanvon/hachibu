@@ -36,8 +36,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         historyStore = store
         let batteryMonitor = BatteryMonitor(sampler: sampler, helperService: .shared)
         self.batteryMonitor = batteryMonitor
-        batteryMonitor.onRead = { [alertMonitor] reading, date in
-            await alertMonitor.handleReading(reading, at: date)
+        batteryMonitor.onRead = { [alertMonitor, weak batteryMonitor] reading, date in
+            await alertMonitor.handleReading(reading, at: date, isCalibrating: batteryMonitor?.calibration != nil)
         }
         batteryMonitor.onHealthRefresh = { [alertMonitor] health in
             await alertMonitor.handleHealth(health)

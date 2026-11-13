@@ -28,6 +28,8 @@ struct NotificationsPageContent: View {
         SettingsColumns {
             authorizationGroup
             SettingsGroupDivider()
+            batteryLevelGroup
+            SettingsGroupDivider()
             temperatureGroup
             SettingsGroupDivider()
             chargeControlGroup
@@ -36,6 +38,10 @@ struct NotificationsPageContent: View {
             await alerts.refreshAuthorization()
             await history?.loadHighestRecentTemperature()
         }
+        // 打开提醒时，还没询问过就请求授权。
+        .onChange(of: settings.chargeCompleteAlertEnabled) { requestAuthorizationIfEnabled($1) }
+        .onChange(of: settings.lowBatteryAlertEnabled) { requestAuthorizationIfEnabled($1) }
+        .onChange(of: settings.temperatureAlertEnabled) { requestAuthorizationIfEnabled($1) }
         // 用户可能在系统设置里改了通知权限后切回来。
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             Task { await alerts.refreshAuthorization() }
@@ -75,6 +81,44 @@ struct NotificationsPageContent: View {
                     .settingsButtonStyle()
                 }
             }
+        }
+    }
+
+    private func requestAuthorizationIfEnabled(_ isOn: Bool) {
+        guard isOn else { return }
+        Task { await alerts.requestAuthorizationIfNeeded() }
+    }
+
+    // MARK: 充电和电量
+
+    private var batteryLevelGroup: some View {
+        let threshold = settings.lowBatteryAlertThreshold
+        return SettingsGroup(
+            Text("Charging and Battery Level", bundle: .module),
+            description: Text("Charge complete alerts once per plug-in, after the battery has charged to 100% or to the charge limit. Low battery alerts once while on battery, and again after charging or rising \(LowBatteryAlertRule.recoveryMargin)% above the alert level.", bundle: .module)
+        ) {
+            NotificationPreview(
+                title: Text("Charge Limit Reached", bundle: .module),
+                message: Text("The battery has charged to your \(80)% limit.", bundle: .module)
+            )
+        } panel: {
+            SettingsRow(Text("Charge Complete", bundle: .module)) {
+                SettingsSwitch(isOn: $settings.chargeCompleteAlertEnabled, label: Text("Charge Complete", bundle: .module))
+            }
+            SettingsRowDivider()
+            SettingsRow(Text("Low Battery", bundle: .module)) {
+                SettingsSwitch(isOn: $settings.lowBatteryAlertEnabled, label: Text("Low Battery", bundle: .module))
+            }
+            SettingsRowDivider()
+            SettingsRow(Text("Alert Level", bundle: .module)) {
+                SettingsStepper(
+                    value: $settings.lowBatteryAlertThreshold,
+                    range: AppSettings.lowBatteryThresholdRange,
+                    text: DisplayFormat.percent(threshold),
+                    label: Text("Alert Level", bundle: .module)
+                )
+            }
+            .disabled(!settings.lowBatteryAlertEnabled)
         }
     }
 

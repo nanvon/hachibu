@@ -1,3 +1,4 @@
+import BatteryCore
 import Foundation
 
 /// 电池温度过高提醒的判定，规则见 docs/v1技术设计.md 第 12 节：
@@ -78,5 +79,75 @@ struct TemperatureAlertRule: Equatable {
         }
         highSince = since
         return false
+    }
+}
+
+/// 充电完成提醒的判定，规则见 docs/v1技术设计.md 第 12 节：
+/// 本次插电期间看到过充电，之后状态第一次变成已充满或已达上限时提醒一次；拔电后重新开始。
+/// 启动时已经充满、只放电到上限、保持当前电量、Hachibu 校准期间都不提醒。不持久化：重启后要重新看到充电。
+struct ChargeCompleteAlertRule: Equatable {
+    /// 本次插电期间看到过充电。
+    private(set) var sawCharging = false
+    /// 本次插电期间已经提醒过。
+    private(set) var hasAlerted = false
+
+    /// 处理一次读数。返回要提醒的内容：nil 表示不提醒；`.chargeCompleted(limit: nil)` 表示充满。
+    /// 发送失败时调用 `deliveryFailed()`，下一次读数仍满足条件时重试。
+    mutating func update(status: ChargeStatus?, isCalibrating: Bool) -> BatteryAlert? {
+        guard let status else { return nil }
+        if isCalibrating {
+            // 校准会充满并保持，结束后要重新看到充电才算一次充电。
+            sawCharging = false
+            return nil
+        }
+        switch status {
+        case .onBattery:
+            sawCharging = false
+            hasAlerted = false
+            return nil
+        case .charging, .temporaryFullCharge:
+            sawCharging = true
+            return nil
+        case .fullyCharged:
+            return complete(limit: nil)
+        case .chargeLimitReached(let limit):
+            return complete(limit: limit)
+        default:
+            return nil
+        }
+    }
+
+    mutating func deliveryFailed() {
+        hasAlerted = false
+    }
+
+    private mutating func complete(limit: Int?) -> BatteryAlert? {
+        guard sawCharging, !hasAlerted else { return nil }
+        hasAlerted = true
+        return .chargeCompleted(limit: limit)
+    }
+}
+
+/// 低电量提醒的判定，规则见 docs/v1技术设计.md 第 12 节：
+/// 使用电池且电量不高于阈值时提醒一次；插上电源或电量回到“阈值 + 5”以上后允许再次提醒。
+/// 读数缺失不提醒也不重置。不持久化：重启后仍低于阈值会再提醒一次。
+struct LowBatteryAlertRule: Equatable {
+    static let recoveryMargin = 5
+
+    private(set) var hasAlerted = false
+
+    mutating func update(isExternalPower: Bool?, percent: Int?, threshold: Int) -> Bool {
+        guard let isExternalPower, let percent else { return false }
+        if isExternalPower || percent >= threshold + Self.recoveryMargin {
+            hasAlerted = false
+            return false
+        }
+        guard percent <= threshold, !hasAlerted else { return false }
+        hasAlerted = true
+        return true
+    }
+
+    mutating func deliveryFailed() {
+        hasAlerted = false
     }
 }

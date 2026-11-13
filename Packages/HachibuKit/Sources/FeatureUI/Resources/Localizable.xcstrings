@@ -298,6 +298,16 @@
         }
       }
     },
+    "Alert Level" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "提醒电量"
+          }
+        }
+      }
+    },
     "Alert Threshold" : {
       "localizations" : {
         "zh-Hans" : {
@@ -499,12 +509,32 @@
         }
       }
     },
+    "Battery Fully Charged" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "电池已充满"
+          }
+        }
+      }
+    },
     "Battery Health" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "电池健康"
+          }
+        }
+      }
+    },
+    "Battery is at %lld%%, at or below your %lld%% alert level. Plug in the power adapter." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "电量为 %1$lld%%，已不高于提醒电量 %2$lld%%，请接上电源适配器。"
           }
         }
       }
@@ -740,6 +770,26 @@
         }
       }
     },
+    "Charge Complete" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "充电完成"
+          }
+        }
+      }
+    },
+    "Charge complete alerts once per plug-in, after the battery has charged to 100%% or to the charge limit. Low battery alerts once while on battery, and again after charging or rising %lld%% above the alert level." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "充电完成：每次插电后充满或充到上限时提醒一次。电量低：使用电池且电量不高于提醒电量时提醒一次，接上电源或电量回升 %lld%% 以上后可再次提醒。"
+          }
+        }
+      }
+    },
     "Charge Control" : {
       "localizations" : {
         "zh-Hans" : {
@@ -786,6 +836,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "安装后会打开系统设置，请在“后台App活动”中打开 Hachibu，系统可能要求输入密码。"
+          }
+        }
+      }
+    },
+    "Charge Limit Reached" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已充到上限"
           }
         }
       }
@@ -847,6 +907,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "充电中"
+          }
+        }
+      }
+    },
+    "Charging and Battery Level" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "充电和电量"
           }
         }
       }
@@ -1683,6 +1753,16 @@
       }
     },
     "Line" : {},
+    "Low Battery" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "电量低"
+          }
+        }
+      }
+    },
     "Low Power Mode" : {
       "localizations" : {
         "zh-Hans" : {
@@ -2767,6 +2847,16 @@
         }
       }
     },
+    "The battery has charged to your %lld%% limit." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "电池已充到设置的 %lld%% 上限。"
+          }
+        }
+      }
+    },
     "The battery has stayed above %lld °C for 3 minutes. Current temperature: %@." : {
       "localizations" : {
         "zh-Hans" : {
@@ -3047,6 +3137,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "系统开始校准时"
+          }
+        }
+      }
+    },
+    "You can unplug the power adapter." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "可以拔掉电源适配器了。"
           }
         }
       }

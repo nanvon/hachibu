@@ -21,6 +21,9 @@ import Testing
             #expect(settings.temperatureAlertThreshold == 40)
             #expect(settings.healthAlertEnabled)
             #expect(settings.healthAlertThreshold == 80)
+            #expect(!settings.chargeCompleteAlertEnabled)
+            #expect(!settings.lowBatteryAlertEnabled)
+            #expect(settings.lowBatteryAlertThreshold == 20)
         }
     }
 

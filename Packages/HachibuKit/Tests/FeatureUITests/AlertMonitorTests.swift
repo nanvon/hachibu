@@ -222,4 +222,49 @@ private actor FakeNotifier: AlertNotifier {
             #expect(await notifier.attempts.isEmpty)
         }
     }
+    @Test func batteryLevelAlertsAreOffByDefault() async {
+        await withDefaults { defaults in
+            let settings = AppSettings(defaults: defaults)
+            let notifier = FakeNotifier(status: .allowed)
+            let monitor = AlertMonitor(settings: settings, notifier: notifier, defaults: defaults)
+            await monitor.refreshAuthorization()
+
+            await monitor.handleReading(.battery(BatterySnapshot(percent: 10, isExternalPower: false)), at: start)
+            #expect(await notifier.attempts.isEmpty)
+        }
+    }
+
+    @Test func lowBatteryAndChargeCompleteAreDelivered() async {
+        await withDefaults { defaults in
+            let settings = AppSettings(defaults: defaults)
+            settings.lowBatteryAlertEnabled = true
+            settings.chargeCompleteAlertEnabled = true
+            let notifier = FakeNotifier(status: .allowed)
+            let monitor = AlertMonitor(settings: settings, notifier: notifier, defaults: defaults)
+            await monitor.refreshAuthorization()
+
+            await monitor.handleReading(.battery(BatterySnapshot(percent: 20, isExternalPower: false)), at: start)
+            await monitor.handleReading(.battery(BatterySnapshot(percent: 30, isExternalPower: true, isCharging: true)), at: start.addingTimeInterval(60))
+            await monitor.handleReading(.battery(BatterySnapshot(percent: 100, isExternalPower: true, isCharging: false)), at: start.addingTimeInterval(120))
+            // 校准期间不提醒充电完成。
+            await monitor.handleReading(.battery(BatterySnapshot(percent: 100, isExternalPower: true, isCharging: false)), at: start.addingTimeInterval(180), isCalibrating: true)
+            #expect(await notifier.attempts == [.lowBattery(percent: 20, threshold: 20), .chargeCompleted(limit: nil)])
+        }
+    }
+
+    @Test func failedBatteryLevelDeliveryRetries() async {
+        await withDefaults { defaults in
+            let settings = AppSettings(defaults: defaults)
+            settings.lowBatteryAlertEnabled = true
+            let notifier = FakeNotifier(status: .allowed)
+            let monitor = AlertMonitor(settings: settings, notifier: notifier, defaults: defaults)
+            await monitor.refreshAuthorization()
+            await notifier.failNextDelivery()
+
+            await monitor.handleReading(.battery(BatterySnapshot(percent: 15, isExternalPower: false)), at: start)
+            await monitor.handleReading(.battery(BatterySnapshot(percent: 15, isExternalPower: false)), at: start.addingTimeInterval(60))
+            await monitor.handleReading(.battery(BatterySnapshot(percent: 15, isExternalPower: false)), at: start.addingTimeInterval(120))
+            #expect(await notifier.attempts == [.lowBattery(percent: 15, threshold: 20), .lowBattery(percent: 15, threshold: 20)])
+        }
+    }
 }

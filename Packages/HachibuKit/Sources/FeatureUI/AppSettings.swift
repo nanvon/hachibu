@@ -7,6 +7,7 @@ import Observation
 @Observable
 public final class AppSettings {
     public static let temperatureThresholdRange = 30...50
+    public static let lowBatteryThresholdRange = 10...50
     /// 保留旧接口；最大容量提醒已移除。
     public static let healthThresholdRange = 50...95
 
@@ -23,7 +24,18 @@ public final class AppSettings {
     public var temperatureAlertThreshold: Int {
         didSet { defaults.set(temperatureAlertThreshold, forKey: Key.temperatureAlertThreshold) }
     }
-    /// 保留旧设置，不再控制提醒。
+    /// 本次插电后充满或到达充电上限。默认关闭，避免升级后突然收到通知。
+    public var chargeCompleteAlertEnabled: Bool {
+        didSet { defaults.set(chargeCompleteAlertEnabled, forKey: Key.chargeCompleteAlertEnabled) }
+    }
+    /// 使用电池且电量不高于阈值。默认关闭。
+    public var lowBatteryAlertEnabled: Bool {
+        didSet { defaults.set(lowBatteryAlertEnabled, forKey: Key.lowBatteryAlertEnabled) }
+    }
+    /// 低电量提醒阈值（%）。
+    public var lowBatteryAlertThreshold: Int {
+        didSet { defaults.set(lowBatteryAlertThreshold, forKey: Key.lowBatteryAlertThreshold) }
+    }
     /// 电池校准完成和中断。
     public var calibrationAlertsEnabled: Bool {
         didSet { defaults.set(calibrationAlertsEnabled, forKey: Key.calibrationAlertsEnabled) }
@@ -83,6 +95,9 @@ public final class AppSettings {
         menuBarIconStyle = defaults.string(forKey: Key.menuBarIconStyle).flatMap(MenuBarIconStyle.init(rawValue:)) ?? .battery
         temperatureAlertEnabled = defaults.object(forKey: Key.temperatureAlertEnabled) as? Bool ?? true
         temperatureAlertThreshold = Self.integer(defaults, Key.temperatureAlertThreshold, default: 40, in: Self.temperatureThresholdRange)
+        chargeCompleteAlertEnabled = defaults.object(forKey: Key.chargeCompleteAlertEnabled) as? Bool ?? false
+        lowBatteryAlertEnabled = defaults.object(forKey: Key.lowBatteryAlertEnabled) as? Bool ?? false
+        lowBatteryAlertThreshold = Self.integer(defaults, Key.lowBatteryAlertThreshold, default: 20, in: Self.lowBatteryThresholdRange)
         calibrationAlertsEnabled = defaults.object(forKey: Key.calibrationAlertsEnabled) as? Bool ?? true
         chargeLimitAlertEnabled = defaults.object(forKey: Key.chargeLimitAlertEnabled) as? Bool ?? true
         systemCalibrationAlertEnabled = defaults.object(forKey: Key.systemCalibrationAlertEnabled) as? Bool ?? false
@@ -112,6 +127,9 @@ public final class AppSettings {
         static let menuBarIconStyle = "menuBarIconStyle"
         static let temperatureAlertEnabled = "temperatureAlertEnabled"
         static let temperatureAlertThreshold = "temperatureAlertThreshold"
+        static let chargeCompleteAlertEnabled = "chargeCompleteAlertEnabled"
+        static let lowBatteryAlertEnabled = "lowBatteryAlertEnabled"
+        static let lowBatteryAlertThreshold = "lowBatteryAlertThreshold"
         static let calibrationAlertsEnabled = "calibrationAlertsEnabled"
         static let chargeLimitAlertEnabled = "chargeLimitAlertEnabled"
         static let systemCalibrationAlertEnabled = "systemCalibrationAlertEnabled"
