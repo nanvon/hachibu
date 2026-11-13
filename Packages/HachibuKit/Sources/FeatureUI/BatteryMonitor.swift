@@ -21,8 +21,9 @@ public final class BatteryMonitor {
     private static let smcPanelInterval: Duration = .milliseconds(2500)
     private static let smcChargingInterval: Duration = .milliseconds(1500)
     private static let smcChargingTolerance: Duration = .milliseconds(500)
-    /// 读不到 `CHSC` 时（如其他机型）面板关闭期间不再高频读取，靠完整读取时的 SMC 读取。
-    private static let smcUnavailableInterval: Duration = .seconds(60)
+    /// 面板关闭时不需要高频读 `CHSC` 的情况：读不到 `CHSC`（如其他机型），或正在使用电池（充电状态不会变化，
+    /// 插上电源由 IOPS 通知触发加快读取）。这时靠完整读取后的 SMC 读取。
+    private static let smcIdleInterval: Duration = .seconds(60)
     /// 超过这个时长没有更新的 SMC 读数不再叠加，退回 IOPS / IORegistry。
     private static let smcDisplayMaxAge: TimeInterval = 90
     private static let smcChargingMaxAge: TimeInterval = 10
@@ -233,10 +234,12 @@ public final class BatteryMonitor {
         stateChangeBoost.map { Date() < $0.end } == true
     }
 
-    private var smcInterval: (Duration, Duration?) {
+    var smcInterval: (Duration, Duration?) {
         if isStateChangeBoosting { return (Self.smcFastInterval, nil) }
         if isPanelVisible { return (Self.smcPanelInterval, nil) }
-        if !isSMCChargingAvailable { return (Self.smcUnavailableInterval, Self.panelClosedTolerance) }
+        if !isSMCChargingAvailable || baseReading?.isExternalPower == false {
+            return (Self.smcIdleInterval, Self.panelClosedTolerance)
+        }
         return (Self.smcChargingInterval, Self.smcChargingTolerance)
     }
 

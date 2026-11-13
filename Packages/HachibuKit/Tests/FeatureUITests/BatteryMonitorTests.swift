@@ -361,6 +361,20 @@ private final class ReorderedPowerSource: @unchecked Sendable {
         #expect(ChargeStatus(snapshot) == .charging)
     }
 
+    /// 使用电池且面板关闭时不再每 1.5 秒读 `CHSC`；插上电源后先加快读取（加快结束后回到 1.5 秒）。
+    @Test func panelClosedSMCPollingSlowsDownOnBattery() async {
+        let power = PowerStateBox(.battery(BatterySnapshot(percent: 80, isExternalPower: false)))
+        let monitor = monitor(source: FixedBatterySource(raw: rawPower(external: false)), power: { power.read() })
+        #expect(monitor.smcInterval.0 == .milliseconds(1500))
+
+        await monitor.refreshPowerSource()
+        #expect(monitor.smcInterval.0 == .seconds(60))
+
+        power.set(.battery(BatterySnapshot(percent: 80, isExternalPower: true, isCharging: true)))
+        await monitor.refreshPowerSource()
+        #expect(monitor.smcInterval.0 == .seconds(1))
+    }
+
     @Test func smcFailureFallsBackToRegistry() async {
         let smc = SMCBox(SMCReadings(isCharging: true, systemPowerMW: 20000))
         let monitor = monitor(
