@@ -1,32 +1,45 @@
 name: Release
 
 # 推送 v 开头的 tag 后构建、签名更新源，并发布 DMG / ZIP / appcast / 更新日志。
-on:
+'on':
   push:
     tags: ['v*']
 
 permissions:
-  contents: write # 创建 Release / 上传产物需要写权限
+  contents: read
 
 env:
+  XCODE_VERSION: '26.3.0'
   XCODEGEN_VERSION: 2.46.0
+  XCODEGEN_SHA256: 4d9e34b62172d645eed6457cac13fc222569974098ef4ee9c3368bedf0196806
 
 jobs:
+  verify:
+    name: 验证发布提交
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
+      pull-requests: read # 复用 CI 声明的权限，tag 不执行改动过滤
+
   release:
+    needs: verify
+    permissions:
+      contents: write # 创建 Release 和上传产物
     runs-on: macos-15
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
 
-      - name: 校验更新签名配置
+      - name: 校验更新公钥
         shell: bash
         env:
           SPARKLE_PUBLIC_ED_KEY: ${{ vars.SPARKLE_PUBLIC_ED_KEY }}
-          SPARKLE_PRIVATE_ED_KEY: ${{ secrets.SPARKLE_PRIVATE_ED_KEY }}
         run: |
           set -euo pipefail
-          if [[ -z "$SPARKLE_PUBLIC_ED_KEY" || -z "$SPARKLE_PRIVATE_ED_KEY" ]]; then
-            echo "请先设置 repository variable SPARKLE_PUBLIC_ED_KEY 和 secret SPARKLE_PRIVATE_ED_KEY。"
+          if [[ -z "$SPARKLE_PUBLIC_ED_KEY" ]]; then
+            echo "请先设置 repository variable SPARKLE_PUBLIC_ED_KEY。"
             echo "配置方式见 docs/打包发布.md；本次停止发布，避免分发无法验证更新的 App。"
             exit 1
           fi
@@ -43,10 +56,10 @@ jobs:
             exit 1
           fi
 
-      - name: 选择最新 Xcode
-        uses: maxim-lobanov/setup-xcode@v1
+      - name: 选择固定版本的 Xcode
+        uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1
         with:
-          xcode-version: latest-stable
+          xcode-version: ${{ env.XCODE_VERSION }}
 
       - name: 安装 XcodeGen（预编译）
         shell: bash
@@ -55,13 +68,14 @@ jobs:
           curl -fsSL --retry 3 \
             "https://github.com/yonaskolb/XcodeGen/releases/download/${XCODEGEN_VERSION}/xcodegen.zip" \
             -o "$RUNNER_TEMP/xcodegen.zip"
+          printf '%s  %s\n' "$XCODEGEN_SHA256" "$RUNNER_TEMP/xcodegen.zip" | shasum -a 256 -c -
           unzip -q "$RUNNER_TEMP/xcodegen.zip" -d "$RUNNER_TEMP"
           echo "$RUNNER_TEMP/xcodegen/bin" >> "$GITHUB_PATH"
 
       # 发布构建仍然清空 build/ 保证产物干净，只缓存 SwiftPM 的包缓存，
       # 省掉每次重新下载 GRDB / Sparkle 的时间。
       - name: 缓存 SwiftPM 依赖
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: ~/Library/Caches/org.swift.swiftpm
           key: swiftpm-release-${{ runner.os }}-${{ hashFiles('project.yml', 'Packages/HachibuKit/Package.resolved') }}-v1
@@ -72,7 +86,8 @@ jobs:
         shell: bash
         run: |
           python3 -m venv "$RUNNER_TEMP/hachibu-dmg-tools"
-          "$RUNNER_TEMP/hachibu-dmg-tools/bin/python" -m pip install dmgbuild==1.6.7
+          "$RUNNER_TEMP/hachibu-dmg-tools/bin/python" -m pip install \
+            --only-binary=:all: --require-hashes -r packaging/dmg/requirements.txt
           echo "$RUNNER_TEMP/hachibu-dmg-tools/bin" >> "$GITHUB_PATH"
 
       - name: 构建并打包(ad-hoc 签名,无需证书)
@@ -118,7 +133,7 @@ jobs:
           } > dist/release-body.md
 
       - name: 上传到 GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
           # 不设 name:Release 标题沿用默认的 tag 名(如 v0.1.0)。
           body_path: dist/release-body.md

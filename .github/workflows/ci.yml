@@ -1,11 +1,12 @@
 name: CI
 
-# PR 和 main 推送时验证 HachibuKit 的全部测试与 App 编译。
-# 纯文档改动只跑轻量的 changes / ci-success 两个 Ubuntu job，不占用 macOS runner。
-on:
+# PR、main 推送和发布 tag 共用相同的测试与 App 编译。
+# 只有 PR 和 main 的纯文档改动可以跳过 macOS job。
+'on':
   push:
     branches: [main]
   pull_request:
+  workflow_call:
 
 permissions:
   contents: read
@@ -18,7 +19,9 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
+  XCODE_VERSION: '26.3.0'
   XCODEGEN_VERSION: 2.46.0
+  XCODEGEN_SHA256: 4d9e34b62172d645eed6457cac13fc222569974098ef4ee9c3368bedf0196806
 
 jobs:
   # 判断是否只有文档变动。这个 job 始终运行，保证 paths 过滤后仍有一个
@@ -28,13 +31,16 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
-      code: ${{ steps.filter.outputs.code }}
+      code: ${{ github.ref_type == 'tag' && 'true' || steps.filter.outputs.code }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        if: github.ref_type != 'tag'
         with:
           fetch-depth: 0
+          persist-credentials: false
 
-      - uses: dorny/paths-filter@v4
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4
+        if: github.ref_type != 'tag'
         id: filter
         with:
           # 用 some-with-excludes：命中任一正向规则且不命中任何排除规则才算代码改动。
@@ -66,29 +72,30 @@ jobs:
           - name: UI 测试
             targets: FeatureUITests
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       # checkout 把所有文件写成当前时间，会让 SwiftPM/Xcode 认为源码全变了。
       # 先恢复成各文件最后一次提交的时间，缓存里的编译产物才能真正复用。
       - name: 恢复文件修改时间
         run: python3 scripts/restore-git-mtimes.py
 
-      - name: 选择最新 Xcode
-        uses: maxim-lobanov/setup-xcode@v1
+      - name: 选择固定版本的 Xcode
+        uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1
         with:
-          xcode-version: latest-stable
+          xcode-version: ${{ env.XCODE_VERSION }}
 
       # .build 里包含 GRDB 的 checkout 和编译产物，是本仓库最耗时的一段。
       # 每个 shard 都构建完整测试 bundle，缓存键保持一致；先完成的 job 保存一次即可复用。
       - name: 缓存 SwiftPM 构建
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: Packages/HachibuKit/.build
-          key: spm-${{ runner.os }}-${{ hashFiles('Packages/HachibuKit/Package.resolved') }}-v2
+          key: spm-${{ runner.os }}-${{ env.XCODE_VERSION }}-${{ hashFiles('Packages/HachibuKit/Package.resolved') }}-v2
           restore-keys: |
-            spm-${{ runner.os }}-${{ hashFiles('Packages/HachibuKit/Package.resolved') }}-
+            spm-${{ runner.os }}-${{ env.XCODE_VERSION }}-${{ hashFiles('Packages/HachibuKit/Package.resolved') }}-
 
       - name: 编译并测试 ${{ matrix.name }}
         run: |
@@ -106,17 +113,18 @@ jobs:
     if: needs.changes.outputs.code == 'true'
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: 恢复文件修改时间
         run: python3 scripts/restore-git-mtimes.py
 
-      - name: 选择最新 Xcode
-        uses: maxim-lobanov/setup-xcode@v1
+      - name: 选择固定版本的 Xcode
+        uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1
         with:
-          xcode-version: latest-stable
+          xcode-version: ${{ env.XCODE_VERSION }}
 
       - name: 安装 XcodeGen（预编译）
         shell: bash
@@ -125,18 +133,19 @@ jobs:
           curl -fsSL --retry 3 \
             "https://github.com/yonaskolb/XcodeGen/releases/download/${XCODEGEN_VERSION}/xcodegen.zip" \
             -o "$RUNNER_TEMP/xcodegen.zip"
+          printf '%s  %s\n' "$XCODEGEN_SHA256" "$RUNNER_TEMP/xcodegen.zip" | shasum -a 256 -c -
           unzip -q "$RUNNER_TEMP/xcodegen.zip" -d "$RUNNER_TEMP"
           echo "$RUNNER_TEMP/xcodegen/bin" >> "$GITHUB_PATH"
 
       # 只缓存 App 构建目录；DerivedData 内含 Sparkle / GRDB 的 SourcePackages，
       # 恢复后只需增量编译仓库自己的代码。
       - name: 缓存 Xcode 构建
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: build/DerivedData
-          key: xcode-${{ runner.os }}-${{ hashFiles('project.yml', 'Config/**', 'Packages/HachibuKit/Package.resolved') }}-v4
+          key: xcode-${{ runner.os }}-${{ env.XCODE_VERSION }}-${{ hashFiles('project.yml', 'Config/**', 'Packages/HachibuKit/Package.resolved') }}-v4
           restore-keys: |
-            xcode-${{ runner.os }}-${{ hashFiles('project.yml', 'Config/**', 'Packages/HachibuKit/Package.resolved') }}-
+            xcode-${{ runner.os }}-${{ env.XCODE_VERSION }}-${{ hashFiles('project.yml', 'Config/**', 'Packages/HachibuKit/Package.resolved') }}-
 
       - name: 生成工程并编译 App
         run: |
@@ -162,18 +171,22 @@ jobs:
       - name: 汇总必需 job 结果
         env:
           CHANGES: ${{ needs.changes.result }}
+          CODE: ${{ needs.changes.outputs.code }}
           TEST: ${{ needs.test.result }}
           BUILD_APP: ${{ needs.build_app.result }}
+          REF_TYPE: ${{ github.ref_type }}
         run: |
           set -euo pipefail
-          echo "changes=$CHANGES test=$TEST build_app=$BUILD_APP"
+          echo "changes=$CHANGES code=$CODE test=$TEST build_app=$BUILD_APP"
           if [[ "$CHANGES" != "success" ]]; then
             echo "changes job 未成功" >&2
             exit 1
           fi
-          for result in "$TEST" "$BUILD_APP"; do
-            if [[ "$result" != "success" && "$result" != "skipped" ]]; then
-              echo "必需 job 未通过：$result" >&2
-              exit 1
-            fi
-          done
+          if [[ "$TEST" == "success" && "$BUILD_APP" == "success" ]]; then
+            exit 0
+          fi
+          if [[ "$REF_TYPE" != "tag" && "$CODE" == "false" && "$TEST" == "skipped" && "$BUILD_APP" == "skipped" ]]; then
+            exit 0
+          fi
+          echo "必需的测试或 App 编译未通过" >&2
+          exit 1

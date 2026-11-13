@@ -21,7 +21,7 @@
 
 ```bash
 python3 -m venv /tmp/hachibu-dmg-tools
-/tmp/hachibu-dmg-tools/bin/python -m pip install dmgbuild==1.6.7
+/tmp/hachibu-dmg-tools/bin/python -m pip install --only-binary=:all: --require-hashes -r packaging/dmg/requirements.txt
 export PATH="/tmp/hachibu-dmg-tools/bin:$PATH"
 ```
 
