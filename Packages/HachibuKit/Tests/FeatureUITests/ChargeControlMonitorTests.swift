@@ -275,13 +275,14 @@ private final class ManagedTestSystem: BatteryDataSource, ChargeLimitWriter, @un
     private var log: [ChargeLimitChange] = []
     private var policyReadFails = false
     private var overrideReadFails = false
+    private var fullReadFails = false
 
     var writes: [ChargeLimitChange] { lock.withLock { log } }
     var setting: ChargeLimitSetting { lock.withLock { state.enabled ? .on(percent: state.limit) : .off } }
 
     func set(
         percent: Int? = nil, limit: Int? = nil, uiState: Int? = nil, fails: Bool? = nil,
-        policyReadFails: Bool? = nil, overrideReadFails: Bool? = nil
+        policyReadFails: Bool? = nil, overrideReadFails: Bool? = nil, fullReadFails: Bool? = nil
     ) {
         lock.withLock {
             if let percent { state.percent = percent }
@@ -290,12 +291,14 @@ private final class ManagedTestSystem: BatteryDataSource, ChargeLimitWriter, @un
             if let fails { state.fails = fails }
             if let policyReadFails { self.policyReadFails = policyReadFails }
             if let overrideReadFails { self.overrideReadFails = overrideReadFails }
+            if let fullReadFails { self.fullReadFails = fullReadFails }
         }
     }
 
-    func read() -> RawBatteryReadings {
-        lock.withLock {
-            RawBatteryReadings(
+    func read() throws -> RawBatteryReadings {
+        try lock.withLock {
+            guard !fullReadFails else { throw BatteryDataSourceError.powerSourcesUnavailable }
+            return RawBatteryReadings(
                 powerSources: [[
                     "Type": .string("InternalBattery"), "Current Capacity": .int(Int64(state.percent)),
                     "Max Capacity": .int(100), "Power Source State": .string("AC Power"), "Is Charging": .bool(false),
@@ -326,14 +329,38 @@ private struct ManagedTestProfiler: SystemProfilerSource {
     func readPowerData() async throws -> RawValue { .dictionary([:]) }
 }
 
+private final class PausedChargeLimitWriter: ChargeLimitWriter, Sendable {
+    let started: AsyncStream<Void>
+    private let signal: AsyncStream<Void>.Continuation
+    private let gate = DispatchSemaphore(value: 0)
+    private let system: ManagedTestSystem
+
+    init(system: ManagedTestSystem) {
+        self.system = system
+        (started, signal) = AsyncStream.makeStream()
+    }
+
+    func write(_ change: ChargeLimitChange) throws {
+        if change == .limit(90) {
+            signal.yield(())
+            guard gate.wait(timeout: .now() + 5) == .success else {
+                throw ChargeLimitWriteError(message: "test write was not resumed")
+            }
+        }
+        try system.write(change)
+    }
+
+    func resume() { gate.signal() }
+}
+
 @MainActor
 @Suite struct ChargeControlMonitorTests {
     private let defaults = UserDefaults(suiteName: "ChargeControlMonitorTests.\(UUID().uuidString)")!
     private let system = ManagedTestSystem()
 
-    private func monitor(store: HistoryStore? = nil) -> BatteryMonitor {
+    private func monitor(store: HistoryStore? = nil, writer: (any ChargeLimitWriter)? = nil) -> BatteryMonitor {
         BatteryMonitor(
-            sampler: BatterySampler(dataSource: system, systemProfiler: ManagedTestProfiler(), chargeLimitWriter: system, store: store),
+            sampler: BatterySampler(dataSource: system, systemProfiler: ManagedTestProfiler(), chargeLimitWriter: writer ?? system, store: store),
             powerSourceReader: { nil }, smcReader: { _ in nil }, holdDefaults: defaults,
             helperService: ChargeHelperService(service: nil)
         )
@@ -403,6 +430,33 @@ private struct ManagedTestProfiler: SystemProfilerSource {
         #expect(defaults.data(forKey: BatteryMonitor.managedOriginalKey) == nil)
     }
 
+    @Test(arguments: [true, false])
+    func quitWaitsForChargeLimitWriteBeforeRestoringOriginal(isManaged: Bool) async {
+        let writer = PausedChargeLimitWriter(system: system)
+        let monitor = monitor(writer: writer)
+        if isManaged {
+            monitor.chargeControl = ChargeControlConfiguration(mode: .managed, target: 90)
+        } else {
+            monitor.holdsChargeAboveLimit = true
+        }
+        await monitor.read()
+        var started = writer.started.makeAsyncIterator()
+        _ = await started.next()
+        let quit = Task { await monitor.prepareToQuit() }
+        while !monitor.isPreparingToQuit {
+            await Task.yield()
+        }
+        // 90% 的写入还没生效，当前仍是 80%。这时不能清除恢复记录。
+        #expect(system.setting == .on(percent: 80))
+        #expect(isManaged ? monitor.managedOriginal == .on(percent: 80) : monitor.chargeLimitHold != nil)
+        writer.resume()
+        await quit.value
+        #expect(system.writes == [.limit(90), .limit(80)])
+        #expect(system.setting == .on(percent: 80))
+        #expect(monitor.managedOriginal == nil)
+        #expect(monitor.chargeLimitHold == nil)
+    }
+
     @Test func systemPolicyPreventsWritesAndEndReappliesTarget() async {
         system.set(uiState: 18)
         let monitor = monitor()
@@ -452,6 +506,26 @@ private struct ManagedTestProfiler: SystemProfilerSource {
         #expect(system.writes == [.limit(85)])
     }
 
+    @Test func fullReadFailurePreventsControlFromUsingOldPolicy() async {
+        let monitor = monitor()
+        monitor.chargeControl = ChargeControlConfiguration(mode: .managed, target: 80)
+        await monitor.read()
+        let previous = monitor.reading
+
+        system.set(uiState: 3, fullReadFails: true)
+        await monitor.read()
+        monitor.chargeControl.target = 85
+        await monitor.refreshSMC(.display)
+        await settle(monitor)
+        #expect(monitor.reading == previous)
+        #expect(system.writes.isEmpty)
+
+        system.set(uiState: 14, fullReadFails: false)
+        await monitor.read()
+        await settle(monitor)
+        #expect(system.writes == [.limit(85)])
+    }
+
     @Test func unknownReadingDoesNotEndSystemFullChargeOrStartCalibration() async {
         let monitor = monitor()
         monitor.chargeControl = ChargeControlConfiguration(
@@ -489,6 +563,22 @@ private struct ManagedTestProfiler: SystemProfilerSource {
 
         monitor.cancelCalibration()
         await settle(monitor)
+        #expect(system.setting == .on(percent: 85))
+    }
+
+    @Test func pausingCalibrationCanRestoreItsLowLimitWithUnknownPolicy() async {
+        let monitor = monitor()
+        monitor.chargeControl = ChargeControlConfiguration(mode: .managed, target: 85)
+        await monitor.read()
+        await settle(monitor)
+        monitor.calibration = CalibrationProgress(start: .manual, step: .dischargeToLow, at: Date(), percent: 90)
+        monitor.managedAppliedLimit = CalibrationStep.dischargeTarget
+        system.set(limit: CalibrationStep.dischargeTarget, policyReadFails: true)
+        await monitor.read()
+
+        monitor.pauseCalibration()
+        await settle(monitor)
+        #expect(monitor.calibration?.pauseReason == .user)
         #expect(system.setting == .on(percent: 85))
     }
 

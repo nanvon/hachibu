@@ -16,6 +16,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItemController: StatusItemController?
     private var mainWindowController: MainWindowController?
     private var pendingSettings: Bool?
+    private var isTerminating = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.mainMenu = MainMenu.make()
@@ -86,6 +87,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// 把设置页的充电上限管理设置同步给 BatteryMonitor，见 docs/v1技术设计.md 21.1。
     private func syncChargeControl() {
+        guard !isTerminating else { return }
         batteryMonitor?.chargeControl = withObservationTracking {
             settings.chargeControlConfiguration
         } onChange: { [weak self] in
@@ -93,9 +95,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    /// 接管模式下恢复系统设置（21.4），或在“保持当前电量”时写回用户设置的上限（第 6 节）。
+    /// 上限写入和退出恢复完成后，再让 AppKit 结束进程。
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        guard let batteryMonitor else { return .terminateNow }
+        guard !isTerminating else { return .terminateLater }
+        isTerminating = true
+        Task {
+            await batteryMonitor.prepareToQuit()
+            sender.reply(toApplicationShouldTerminate: true)
+        }
+        return .terminateLater
+    }
+
     func applicationWillTerminate(_ notification: Notification) {
-        batteryMonitor?.restoreChargeLimitBeforeExit()
+        if !isTerminating { batteryMonitor?.restoreChargeLimitBeforeExit() }
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {

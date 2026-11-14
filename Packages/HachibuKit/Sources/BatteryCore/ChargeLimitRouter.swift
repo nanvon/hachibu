@@ -2,7 +2,7 @@ import Foundation
 import os
 
 /// 按目标选择写入方式：80–100% 经 PowerUI，1–79% 经特权 helper。规则见 docs/v1技术设计.md 21.2。
-/// 从低于 80% 回到 80% 以上或关闭时，先经 helper 释放（清掉登记、按原值恢复），再用 PowerUI 写入目标；
+/// 回到 80% 以上或关闭时，若有低上限或遗留恢复标记，先经 helper 释放，再用 PowerUI 写入目标；
 /// helper 不可用时直接用 PowerUI 关闭再写入。跟随系统设置时只会出现 80–100%，行为与 `PowerUIChargeLimitWriter` 相同。
 public struct RoutedChargeLimitWriter: ChargeLimitWriter {
     /// 已批准、可用的 helper；没有时返回 nil。
@@ -27,7 +27,7 @@ public struct RoutedChargeLimitWriter: ChargeLimitWriter {
         case .enable:
             try PowerUIClient.write(.enable)
         case .disable, .limit(100...):
-            try releaseBelowMinimum()
+            try releaseHelperOverride()
             if currentSetting() != .off { try PowerUIClient.write(.disable) }
         case .limit(let percent) where percent < Self.powerUIMinimum:
             guard ChargeHelper.limitRange.contains(percent) else {
@@ -38,7 +38,7 @@ public struct RoutedChargeLimitWriter: ChargeLimitWriter {
             try waitForReadback("helper limit \(percent)") { $0 == .on(percent: percent) }
             Self.logger.info("Helper set limit \(percent, privacy: .public)")
         case .limit(let percent):
-            try releaseBelowMinimum()
+            try releaseHelperOverride()
             if currentSetting() == .off {
                 try PowerUIClient.write(.enable)
             }
@@ -48,16 +48,25 @@ public struct RoutedChargeLimitWriter: ChargeLimitWriter {
         }
     }
 
-    /// 当前上限低于 80% 时释放。helper 释放后按原值恢复到 80% 以上或关闭。
-    private func releaseBelowMinimum() throws {
-        guard case .on(let current)? = currentSetting(), current < Self.powerUIMinimum else { return }
-        if let helper = helper() {
-            try helper.release()
-            Self.logger.info("Helper released limit \(current, privacy: .public)")
+    /// 外部改值后仍可能有恢复标记，先释放，再让调用方写入目标。
+    private func releaseHelperOverride() throws {
+        let current = currentSetting()
+        let isBelowMinimum: Bool
+        if case .on(let percent)? = current {
+            isBelowMinimum = percent < Self.powerUIMinimum
         } else {
+            isBelowMinimum = false
+        }
+        let hasMarker = FileManager.default.fileExists(atPath: ChargeHelperMarker.url.path)
+        if let helper = helper(), isBelowMinimum || hasMarker {
+            try helper.release()
+            Self.logger.info("Helper released the charge limit override")
+        } else if isBelowMinimum {
             // helper 已移除或未批准：PowerUI 的关闭同样能清掉登记。
-            Self.logger.info("Releasing limit \(current, privacy: .public) without helper")
+            Self.logger.info("Releasing the charge limit without helper")
             try PowerUIClient.write(.disable)
+        } else {
+            return
         }
         try waitForReadback("release") { setting in
             switch setting {

@@ -42,9 +42,13 @@ public final class BatteryMonitor {
     /// 最近一次 `system_profiler` 读到的健康信息。读取失败时保留上一次的值。
     public private(set) var health: BatteryHealthInfo?
     /// 正在修改系统充电上限。
-    public internal(set) var isWritingChargeLimit = false
+    public internal(set) var isWritingChargeLimit = false {
+        didSet { resumeQuitWhenIdle() }
+    }
     /// 正在移除后台组件。期间暂停自动写入，避免释放与重新应用目标交错。
-    public internal(set) var isRemovingChargeHelper = false
+    public internal(set) var isRemovingChargeHelper = false {
+        didSet { resumeQuitWhenIdle() }
+    }
     /// 最近一次修改失败，或读回的设置与修改不符。下一次修改开始时清除。
     public private(set) var chargeLimitWriteFailed = false
     /// AlDente 等充电控制工具正在运行。此时不提供充电上限控制，避免两套工具同时控制充电。
@@ -89,6 +93,9 @@ public final class BatteryMonitor {
     @ObservationIgnored var chargeLimitHoldPausedUntil: Date?
     @ObservationIgnored private var latestPowerSource: (reading: BatteryReading, date: Date)?
     @ObservationIgnored private var lastReadAt: Date?
+    @ObservationIgnored private var lastFailedReadAt: Date?
+    /// 界面可以保留旧读数；自动控制等待下一次成功的完整读取。
+    var hasCurrentChargeReading: Bool { lastReadAt != nil && lastFailedReadAt == nil }
     @ObservationIgnored private var chargeLimitHoldTracker = ChargeLimitHoldTracker()
     @ObservationIgnored private var powerSourceTask: Task<Void, Never>?
     @ObservationIgnored private var immediateReadTask: Task<Void, Never>?
@@ -96,6 +103,9 @@ public final class BatteryMonitor {
     @ObservationIgnored private var readTask: Task<Void, Never>?
     @ObservationIgnored private var minuteTask: Task<Void, Never>?
     @ObservationIgnored private var healthTask: Task<Void, Never>?
+    @ObservationIgnored private var quitTask: Task<Void, Never>?
+    @ObservationIgnored private var quitWaiter: CheckedContinuation<Void, Never>?
+    var isPreparingToQuit: Bool { quitTask != nil }
     @ObservationIgnored private var powerSourceObserver: PowerSourceObserver?
     @ObservationIgnored private var notificationObservers: [any NSObjectProtocol] = []
 
@@ -427,11 +437,15 @@ public final class BatteryMonitor {
     private func update(_ newReading: BatteryReading?, at date: Date) async {
         // 多个触发同时读取时可能乱序返回，只保留较新的结果。
         if let lastReadAt, date < lastReadAt { return }
+        if let lastFailedReadAt, date < lastFailedReadAt { return }
         guard let newReading else {
+            lastFailedReadAt = date
+            calibration?.lastHoldTick = nil
             await onRead?(nil, date)
             return
         }
         lastReadAt = date
+        lastFailedReadAt = nil
         let updated: BatteryReading
         if let latestPowerSource, latestPowerSource.date > date {
             updated = newReading.updatingPowerSource(from: latestPowerSource.reading)
@@ -449,7 +463,8 @@ public final class BatteryMonitor {
     /// 上限关闭时选低于 100% 的档位：先开启再写入档位，`setMCLLimit:error:` 只在已开启时调用。
     public func setChargeLimit(_ change: ChargeLimitChange) async {
         // 接管模式下界面改的是 AppSettings 里的目标，由 `chargeControl` 同步过来后写入。
-        guard !isWritingChargeLimit, !isRemovingChargeHelper, chargeControl.mode == .followSystem else { return }
+        guard !isPreparingToQuit, !isWritingChargeLimit, !isRemovingChargeHelper,
+              chargeControl.mode == .followSystem else { return }
         var changes = [change]
         if let hold = chargeLimitHold {
             switch change {
@@ -552,15 +567,56 @@ public final class BatteryMonitor {
 
     /// 应用退出前同步恢复：接管模式按 21.4 恢复系统设置或保留当前上限，否则写回“保持当前电量”前的上限。
     public func restoreChargeLimitBeforeExit() {
-        if restoreManagedLimitBeforeExit() { return }
-        restoreChargeLimitHoldBeforeExit()
+        guard !isPreparingToQuit else { return }
+        let snapshot: BatterySnapshot? = if hasCurrentChargeReading, case .battery(let snapshot)? = reading { snapshot } else { nil }
+        restoreChargeLimitBeforeExit(using: snapshot)
+    }
+
+    /// 停止发起新写入，等在途操作结束后，以重新读取的系统上限决定如何恢复。
+    public func prepareToQuit() async {
+        if quitTask == nil {
+            quitTask = Task { await finishPreparingToQuit() }
+        }
+        await quitTask?.value
+    }
+
+    private func finishPreparingToQuit() async {
+        leaseTask?.cancel()
+        await leaseTask?.value
+        if isWritingChargeLimit || isRemovingChargeHelper {
+            await withCheckedContinuation { quitWaiter = $0 }
+        }
+        var snapshot: BatterySnapshot?
+        // 写入超时可能仍在系统端执行，保留恢复记录，下次启动再处理。
+        if !chargeLimitWriteFailed, managedOriginal != nil || chargeLimitHold != nil || calibration != nil {
+            if case .battery(let current)? = await sampler.read().reading {
+                snapshot = current
+            }
+        }
+        restoreChargeLimitBeforeExit(using: snapshot)
+    }
+
+    private func resumeQuitWhenIdle() {
+        guard !isWritingChargeLimit, !isRemovingChargeHelper, let quitWaiter else { return }
+        self.quitWaiter = nil
+        quitWaiter.resume()
+    }
+
+    private func restoreChargeLimitBeforeExit(using snapshot: BatterySnapshot?) {
+        if let progress = calibration {
+            calibration = CalibrationEngine.pauseForRelaunch(progress)
+            saveCalibration(force: true)
+        }
+        guard !isWritingChargeLimit, !isRemovingChargeHelper, !chargeLimitWriteFailed,
+              let snapshot, snapshot.systemChargeState != .temporaryFullCharge else { return }
+        if restoreManagedLimitBeforeExit(snapshot) { return }
+        restoreChargeLimitHoldBeforeExit(snapshot)
     }
 
     /// 写回用户设置的上限。系统上限已不是临时值时只丢弃保存的值；
     /// 写入失败（如 PowerUI 正忙）时保留，下次启动时恢复。临时充满期间不写入，也保留到下次启动。
-    private func restoreChargeLimitHoldBeforeExit() {
-        guard let hold = chargeLimitHold, case .battery(let snapshot)? = reading, let limit = snapshot.chargeLimit else { return }
-        if snapshot.systemChargeState == .temporaryFullCharge { return }
+    private func restoreChargeLimitHoldBeforeExit(_ snapshot: BatterySnapshot) {
+        guard let hold = chargeLimitHold, let limit = snapshot.chargeLimit else { return }
         if limit == .on(percent: hold.heldLimit) {
             guard sampler.writeChargeLimitImmediately(.limit(hold.userLimit)) else { return }
         }

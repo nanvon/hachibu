@@ -168,7 +168,7 @@ extension BatteryMonitor {
 
     /// 进入接管：保存系统当前的设置（已存在时不覆盖），再写入目标。
     private func enterManagedMode(snapshot: BatterySnapshot?) {
-        guard managedOriginal == nil else { return }
+        guard hasCurrentChargeReading, managedOriginal == nil else { return }
         guard let current = snapshot?.chargeLimit, current != .unsupported else { return }
         // “保持当前电量”期间系统里是临时值，原值是保存的用户上限。
         let original: ChargeLimitSetting = snapshot?.chargeLimitHold.map { .on(percent: $0.userLimit) } ?? current
@@ -201,7 +201,7 @@ extension BatteryMonitor {
 
     /// 每次读数更新、写入结束、设置变化后调用：记录系统策略，推进校准，接管模式下写回目标，最后判断“保持当前电量”。
     func evaluateChargeControl() {
-        guard case .battery(let snapshot)? = reading else { return }
+        guard !isPreparingToQuit, hasCurrentChargeReading, case .battery(let snapshot)? = reading else { return }
         trackPolicies(snapshot)
         refreshHelperIfNeeded()
         guard !isRemovingChargeHelper else { return }
@@ -259,7 +259,10 @@ extension BatteryMonitor {
             setChargeLimitHold(nil)
         }
 
-        if ManagedChargeLimit.isApplied(desired, to: current) {
+        let matchesDesired = ManagedChargeLimit.isApplied(desired, to: current)
+        let pendingRelease = desired >= ManagedChargeLimit.helperThreshold
+            && helperService.state == .enabled && hasHelperMarker
+        if matchesDesired, !pendingRelease {
             if managedAppliedLimit != desired {
                 managedAppliedLimit = desired
                 logger.info("Applied \(desired, privacy: .public)")
@@ -273,7 +276,7 @@ extension BatteryMonitor {
             return true
         }
 
-        if managedAppliedLimit == desired, !hasRevertedExternalChange {
+        if managedAppliedLimit == desired, !hasRevertedExternalChange, !matchesDesired {
             // 生效后又被改了：用户在系统设置里改，或其他工具改。改回并提示一次。
             hasRevertedExternalChange = true
             externalChangeRevertedAt = Date()
@@ -316,12 +319,15 @@ extension BatteryMonitor {
             if original == .unsupported { setManagedOriginal(nil) }
             return
         }
-        if ManagedChargeLimit.isApplied(limit, to: current) {
+        let pendingRelease = limit >= ManagedChargeLimit.helperThreshold && hasHelperMarker
+        if ManagedChargeLimit.isApplied(limit, to: current), !pendingRelease {
             logger.info("Restored original \(String(describing: original), privacy: .public)")
             setManagedOriginal(nil)
             return
         }
         guard snapshot.systemChargeState != .temporaryFullCharge, !isChargeLimitHoldPaused else { return }
+        if pendingRelease, ManagedChargeLimit.isApplied(limit, to: current),
+           helperService.state != .enabled { return }
         if let last = managedLastWrite, last.limit == limit, Date().timeIntervalSince(last.date) < Self.managedRewriteDelay { return }
         logger.info("Restoring original \(String(describing: original), privacy: .public)")
         startManagedWrite(change, limit: limit)
@@ -329,28 +335,26 @@ extension BatteryMonitor {
 
     // MARK: - 退出
 
-    /// 接管模式（或还留着原值）时同步恢复。返回 true 表示已处理，不再走“保持当前电量”的恢复。
-    func restoreManagedLimitBeforeExit() -> Bool {
-        if let progress = calibration {
-            calibration = CalibrationEngine.pauseForRelaunch(progress)
-            saveCalibration(force: true)
-        }
+    /// 接管模式（或还留着原值）时恢复。返回 true 表示已处理。
+    func restoreManagedLimitBeforeExit(_ snapshot: BatterySnapshot) -> Bool {
         guard chargeControl.mode == .managed || managedOriginal != nil else { return false }
-        guard canWriteChargeLimit, !isChargeControlAppRunning, case .battery(let snapshot)? = reading,
+        guard canWriteChargeLimit, !isChargeControlAppRunning,
               let current = snapshot.chargeLimit else { return true }
-        // 临时充满期间写入可能打断它，保留原值，下次启动时处理。
-        if snapshot.systemChargeState == .temporaryFullCharge { return true }
 
         if chargeControl.mode == .managed, chargeControl.keepsLimitOnQuit {
             let target = effectiveManagedTarget
-            if !ManagedChargeLimit.isApplied(target, to: current) {
+            let pendingRelease = target >= ManagedChargeLimit.helperThreshold && hasHelperMarker
+            if !ManagedChargeLimit.isApplied(target, to: current)
+                || (pendingRelease && helperService.state == .enabled) {
                 guard sampler.writeChargeLimitImmediately(ManagedChargeLimit.change(for: target)) else { return true }
             }
+            if pendingRelease, hasHelperMarker { return true }
             setChargeLimitHold(nil)
             if target < ManagedChargeLimit.helperThreshold, let client = ChargeHelperService.readyClient() {
                 // 不再续约，helper 也不自动恢复。
                 do { try client.renewLease(seconds: 0) } catch {
                     logger.error("Failed to keep limit: \(String(describing: error), privacy: .public)")
+                    return true
                 }
             }
             logger.info("Kept limit \(target, privacy: .public) after quit")
@@ -359,12 +363,14 @@ extension BatteryMonitor {
 
         guard let original = managedOriginal, let limit = ManagedChargeLimit.limit(of: original),
               let change = ManagedChargeLimit.restoreChange(for: original) else { return true }
-        if !ManagedChargeLimit.isApplied(limit, to: current) {
+        if !ManagedChargeLimit.isApplied(limit, to: current)
+            || (limit >= ManagedChargeLimit.helperThreshold && hasHelperMarker && helperService.state == .enabled) {
             guard sampler.writeChargeLimitImmediately(change) else {
                 logger.error("Failed to restore original before exit")
                 return true
             }
         }
+        if limit >= ManagedChargeLimit.helperThreshold, hasHelperMarker { return true }
         setManagedOriginal(nil)
         setChargeLimitHold(nil)
         logger.info("Restored original \(String(describing: original), privacy: .public) before exit")
@@ -372,6 +378,10 @@ extension BatteryMonitor {
     }
 
     // MARK: - 登记和 helper
+
+    var hasHelperMarker: Bool {
+        FileManager.default.fileExists(atPath: ChargeHelperMarker.url.path)
+    }
 
     /// 读 `pmset -g battlimit`。面板打开时最短 10 秒一次；写入后立即读。
     func refreshRegistration(force: Bool) {
@@ -399,16 +409,15 @@ extension BatteryMonitor {
 
     /// 临时充满时 PowerUI 可能读回 100%，恢复标记仍需要续约。
     func helperLeaseSeconds(hasMarker: Bool) -> Int? {
-        guard chargeControl.mode == .managed, !isRemovingChargeHelper,
+        guard chargeControl.mode == .managed, !isPreparingToQuit, !isRemovingChargeHelper,
               chargeControl.target < ManagedChargeLimit.helperThreshold || calibration != nil || hasMarker
         else { return nil }
         return chargeControl.keepsLimitOnQuit && calibration == nil ? 0 : Int(ChargeHelper.leaseTimeout)
     }
 
     func renewLeaseIfNeeded() async {
-        guard chargeControl.mode == .managed, !isRemovingChargeHelper,
-              let client = ChargeHelperService.readyClient(),
-              let seconds = helperLeaseSeconds(hasMarker: FileManager.default.fileExists(atPath: ChargeHelperMarker.url.path))
+        guard let client = ChargeHelperService.readyClient(),
+              let seconds = helperLeaseSeconds(hasMarker: hasHelperMarker)
         else { return }
         await Task.detached {
             do {
@@ -423,7 +432,7 @@ extension BatteryMonitor {
     /// 期间暂停自动写入和校准判断，结束后重新判断。返回 false 表示没有移除，helper 保留。
     @discardableResult
     public func removeChargeHelper() async -> Bool {
-        guard !isWritingChargeLimit, !isRemovingChargeHelper else { return false }
+        guard !isPreparingToQuit, !isWritingChargeLimit, !isRemovingChargeHelper else { return false }
         isRemovingChargeHelper = true
         defer {
             isRemovingChargeHelper = false
@@ -436,8 +445,8 @@ extension BatteryMonitor {
         let below = if case .battery(let snapshot)? = reading, let percent = snapshot.chargeLimitPercent {
             percent < ManagedChargeLimit.helperThreshold
         } else { false }
-        if status?.hasMarker == true || below {
-            guard case .battery(let snapshot)? = reading, snapshot.activeChargePolicies.isEmpty,
+        if status?.hasMarker == true || hasHelperMarker || below {
+            guard hasCurrentChargeReading, case .battery(let snapshot)? = reading, snapshot.activeChargePolicies.isEmpty,
                   let client = ChargeHelperService.readyClient() else { return false }
             isWritingChargeLimit = true
             let released = await Task.detached { () -> Bool in
@@ -527,7 +536,7 @@ extension BatteryMonitor {
         from step: CalibrationStep, kind: CalibrationStartKind = .manual,
         earlierCompletion: CalibrationStepCompletion = .alreadySatisfied
     ) {
-        guard chargeControl.mode == .managed, calibration == nil else { return }
+        guard !isPreparingToQuit, chargeControl.mode == .managed, calibration == nil else { return }
         let percent: Int? = if case .battery(let snapshot)? = reading { snapshot.percent } else { nil }
         if chargeLimitHold != nil { setChargeLimitHold(nil) }
         let result = CalibrationEngine.start(kind, from: step, earlierCompletion: earlierCompletion, at: Date(), percent: percent)
@@ -591,7 +600,8 @@ extension BatteryMonitor {
             finishCalibration(.cancelled)
             return
         }
-        guard snapshot.isChargePolicyKnown else {
+        // 用户主动暂停时仍更新暂停原因，使未知策略下也能恢复已确认是 App 写入的 15%。
+        guard snapshot.isChargePolicyKnown || progress.stickyPause != nil else {
             if progress.lastHoldTick != nil {
                 progress.lastHoldTick = nil
                 calibration = progress

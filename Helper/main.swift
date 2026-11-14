@@ -127,6 +127,13 @@ final class Daemon: NSObject, NSXPCListenerDelegate, ChargeHelperProtocol, @unch
                 lease.clear()
                 return nil
             }
+            // 15% 只用于校准，较早发出的保留请求也不能取消它的恢复租约。
+            if seconds == 0 {
+                let values = Self.readPreferences()
+                if (values.limitValue as? NSNumber)?.intValue == CalibrationStep.dischargeTarget {
+                    return "Calibration limit cannot be kept after quitting"
+                }
+            }
             let keeps = seconds == 0
             if marker.keepsLimit != keeps {
                 marker.keepsLimit = keeps
@@ -161,9 +168,13 @@ final class Daemon: NSObject, NSXPCListenerDelegate, ChargeHelperProtocol, @unch
             )
             if let error = writeMarker(marker) { return error }
             logger.info("Saved original state \(marker.featureState ?? -1, privacy: .public) limit \(marker.limitValue ?? -1, privacy: .public)")
-        case .valid?:
-            break
+        case .valid(var marker)?:
+            if percent == CalibrationStep.dischargeTarget, marker.keepsLimit {
+                marker.keepsLimit = false
+                if let error = writeMarker(marker) { return error }
+            }
         }
+        if percent == CalibrationStep.dischargeTarget { lease.renew(at: .now) }
         guard Self.writePreferences(featureState: 1, limitValue: percent) else { return "Failed to write preferences" }
         guard notify_post(ManualChargeLimitPreferences.reloadNotification) == UInt32(NOTIFY_STATUS_OK) else {
             return "Failed to post reload notification"
