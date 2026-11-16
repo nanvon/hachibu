@@ -175,6 +175,15 @@ final class Daemon: NSObject, NSXPCListenerDelegate, ChargeHelperProtocol, @unch
             }
         }
         if percent == CalibrationStep.dischargeTarget { lease.renew(at: .now) }
+        // 上限已开启时只改数值，PowerUIAgent 只重新读取偏好，不把新上限交给 powerd，要等下一次插拔电源才生效；
+        // 从关闭改为开启时会立即生效（2026-11-16 日志）。所以先经 PowerUI 关闭，再写入。
+        if case .on? = PowerUIChargeLimitWriter.currentSetting() {
+            guard let writer = PowerUIChargeLimitWriter() else { return "PowerUI unavailable" }
+            do { try writer.write(.disable) } catch {
+                logger.error("Turning off before writing failed: \(String(describing: error), privacy: .public)")
+                return "Failed to turn off the charge limit before writing"
+            }
+        }
         guard Self.writePreferences(featureState: 1, limitValue: percent) else { return "Failed to write preferences" }
         guard notify_post(ManualChargeLimitPreferences.reloadNotification) == UInt32(NOTIFY_STATUS_OK) else {
             return "Failed to post reload notification"

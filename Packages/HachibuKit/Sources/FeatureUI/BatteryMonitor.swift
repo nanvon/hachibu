@@ -150,6 +150,10 @@ public final class BatteryMonitor {
     @ObservationIgnored var calibrationSavedAt: Date?
     @ObservationIgnored var leaseTask: Task<Void, Never>?
     @ObservationIgnored var helperRefreshedAt: Date?
+    /// 最近一次收到退出登录、重启或关机通知的时间。
+    @ObservationIgnored var sessionEndRequestedAt: Date?
+    /// 上次随退出登录等结束时保留了校准的 15%：启动后第一次读到上限仍是 15% 就自动继续。
+    @ObservationIgnored var resumesHeldCalibration = false
 
     public init(
         sampler: BatterySampler,
@@ -176,6 +180,9 @@ public final class BatteryMonitor {
 
         powerSourceObserver = PowerSourceObserver { [weak self] in self?.powerSourceDidChange() }
         observe(NSWorkspace.didWakeNotification, in: NSWorkspace.shared.notificationCenter)
+        observe(NSWorkspace.willPowerOffNotification, in: NSWorkspace.shared.notificationCenter) {
+            $0.sessionEndRequestedAt = Date()
+        }
         observe(.NSProcessInfoPowerStateDidChange, in: .default)
         // 用户在系统电池设置中修改上限后，切回主窗口时立即刷新。
         observe(NSApplication.didBecomeActiveNotification, in: .default)
@@ -604,8 +611,10 @@ public final class BatteryMonitor {
 
     private func restoreChargeLimitBeforeExit(using snapshot: BatterySnapshot?) {
         if let progress = calibration {
+            let holdsLimit = holdCalibrationLimitForSessionEnd(progress, snapshot: snapshot)
             calibration = CalibrationEngine.pauseForRelaunch(progress)
             saveCalibration(force: true)
+            if holdsLimit { return }
         }
         guard !isWritingChargeLimit, !isRemovingChargeHelper, !chargeLimitWriteFailed,
               let snapshot, snapshot.systemChargeState != .temporaryFullCharge else { return }

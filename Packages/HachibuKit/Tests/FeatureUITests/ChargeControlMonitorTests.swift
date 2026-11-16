@@ -582,6 +582,36 @@ private final class PausedChargeLimitWriter: ChargeLimitWriter, Sendable {
         #expect(system.setting == .on(percent: 85))
     }
 
+    @Test func sessionEndKeepsCalibrationLimitAndResumesAfterRelaunch() async {
+        let monitor = monitor()
+        monitor.chargeControl = ChargeControlConfiguration(mode: .managed, target: 85)
+        await monitor.read()
+        await settle(monitor)
+        monitor.calibration = CalibrationProgress(start: .manual, step: .dischargeToLow, at: Date(), percent: 90)
+        monitor.managedAppliedLimit = CalibrationStep.dischargeTarget
+        system.set(limit: CalibrationStep.dischargeTarget, policyReadFails: true)
+        await monitor.read()
+        #expect(monitor.calibration?.pauseReason == nil)
+
+        monitor.sessionEndRequestedAt = Date()
+        monitor.restoreChargeLimitBeforeExit()
+        #expect(system.setting == .on(percent: 15))
+
+        let relaunched = self.monitor()
+        relaunched.chargeControl = ChargeControlConfiguration(mode: .managed, target: 85)
+        #expect(relaunched.calibration?.pauseReason == .appQuit)
+        await relaunched.read()
+        await settle(relaunched)
+        #expect(relaunched.calibration?.pauseReason == nil)
+        #expect(relaunched.calibration?.stickyPause == nil)
+        #expect(system.setting == .on(percent: 15))
+
+        // 再次普通退出时照常暂停并恢复接管前的原值，下次启动不自动继续。
+        relaunched.restoreChargeLimitBeforeExit()
+        #expect(system.setting == .on(percent: 80))
+        #expect(self.monitor().resumesHeldCalibration == false)
+    }
+
     @Test func leaseUsesTargetCalibrationOrMarkerDuringSystemTemporaryFullCharge() async {
         let monitor = monitor()
         monitor.chargeControl = ChargeControlConfiguration(mode: .managed, target: 60)

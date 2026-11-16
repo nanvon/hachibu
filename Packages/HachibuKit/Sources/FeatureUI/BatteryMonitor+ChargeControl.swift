@@ -48,6 +48,10 @@ struct CalibrationRecordIDs: Equatable {
 extension BatteryMonitor {
     static let managedOriginalKey = "managedChargeOriginal"
     static let calibrationProgressKey = "calibrationProgress"
+    /// 随退出登录、重启或关机结束时保留了校准 15% 的时间。
+    static let calibrationHeldAtQuitKey = "calibrationHeldAtQuit"
+    /// 收到退出登录等通知后，这么久内的退出按会话结束处理。
+    static let sessionEndWindow: TimeInterval = 60
     /// 同一个上限值写入后，这么久内不因读回不一致而重写（21.2）。
     static let managedRewriteDelay: TimeInterval = 60
     /// 面板打开时 `pmset -g battlimit` 的最短间隔；关闭时随完整读取（约 60 秒）。
@@ -113,7 +117,14 @@ extension BatteryMonitor {
                 run: progress.runID, step: progress.stepRecordID, pause: progress.pauseRecordID
             )
             saveCalibration(force: true)
+            // 随退出登录等结束且没过 helper 的续约超时：第一次读数确认仍是 15% 后自动继续。
+            if let heldAt = holdDefaults.object(forKey: Self.calibrationHeldAtQuitKey) as? Date {
+                let elapsed = Date().timeIntervalSince(heldAt)
+                // 退出时保存的进度已带“退出时未完成”；用户自己暂停的不会保留 15%，这里再排除一次。
+                resumesHeldCalibration = progress.stickyPause != .user && elapsed >= 0 && elapsed < ChargeHelper.leaseTimeout
+            }
         }
+        holdDefaults.removeObject(forKey: Self.calibrationHeldAtQuitKey)
     }
 
     func startChargeControl() {
@@ -334,6 +345,19 @@ extension BatteryMonitor {
     }
 
     // MARK: - 退出
+
+    /// 退出登录、重启或关机时校准正在用 15% 放电：不恢复用户目标，避免退出期间充电。
+    /// helper 的续约超时仍会兜底恢复；下次启动仍读到 15% 时自动继续（21.6）。返回 true 表示保留。
+    func holdCalibrationLimitForSessionEnd(_ progress: CalibrationProgress, snapshot: BatterySnapshot?) -> Bool {
+        guard let requested = sessionEndRequestedAt, Date().timeIntervalSince(requested) < Self.sessionEndWindow,
+              chargeControl.mode == .managed, progress.step == .dischargeToLow,
+              CalibrationEngine.requestedLimit(for: progress) == CalibrationStep.dischargeTarget,
+              snapshot?.chargeLimit == .on(percent: CalibrationStep.dischargeTarget)
+        else { return false }
+        holdDefaults.set(Date(), forKey: Self.calibrationHeldAtQuitKey)
+        logger.info("Keeping calibration limit through session end")
+        return true
+    }
 
     /// 接管模式（或还留着原值）时恢复。返回 true 表示已处理。
     func restoreManagedLimitBeforeExit(_ snapshot: BatterySnapshot) -> Bool {
@@ -599,6 +623,18 @@ extension BatteryMonitor {
         guard chargeControl.mode == .managed else {
             finishCalibration(.cancelled)
             return
+        }
+        if resumesHeldCalibration, snapshot.chargeLimit != nil {
+            resumesHeldCalibration = false
+            // “退出时未完成”的暂停没有写库，直接清除即可，不产生继续事件。
+            if progress.stickyPause == .appQuit, progress.step == .dischargeToLow,
+               snapshot.chargeLimit == .on(percent: CalibrationStep.dischargeTarget) {
+                progress.stickyPause = nil
+                progress.pauseReason = nil
+                calibration = progress
+                saveCalibration(force: true)
+                logger.info("Calibration resumed after session end")
+            }
         }
         // 用户主动暂停时仍更新暂停原因，使未知策略下也能恢复已确认是 App 写入的 15%。
         guard snapshot.isChargePolicyKnown || progress.stickyPause != nil else {
