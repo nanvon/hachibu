@@ -67,7 +67,7 @@ public struct PanelRootView: View {
         // 面板成为 key window 时系统会把第一个控件设为焦点，开启“键盘导航”后会画焦点环，这里统一不显示。
         .focusEffectDisabled()
         // 与 PanelController 的玻璃底板同圆角。
-        .panelOutline(in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .panelOutline(in: RoundedRectangle(cornerRadius: PanelMetrics.cornerRadius, style: .continuous))
     }
 }
 
@@ -124,16 +124,30 @@ struct PanelContent: View {
         .frame(width: 360)
         .lineLimit(1)
         // 只在面板结构变化时做动画；读数数值变化直接显示，避免每次刷新都逐帧重画整个面板。
-        .animation(PanelMotion.animation(reduceMotion: reduceMotion), value: PanelStructure(reading))
-        .animation(PanelMotion.animation(reduceMotion: reduceMotion), value: health)
-        .animation(PanelMotion.animation(reduceMotion: reduceMotion), value: chargeLimitControl)
-        .animation(PanelMotion.animation(reduceMotion: reduceMotion), value: calibration?.step)
-        .animation(PanelMotion.animation(reduceMotion: reduceMotion), value: calibration == nil)
+        .animation(PanelMotion.animation(reduceMotion: reduceMotion), value: animationTrigger)
+    }
+
+    private var animationTrigger: PanelAnimationTrigger {
+        PanelAnimationTrigger(
+            structure: PanelStructure(reading),
+            health: health,
+            chargeLimitControl: chargeLimitControl,
+            calibrationStep: calibration?.step,
+            hasCalibration: calibration != nil
+        )
     }
 
     private var snapshot: BatterySnapshot? {
         if case .battery(let snapshot) = reading { snapshot } else { nil }
     }
+}
+
+private struct PanelAnimationTrigger: Equatable {
+    let structure: PanelStructure
+    let health: BatteryHealthInfo?
+    let chargeLimitControl: ChargeLimitControl?
+    let calibrationStep: CalibrationStep?
+    let hasCalibration: Bool
 }
 
 /// 读数里决定面板结构的部分：有没有电池、状态、充电器信息的有无、低电量模式。
@@ -168,14 +182,17 @@ private struct BatteryPanelContent: View {
     let onChangeChargeLimit: @MainActor (ChargeLimitChange) -> Void
     let calibration: CalibrationDisplay?
     let onCalibrationAction: @MainActor (CalibrationAction) -> Void
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         PowerTile(snapshot: snapshot, isFlowAnimating: isFlowAnimating, calibrationStep: calibration?.pauseReason == nil ? calibration?.step : nil)
         MetricsRow(snapshot: snapshot, highTemperatureCelsius: highTemperatureCelsius)
         if let calibration {
             CalibrationTile(display: calibration, onAction: onCalibrationAction)
+                .transition(PanelMotion.transition(reduceMotion: reduceMotion))
         } else if let chargeLimitControl {
             ChargeLimitTile(control: chargeLimitControl, onChange: onChangeChargeLimit, onCalibrationAction: onCalibrationAction)
+                .transition(PanelMotion.transition(reduceMotion: reduceMotion))
         }
         HealthTile(snapshot: snapshot, health: health)
     }
@@ -643,6 +660,7 @@ private struct ChargeLimitTile: View {
     let control: ChargeLimitControl
     let onChange: @MainActor (ChargeLimitChange) -> Void
     let onCalibrationAction: @MainActor (CalibrationAction) -> Void
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -668,6 +686,7 @@ private struct ChargeLimitTile: View {
                     .controlSize(.small)
                     .buttonBorderShape(.capsule)
                     .focusable(false)
+                    .transition(PanelMotion.transition(reduceMotion: reduceMotion))
                 }
             }
             LimitSegments(options: control.options, selection: control.percent) { onChange(.limit($0)) }
@@ -680,8 +699,9 @@ private struct ChargeLimitTile: View {
                 }
             }
             .font(.system(size: 11))
+            .transition(PanelMotion.transition(reduceMotion: reduceMotion))
         }
-        .panelTile()
+        .panelTile(emphasis: .secondary)
     }
 }
 
@@ -709,20 +729,34 @@ struct LimitSegments: View {
     let selection: Int?
     let onSelect: @MainActor (Int) -> Void
     @Namespace private var thumb
+    @State private var optimisticSelection: Int?
+    @State private var optimisticClearTask: Task<Void, Never>?
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.isEnabled) private var isEnabled
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
+    private var displayedSelection: Int? {
+        optimisticSelection ?? selection
+    }
+
     var body: some View {
         HStack(spacing: 0) {
             ForEach(options, id: \.self) { percent in
-                segment(percent, isSelected: percent == selection)
+                segment(percent, isSelected: percent == displayedSelection)
             }
         }
         .padding(2.5)
         .background(Color.primary.opacity(colorScheme == .dark ? 0.14 : 0.06), in: Capsule())
         .opacity(isEnabled ? 1 : 0.5)
-        .animation(PanelMotion.animation(reduceMotion: reduceMotion), value: selection)
+        .animation(PanelMotion.animation(reduceMotion: reduceMotion), value: displayedSelection)
+        .onChange(of: selection) { _, _ in
+            optimisticClearTask?.cancel()
+            optimisticSelection = nil
+        }
+        .onDisappear {
+            optimisticClearTask?.cancel()
+            optimisticSelection = nil
+        }
         .accessibilityElement(children: .contain)
         .accessibilityLabel(Text("Limit", bundle: .module))
     }
@@ -730,6 +764,13 @@ struct LimitSegments: View {
     private func segment(_ percent: Int, isSelected: Bool) -> some View {
         Button {
             if !isSelected {
+                optimisticSelection = percent
+                optimisticClearTask?.cancel()
+                optimisticClearTask = Task {
+                    try? await Task.sleep(for: .seconds(1.5))
+                    guard !Task.isCancelled else { return }
+                    optimisticSelection = nil
+                }
                 onSelect(percent)
             }
         } label: {
@@ -828,6 +869,7 @@ struct ChargeLimitNote: View {
 private struct HealthTile: View {
     let snapshot: BatterySnapshot
     let health: BatteryHealthInfo?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -859,13 +901,16 @@ private struct HealthTile: View {
             .help(Text("Full charge capacity estimated by the battery, and its percentage of the design capacity.", bundle: .module))
             .padding(.top, 14)
             if snapshot.isExternalPower == true {
-                HairlineDivider()
-                    .padding(.top, 12)
-                ChargerDetails(snapshot: snapshot)
-                    .padding(.top, 12)
+                VStack(spacing: 0) {
+                    HairlineDivider()
+                        .padding(.top, 12)
+                    ChargerDetails(snapshot: snapshot)
+                        .padding(.top, 12)
+                }
+                .transition(PanelMotion.transition(reduceMotion: reduceMotion))
             }
         }
-        .panelTile()
+        .panelTile(emphasis: .secondary)
     }
 }
 
@@ -1072,11 +1117,13 @@ private struct PanelFooter: View {
     let onOpenMainWindow: @MainActor () -> Void
     let onOpenSettings: @MainActor () -> Void
     let onQuit: @MainActor () -> Void
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         HStack(spacing: 8) {
             if lowPowerModeEnabled == true {
                 LowPowerModeBadge()
+                    .transition(PanelMotion.transition(reduceMotion: reduceMotion))
             }
             Spacer(minLength: 0)
             actionButton("macwindow", title: Text("Open Main Window", bundle: .module), action: onOpenMainWindow)
@@ -1231,8 +1278,8 @@ private struct PanelPreview: View {
             onOpenSettings: {},
             onQuit: {}
         )
-        .panelGlass(in: RoundedRectangle(cornerRadius: 28, style: .continuous))
-        .panelOutline(in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .panelGlass(in: RoundedRectangle(cornerRadius: PanelMetrics.cornerRadius, style: .continuous))
+        .panelOutline(in: RoundedRectangle(cornerRadius: PanelMetrics.cornerRadius, style: .continuous))
         .padding(24)
     }
 }

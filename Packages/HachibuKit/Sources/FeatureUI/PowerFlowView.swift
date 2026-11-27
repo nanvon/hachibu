@@ -1,12 +1,12 @@
 import BatteryCore
 import SwiftUI
 
-/// 三段功率流向图：供电方 → MacBook → 用电方。规则见 docs/v1技术设计.md 第 8 节，样式见第 19.2 节。
-/// 节点画成细竖条，图标和数值写在节点外侧，贴着图的左右边缘对齐；流带为单色（供电方一侧用供电方颜色，用电方一侧用用电方颜色），
-/// 在 MacBook 一侧按同一比例收窄。流带里有光点从左往右流动，约 15 帧每秒；`isAnimating` 为 false 或开启“减弱动态效果”时停在固定位置。
-/// 节点出现、消失或电池换边时流带用弹簧动画过渡；只有功率数值变化时直接显示新值，不逐帧重画静态层。
+/// 三段功率流向图：供电方 → MacBook → 用电方。规则见 docs/v1技术设计.md 第 8 节，样式见第 19.2、19.4 节。
+/// 节点画成细竖条，图标和数值写在节点外侧，贴着图的左右边缘对齐；流带用对应节点颜色做沿流向微渐变和内边缘亮线，
+/// 在 MacBook 一侧按同一比例收窄。流带里有光点从左往右流动，约 30 帧每秒；`isAnimating` 为 false 或开启“减弱动态效果”时停在固定位置。
+/// 节点增减时用 0.3 秒强 ease-out 与面板同步过渡；面板打开期间功率数值变化时以 0.28 秒平滑过渡。
 struct PowerFlowView: View {
-    private static let height: CGFloat = 116
+    private static let height: CGFloat = 92
 
     let flow: PowerFlow
     /// 面板显示时为 true。渲染测试保持 false，光点停在固定位置。
@@ -16,9 +16,9 @@ struct PowerFlowView: View {
     var body: some View {
         let metrics = FlowMetrics(flow)
         AnimatedFlow(metrics: metrics, labels: FlowLabels(flow), isLive: isAnimating && !reduceMotion)
-            .animation(reduceMotion ? .easeInOut(duration: 0.2) : .spring(duration: 0.7, bounce: 0.12), value: metrics.visibleSlots)
-            // 写在外层，先于上面的修饰处理：读数变化时取消动画（包括面板外层的动画），显示的流带变化时再由上面重新加上。
-            .animation(nil, value: metrics)
+            .animation(PanelMotion.animation(reduceMotion: reduceMotion), value: metrics.visibleSlots)
+            // 外层处理功率读数变化（打开且未减弱动态效果时平滑过渡）；流带增减由内层 PanelMotion 覆盖。
+            .animation(isAnimating && !reduceMotion ? .easeOut(duration: 0.28) : nil, value: metrics)
             .frame(height: Self.height)
             .accessibilityElement()
             .accessibilityLabel(accessibilityText)
@@ -67,16 +67,25 @@ enum FlowStyle {
     }
 }
 
-/// 节点竖条用实色，流带用同色的淡色，拉开层次。
+/// 节点竖条用实色，流带用同色沿流向柔和渐变并带内边缘亮线，MacBook Hub 用通透胶囊节点。
 private struct FlowPalette {
-    /// 流带填充的不透明度。
-    var bandOpacity: Double
-    var hubBar: Color
+    var outerBandOpacity: Double
+    var hubBandOpacity: Double
+    var bandEdgeOpacity: Double
+    var hubFillTop: Color
+    var hubFillBottom: Color
+    var hubRim: Color
+    var hubOutline: Color
 
     init(colorScheme: ColorScheme) {
         let dark = colorScheme == .dark
-        bandOpacity = dark ? 0.35 : 0.3
-        hubBar = .primary.opacity(dark ? 0.55 : 0.45)
+        outerBandOpacity = dark ? 0.46 : 0.40
+        hubBandOpacity = dark ? 0.24 : 0.20
+        bandEdgeOpacity = dark ? 0.32 : 0.26
+        hubFillTop = dark ? .white.opacity(0.20) : .white.opacity(0.85)
+        hubFillBottom = dark ? .white.opacity(0.08) : .white.opacity(0.45)
+        hubRim = .white.opacity(dark ? 0.24 : 0.85)
+        hubOutline = .primary.opacity(dark ? 0.22 : 0.12)
     }
 }
 
@@ -157,6 +166,8 @@ private struct AnimatedFlow: View, Animatable {
     var metrics: FlowMetrics
     let labels: FlowLabels
     let isLive: Bool
+    @State private var phaseOffset: TimeInterval = FlowRenderer.restingParticleTime
+    @State private var playStartDate: Date?
     @Environment(\.colorScheme) private var colorScheme
 
     nonisolated var animatableData: FlowMetrics {
@@ -173,13 +184,27 @@ private struct AnimatedFlow: View, Animatable {
                 Canvas { graphics, _ in
                     FlowRenderer(layout: layout, palette: palette).draw(in: &graphics)
                 }
-                // 光点每秒只移动约 30pt，15 帧每秒已足够连贯，帧率减半以降低面板打开时的开销。
-                TimelineView(.animation(minimumInterval: 1.0 / 15, paused: !isLive)) { context in
+                // 30 帧每秒，采用连续累积相位接续静止位置，打开/关闭不跳帧。
+                TimelineView(.animation(minimumInterval: 1.0 / 30, paused: !isLive)) { context in
                     Canvas { graphics, _ in
-                        let time = isLive ? context.date.timeIntervalSinceReferenceDate : FlowRenderer.restingParticleTime
+                        let elapsed = playStartDate.map { max(0, context.date.timeIntervalSince($0)) } ?? 0
+                        let time = isLive ? (phaseOffset + elapsed) : phaseOffset
                         FlowRenderer(layout: layout, palette: palette).drawParticles(at: time, in: &graphics)
                     }
                 }
+            }
+        }
+        .onAppear {
+            if isLive, playStartDate == nil {
+                playStartDate = Date()
+            }
+        }
+        .onChange(of: isLive) { _, live in
+            if live {
+                playStartDate = Date()
+            } else if let start = playStartDate {
+                phaseOffset += max(0, Date().timeIntervalSince(start))
+                playStartDate = nil
             }
         }
     }
@@ -189,20 +214,21 @@ private struct AnimatedFlow: View, Animatable {
 
 private struct FlowLayout {
     /// 两侧图标和数值所占的宽度。
-    static let labelWidth: CGFloat = 46
-    static let labelGap: CGFloat = 4
+    static let labelWidth: CGFloat = 42
+    static let labelGap: CGFloat = 3
     static let barWidth: CGFloat = 5
-    static let hubWidth: CGFloat = 6
+    static let hubWidth: CGFloat = 8
     /// 流带和节点之间的空隙。
-    static let bandGap: CGFloat = 2
+    static let bandGap: CGFloat = 3
     /// 合计较大的一侧最多占图高的比例。
-    static let sideFraction: CGFloat = 0.88
+    static let sideFraction: CGFloat = 0.86
     /// 流带到 MacBook 一侧收窄到的比例。
-    static let hubScale: CGFloat = 0.75
-    static let nodeSpacing: CGFloat = 14
-    static let minBandWidth: CGFloat = 3
+    static let hubScale: CGFloat = 0.72
+    static let nodeSpacing: CGFloat = 12
+    static let minBandWidth: CGFloat = 3.5
+    static let minNodeHeight: CGFloat = 14
     /// 两侧标签（图标 + 数值）的高度。
-    static let labelHeight: CGFloat = 32
+    static let labelHeight: CGFloat = 28
 
     struct Node {
         var slot: FlowSlot
@@ -296,9 +322,13 @@ private struct FlowLayout {
                 guard presence > 0.01 else { continue }
                 let side = sides[index]
                 let barX = isInput ? leftBarX : rightBarX
+                let rawHeight = side.upperBound - side.lowerBound
+                let nodeHeight = max(Self.minNodeHeight * presence, rawHeight)
+                let nodeMidY = (side.lowerBound + side.upperBound) / 2
+                let nodeY = min(max(0, nodeMidY - nodeHeight / 2), height - nodeHeight)
                 nodes.append(Node(
                     slot: slot,
-                    rect: CGRect(x: barX, y: side.lowerBound, width: Self.barWidth, height: side.upperBound - side.lowerBound),
+                    rect: CGRect(x: barX, y: nodeY, width: Self.barWidth, height: nodeHeight),
                     opacity: presence,
                     labelAnchor: CGPoint(x: isInput ? 0 : size.width, y: centers[index]),
                     value: labels.values[slot] ?? ""
@@ -318,8 +348,10 @@ private struct FlowLayout {
                     ))
             }
         }
-        // 没有读数时竖条缩成一个圆点。
-        let hubHeight = max(Self.hubWidth, hubBottom - hubTop)
+        // 没有读数时竖条缩成一个圆点；有流带时比汇合流带略高形成胶囊端点。
+        let hasBands = !bands.isEmpty
+        let rawHubHeight = hubBottom - hubTop
+        let hubHeight = hasBands ? min(height - 8, max(22, rawHubHeight + 6)) : Self.hubWidth
         hubRect = CGRect(x: hubX, y: (hubTop + hubBottom - hubHeight) / 2, width: Self.hubWidth, height: hubHeight)
     }
 
@@ -365,13 +397,31 @@ private struct FlowRenderer {
     /// 不播放动画时光点停在这个时刻的位置，与定稿渲染图一致。
     static let restingParticleTime: TimeInterval = 1.3
     /// 同一条轨道上相邻光点的平均间距。
-    private static let particleSpacing: CGFloat = 44
+    private static let particleSpacing: CGFloat = 46
     /// 光点拖尾的长度。
-    private static let streakLength: CGFloat = 9
+    private static let streakLength: CGFloat = 12
 
     func draw(in graphics: inout GraphicsContext) {
         for band in layout.bands {
-            graphics.fill(band.path, with: .color(band.slot.tint.opacity(palette.bandOpacity * band.opacity)))
+            let path = band.path
+            let outerColor = band.slot.tint.opacity(palette.outerBandOpacity * band.opacity)
+            let hubColor = band.slot.tint.opacity(palette.hubBandOpacity * band.opacity)
+            let colors = band.slot.isInput ? [outerColor, hubColor] : [hubColor, outerColor]
+            graphics.fill(
+                path,
+                with: .linearGradient(
+                    Gradient(colors: colors),
+                    startPoint: CGPoint(x: band.startX, y: 0),
+                    endPoint: CGPoint(x: band.endX, y: 0)
+                )
+            )
+            var edgeContext = graphics
+            edgeContext.clip(to: path)
+            edgeContext.stroke(
+                path,
+                with: .color(band.slot.tint.opacity(palette.bandEdgeOpacity * band.opacity)),
+                lineWidth: 1.2
+            )
         }
         for node in layout.nodes {
             drawNode(node, in: &graphics)
@@ -392,14 +442,15 @@ private struct FlowRenderer {
         context.clip(to: path)
         let length = band.endX - band.startX
         let thickness = max(band.start.upperBound - band.start.lowerBound, band.end.upperBound - band.end.lowerBound)
-        let lanes = max(1, min(2, Int(thickness / 30)))
+        let lanes = max(1, min(3, Int((thickness + 8) / 22)))
+        let powerBoost = 0.85 + 0.15 * min(1, thickness / 36)
         for lane in 0..<lanes {
             let seed = Self.fraction(Double(lane) * 0.618 + Double(band.slot.rawValue) * 0.37)
             let seed2 = Self.fraction(seed * 7.31 + 0.13)
             let spacing = Self.particleSpacing * (0.8 + 0.5 * seed2)
-            let speed = 26 + 12 * seed
-            let across = (CGFloat(lane) + 0.25 + 0.5 * seed2) / CGFloat(lanes)
-            let lineWidth = 1.2 + 0.4 * seed
+            let speed = 30 + 14 * seed
+            let across = lanes == 1 ? 0.5 : (CGFloat(lane) + 0.3 + 0.4 * seed2) / CGFloat(lanes)
+            let lineWidth = 1.2 + 0.45 * seed
             var x = CGFloat((time * speed + seed * spacing).truncatingRemainder(dividingBy: spacing)) - spacing
             while x < length + Self.streakLength {
                 defer { x += spacing }
@@ -410,14 +461,14 @@ private struct FlowRenderer {
                     let edges = band.edges(atX: band.startX + offset)
                     return CGPoint(x: band.startX + offset, y: edges.lowerBound + (edges.upperBound - edges.lowerBound) * across)
                 }
-                let fade = min(1, head / 14, (length - tail) / 14) * band.opacity
+                let fade = min(1, head / 14, (length - tail) / 14) * band.opacity * powerBoost
                 var streak = Path()
                 streak.move(to: point(tail))
                 streak.addLine(to: point(head))
                 context.stroke(
                     streak,
                     with: .linearGradient(
-                        Gradient(colors: [.white.opacity(0), .white.opacity(0.6 * fade)]),
+                        Gradient(colors: [.white.opacity(0), .white.opacity(0.68 * fade)]),
                         startPoint: point(x - Self.streakLength),
                         endPoint: point(x)
                     ),
@@ -438,24 +489,35 @@ private struct FlowRenderer {
         var context = graphics
         context.opacity = node.opacity
         let icon = Text(Image(systemName: FlowStyle.symbol(node.slot.node, isInput: node.slot.isInput)))
-            .font(.system(size: 12, weight: .semibold))
+            .font(.system(size: 11.5, weight: .semibold))
             .foregroundStyle(node.slot.tint)
         // 图标和数值按两者中较宽的一个居中成一组，整组贴边。
         let resolvedIcon = context.resolve(icon)
-        let resolvedValue = context.resolve(valueText(node.value, size: 12.5))
+        let resolvedValue = context.resolve(valueText(node.value, size: 12))
         let unbounded = CGSize(width: CGFloat.infinity, height: .infinity)
         let groupWidth = max(resolvedIcon.measure(in: unbounded).width, resolvedValue.measure(in: unbounded).width)
         let point = node.labelAnchor
         let centerX = node.slot.isInput ? point.x + groupWidth / 2 : point.x - groupWidth / 2
-        context.draw(resolvedIcon, at: CGPoint(x: centerX, y: point.y - 8), anchor: .center)
-        context.draw(resolvedValue, at: CGPoint(x: centerX, y: point.y + 8), anchor: .center)
+        context.draw(resolvedIcon, at: CGPoint(x: centerX, y: point.y - 7), anchor: .center)
+        context.draw(resolvedValue, at: CGPoint(x: centerX, y: point.y + 7), anchor: .center)
     }
 
-    /// MacBook 节点是两侧汇合、分配的点，只画竖条：它的读数总与只有一条流带的那一侧相同，不重复写；笔记本图标只用在系统节点上。
+    /// MacBook 节点是两侧汇合、分配的点，只画胶囊汇合条：它的读数总与只有一条流带的那一侧相同，不重复写；笔记本图标只用在系统节点上。
     private func drawHub(in graphics: inout GraphicsContext) {
         let rect = layout.hubRect
         let bar = RoundedRectangle(cornerRadius: FlowLayout.hubWidth / 2, style: .continuous).path(in: rect)
-        graphics.fill(bar, with: .color(palette.hubBar))
+        graphics.fill(
+            bar,
+            with: .linearGradient(
+                Gradient(colors: [palette.hubFillTop, palette.hubFillBottom]),
+                startPoint: CGPoint(x: rect.midX, y: rect.minY),
+                endPoint: CGPoint(x: rect.midX, y: rect.maxY)
+            )
+        )
+        var rimContext = graphics
+        rimContext.clip(to: bar)
+        rimContext.stroke(bar, with: .color(palette.hubRim), lineWidth: 1.5)
+        graphics.stroke(bar, with: .color(palette.hubOutline), lineWidth: 0.6)
     }
 
     private func valueText(_ value: String, size: CGFloat) -> Text {

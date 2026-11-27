@@ -68,7 +68,7 @@ import Testing
                 let control = ChargeLimitControl(
                     managedTarget: target, snapshot: snapshot, canWrite: true, state: state, isBlocked: false
                 )
-                let shape = RoundedRectangle(cornerRadius: 28, style: .continuous)
+                let shape = RoundedRectangle(cornerRadius: PanelMetrics.cornerRadius, style: .continuous)
                 let panel = PanelContent(
                     reading: .battery(snapshot), health: PanelPreviewData.health, highTemperatureCelsius: 40,
                     chargeLimitControl: control, onChangeChargeLimit: { _ in },

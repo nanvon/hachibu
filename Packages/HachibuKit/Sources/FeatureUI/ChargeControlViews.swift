@@ -189,7 +189,7 @@ struct CalibrationTile: View {
                 buttons
             }
         }
-        .panelTile()
+        .panelTile(emphasis: .secondary)
     }
 
     @ViewBuilder

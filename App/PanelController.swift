@@ -6,11 +6,15 @@ import SwiftUI
 /// 关闭时机：再次点击菜单栏图标、点击面板以外的位置、按 Esc、切换到其他应用。
 @MainActor
 final class PanelController: NSObject {
-    private static let cornerRadius: CGFloat = 28
+    private static let cornerRadius: CGFloat = PanelMetrics.cornerRadius
     private static let gapBelowMenuBar: CGFloat = 6
     private static let screenMargin: CGFloat = 8
     /// 与 FeatureUI 中内容展开、收起的动画（`PanelMotion.duration`）相同。
     private static let resizeDuration: TimeInterval = 0.3
+    private static let showDuration: TimeInterval = 0.18
+    private static let closeDuration: TimeInterval = 0.14
+    private static let showSlideOffset: CGFloat = 6
+    private static let closeSlideOffset: CGFloat = 4
 
     private let panel: StatusPanel
     private let onVisibilityChange: @MainActor (Bool) -> Void
@@ -18,6 +22,8 @@ final class PanelController: NSObject {
     private weak var anchorButton: NSStatusBarButton?
     private var eventMonitors: [Any] = []
     private var applicationActivationObserver: NSObjectProtocol?
+    private var isClosing = false
+    private var visibilityGeneration = 0
 
     /// `onVisibilityChange` 在面板显示、关闭时调用，用于切换采样频率。
     init(
@@ -72,7 +78,7 @@ final class PanelController: NSObject {
     }
 
     func toggle(relativeTo button: NSStatusBarButton) {
-        if panel.isVisible {
+        if panel.isVisible && !isClosing {
             close()
         } else {
             show(relativeTo: button)
@@ -80,10 +86,34 @@ final class PanelController: NSObject {
     }
 
     func close() {
-        guard panel.isVisible else { return }
-        panel.orderOut(nil)
+        guard panel.isVisible, !isClosing else { return }
         removeEventMonitors()
         onVisibilityChange(false)
+
+        if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
+            panel.orderOut(nil)
+            panel.alphaValue = 1
+            return
+        }
+
+        isClosing = true
+        visibilityGeneration += 1
+        let generation = visibilityGeneration
+        let targetOrigin = NSPoint(x: panel.frame.origin.x, y: panel.frame.origin.y + Self.closeSlideOffset)
+
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = Self.closeDuration
+            context.timingFunction = CAMediaTimingFunction(controlPoints: 0.4, 0, 1, 1)
+            panel.animator().alphaValue = 0
+            panel.animator().setFrameOrigin(targetOrigin)
+        } completionHandler: { [weak self] in
+            Task { @MainActor [weak self] in
+                guard let self, self.visibilityGeneration == generation, self.isClosing else { return }
+                self.isClosing = false
+                self.panel.orderOut(nil)
+                self.panel.alphaValue = 1
+            }
+        }
     }
 
     // MARK: - Private
@@ -91,6 +121,10 @@ final class PanelController: NSObject {
     private func show(relativeTo button: NSStatusBarButton) {
         guard let buttonWindow = button.window else { return }
         anchorButton = button
+        visibilityGeneration += 1
+        let generation = visibilityGeneration
+        let wasVisible = panel.isVisible
+        isClosing = false
 
         // 每次打开都按按钮当前所在的屏幕重新计算位置。
         let buttonFrame = buttonWindow.convertToScreen(button.convert(button.bounds, to: nil))
@@ -102,23 +136,49 @@ final class PanelController: NSObject {
             visibleFrame.maxX - size.width - Self.screenMargin
         )
         let y = buttonFrame.minY - size.height - Self.gapBelowMenuBar
-        panel.setFrameOrigin(NSPoint(x: x, y: y))
+        let targetOrigin = NSPoint(x: x, y: y)
 
-        panel.makeKeyAndOrderFront(nil)
-        panel.invalidateShadow()
         installEventMonitors()
         onVisibilityChange(true)
+
+        if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
+            panel.alphaValue = 1
+            panel.setFrameOrigin(targetOrigin)
+            panel.makeKeyAndOrderFront(nil)
+            panel.invalidateShadow()
+            return
+        }
+
+        if !wasVisible {
+            panel.alphaValue = 0
+            panel.setFrameOrigin(NSPoint(x: x, y: y + Self.showSlideOffset))
+        }
+        panel.makeKeyAndOrderFront(nil)
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = Self.showDuration
+            context.timingFunction = CAMediaTimingFunction(controlPoints: 0.23, 1, 0.32, 1)
+            panel.animator().alphaValue = 1
+            panel.animator().setFrameOrigin(targetOrigin)
+        } completionHandler: { [weak self] in
+            Task { @MainActor [weak self] in
+                guard let self, self.visibilityGeneration == generation, !self.isClosing else { return }
+                self.panel.invalidateShadow()
+            }
+        }
     }
 
     /// 按内容的理想尺寸调整面板大小，保持顶边位置不变（面板挂在菜单栏下方）。
-    /// 面板显示时内容增减（例如插拔电、切换充电上限）用动画跟随，见 docs/v1技术设计.md 第 19.7 节。
+    /// 面板显示时内容增减（例如插拔电、切换充电上限）用动画跟随，见 docs/v1技术设计.md 第 19.6 节。
     private func fitToContent(animated: Bool = false) {
-        guard let size = content?.fittingSize, size != panel.frame.size else { return }
+        guard let size = content?.fittingSize else { return }
+        let currentSize = panel.frame.size
+        guard abs(size.width - currentSize.width) > 0.5 || abs(size.height - currentSize.height) > 0.5 else { return }
+
         var frame = panel.frame
         frame.origin.y = frame.maxY - size.height
         frame.size = size
 
-        guard animated, panel.isVisible, !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else {
+        guard animated, panel.isVisible, !isClosing, !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else {
             panel.setFrame(frame, display: panel.isVisible)
             panel.invalidateShadow()
             return
@@ -210,6 +270,7 @@ final class PanelController: NSObject {
         effect.state = .active
         effect.wantsLayer = true
         effect.layer?.cornerRadius = cornerRadius
+        effect.layer?.cornerCurve = .continuous
         effect.layer?.masksToBounds = true
 
         content.translatesAutoresizingMaskIntoConstraints = false

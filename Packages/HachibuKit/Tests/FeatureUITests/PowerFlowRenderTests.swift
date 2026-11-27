@@ -53,7 +53,7 @@ private let outputDirectory = ProcessInfo.processInfo.environment["HACHIBU_RENDE
                             .padding(.vertical, 12)
                             .background(
                                 PanelTileStyle.fill(scheme),
-                                in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+                                in: RoundedRectangle(cornerRadius: PanelTileStyle.cornerRadius, style: .continuous)
                             )
                     }
                 }

@@ -100,7 +100,7 @@ private let outputDirectory = ProcessInfo.processInfo.environment["HACHIBU_RENDE
         } else {
             nil
         }
-        let shape = RoundedRectangle(cornerRadius: 28, style: .continuous)
+        let shape = RoundedRectangle(cornerRadius: PanelMetrics.cornerRadius, style: .continuous)
         return PanelContent(
             reading: sample.reading,
             health: sample.health,
